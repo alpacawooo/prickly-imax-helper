@@ -29,6 +29,11 @@ class PaymentProofTests(unittest.TestCase):
         errors = payment_proof(text, voucher_count=2, selected_voucher_count=2, seats=["H15", "H16"])
         self.assertTrue(any("H16" in error for error in errors))
 
+    def test_short_seat_number_does_not_match_longer_seat_number(self):
+        text = "H10 H2 IMAX 영화관람권 2매 결제 금액 0원"
+        errors = payment_proof(text, voucher_count=2, selected_voucher_count=2, seats=["H1", "H2"])
+        self.assertTrue(any("H1" in error for error in errors))
+
 
 class DuplicateTests(unittest.TestCase):
     MATCH = {"date": "2026-08-13", "time": "24:00"}

@@ -32,6 +32,10 @@ class UnknownAfterSubmit(CheckoutError):
     pass
 
 
+def _contains_seat(text: str, seat: str) -> bool:
+    return re.search(rf"(?<![A-Z0-9]){re.escape(seat)}(?![0-9])", text) is not None
+
+
 def duplicate_status(text: str, match: dict[str, Any], movie: str) -> str:
     normalized = re.sub(r"\s+", " ", text).strip()
     if movie not in normalized:
@@ -55,7 +59,7 @@ def payment_proof(text: str, *, voucher_count: int, selected_voucher_count: int,
     normalized = re.sub(r"\s+", " ", text).strip()
     errors = []
     for seat in seats:
-        if seat not in normalized:
+        if not _contains_seat(normalized, seat):
             errors.append(f"selected seat not proven: {seat}")
     voucher_pattern = rf"IMAX\s*영화관람권\s*(?:x|X|×)?\s*{voucher_count}(?:\b|매)"
     if selected_voucher_count != voucher_count or not re.search(voucher_pattern, normalized):
@@ -84,7 +88,7 @@ def mobile_ticket_proof(text: str, match: dict[str, Any], config: dict[str, Any]
     if not format_proven:
         errors.append("format not proven")
     seats = [str(seat) for seat in match["seats"]]
-    missing_seats = [seat for seat in seats if seat not in normalized]
+    missing_seats = [seat for seat in seats if not _contains_seat(normalized, seat)]
     if missing_seats:
         errors.append("selected seats not proven: " + ", ".join(missing_seats))
     proof = {
