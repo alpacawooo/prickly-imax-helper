@@ -20,6 +20,11 @@ class ReleaseTests(unittest.TestCase):
         self.assertNotIn("--no-editable", installer)
         self.assertIn('"${VENV_DIR}/bin/prickly-imax"', installer)
 
+    def test_install_and_uninstall_restrict_app_home_to_user_home(self):
+        for name in ("Install.command", "Uninstall.command"):
+            script = (ROOT / "scripts" / name).read_text(encoding="utf-8")
+            self.assertIn('[[ ${APP_HOME} != "${USER_HOME}/"* ]]', script)
+
     def test_fingerprint_keeps_source_private(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

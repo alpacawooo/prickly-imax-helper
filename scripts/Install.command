@@ -3,7 +3,9 @@ set -euo pipefail
 
 SCRIPT_DIR=${0:A:h}
 REPO_DIR=${SCRIPT_DIR:h}
-APP_HOME=${PRICKLY_IMAX_HOME:-${HOME}/.prickly-imax-helper}
+USER_HOME=${HOME:A}
+APP_HOME=${PRICKLY_IMAX_HOME:-${USER_HOME}/.prickly-imax-helper}
+APP_HOME=${APP_HOME:A}
 APP_VERSION=0.1.0
 APP_DIR=${APP_HOME}/app/${APP_VERSION}
 VENV_DIR=${APP_HOME}/venv
@@ -15,6 +17,10 @@ MANAGED_PYTHON_VERSION=3.12.12
 
 if [[ $(uname -s) != Darwin ]]; then
   print -u2 "이 설치기는 macOS 전용입니다."
+  exit 1
+fi
+if [[ ${APP_HOME} != "${USER_HOME}/"* ]]; then
+  print -u2 "설치 경로는 현재 사용자 홈의 하위 폴더여야 합니다: ${APP_HOME}"
   exit 1
 fi
 if [[ ! -x "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" ]]; then
