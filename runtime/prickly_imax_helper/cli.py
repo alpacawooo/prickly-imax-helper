@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .config import ConfigError, load_config
 from .paths import RuntimePaths
+from .redaction import redact
 from .setup_server import serve_setup
 from .state import Status, read_state, transition
 
@@ -51,7 +52,7 @@ def main(argv: list[str] | None = None) -> int:
 
         return run(paths, max_cycles=1, allow_checkout=False)
     if args.command == "status":
-        print(json.dumps(read_state(paths.heartbeat), ensure_ascii=False, indent=2))
+        print(json.dumps(redact(read_state(paths.heartbeat)), ensure_ascii=False, indent=2))
         return 0
     if args.command == "diagnose":
         events = []
@@ -75,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
             "browser_state_present": (paths.state_dir / "browser.json").is_file(),
             "recent_events": events,
         }
-        print(json.dumps(output, ensure_ascii=False, indent=2))
+        print(json.dumps(redact(output), ensure_ascii=False, indent=2))
         return 0
     if args.command == "validate":
         try:
