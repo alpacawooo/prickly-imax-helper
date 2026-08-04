@@ -13,7 +13,7 @@ The repository contains no CGV credentials, customer identifiers, cookies, vouch
 5. The LaunchAgent starts the resident monitor. Check it with `~/.local/bin/prickly-imax status`.
 
 No password or payment credential is entered into Prickly AI, Codex, Notion, GitHub, or the helper.
-Python is not a user prerequisite; the installer bootstraps a checksum-verified, pinned `uv` binary and managed Python when no suitable local interpreter exists.
+Python is not a user prerequisite; the installer bootstraps a checksum-verified, pinned `uv` binary and managed Python. It installs only the locked runtime dependencies and generates a local launcher without resolving a separate project build backend.
 
 ## Repository layout
 

@@ -14,6 +14,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_installer_avoids_unlocked_project_build_backend(self):
+        installer = (ROOT / "scripts/Install.command").read_text(encoding="utf-8")
+        self.assertIn("--no-install-project", installer)
+        self.assertNotIn("--no-editable", installer)
+        self.assertIn('"${VENV_DIR}/bin/prickly-imax"', installer)
+
     def test_fingerprint_keeps_source_private(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

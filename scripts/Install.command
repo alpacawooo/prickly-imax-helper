@@ -59,20 +59,39 @@ fi
 export UV_PYTHON_INSTALL_DIR=${APP_HOME}/python
 export UV_CACHE_DIR=${APP_HOME}/cache/uv
 export UV_PROJECT_ENVIRONMENT=${VENV_DIR}
-"${UV_BIN}" sync --project "${APP_DIR}" --locked --no-dev --no-editable \
+"${UV_BIN}" sync --project "${APP_DIR}" --locked --no-dev --no-install-project \
   --python "${MANAGED_PYTHON_VERSION}" --managed-python --quiet
 
-"${VENV_DIR}/bin/python" - "${PLIST_PATH}" "${VENV_DIR}/bin/python" "${APP_HOME}" <<'PY'
+"${VENV_DIR}/bin/python" - "${VENV_DIR}/bin/prickly-imax" "${APP_DIR}/runtime" <<'PY'
+import os
+import sys
+from pathlib import Path
+
+target = Path(sys.argv[1])
+runtime = sys.argv[2]
+python = sys.executable
+target.write_text(
+    f"#!{python}\n"
+    "import sys\n"
+    f"sys.path.insert(0, {runtime!r})\n"
+    "from prickly_imax_helper.cli import main\n"
+    "raise SystemExit(main())\n",
+    encoding="utf-8",
+)
+os.chmod(target, 0o755)
+PY
+
+"${VENV_DIR}/bin/python" - "${PLIST_PATH}" "${VENV_DIR}/bin/prickly-imax" "${APP_HOME}" <<'PY'
 import plistlib
 import sys
 from pathlib import Path
 
 target = Path(sys.argv[1])
-python = sys.argv[2]
+launcher = sys.argv[2]
 home = sys.argv[3]
 payload = {
     "Label": "ai.prickly.imax-helper",
-    "ProgramArguments": [python, "-m", "prickly_imax_helper.monitor"],
+    "ProgramArguments": [launcher, "--home", home, "run"],
     "EnvironmentVariables": {"PRICKLY_IMAX_HOME": home},
     "RunAtLoad": True,
     "KeepAlive": {"SuccessfulExit": False},

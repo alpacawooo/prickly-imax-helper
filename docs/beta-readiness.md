@@ -5,7 +5,7 @@ This checklist is the release gate. A checked implementation item is not equival
 ## Implemented and locally verified
 
 - [x] Standalone Python package installs in a clean virtual environment.
-- [x] A Python-free clean install bootstraps checksum-pinned `uv 0.11.15`, managed Python 3.12.12, and the locked dependency graph.
+- [x] A Python-free clean install bootstraps checksum-pinned `uv 0.11.15`, managed Python 3.12.12, and only the locked runtime dependency graph; no project build backend is resolved during installation.
 - [x] Local setup server binds only to `127.0.0.1` and requires an unguessable request token.
 - [x] Configuration is not saved until the dedicated Chrome session is logged in.
 - [x] Setup records automatic-submission and one-device-per-public-IP consent.
