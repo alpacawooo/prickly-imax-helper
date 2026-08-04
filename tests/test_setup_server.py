@@ -31,6 +31,10 @@ class SetupServerTests(unittest.TestCase):
                 else:
                     self.fail("setup page must reject requests without its token")
                 with urllib.request.urlopen(url, timeout=2) as response:
+                    self.assertEqual(response.headers["Cache-Control"], "no-store")
+                    self.assertEqual(response.headers["Referrer-Policy"], "no-referrer")
+                    self.assertEqual(response.headers["Cross-Origin-Resource-Policy"], "same-origin")
+                    self.assertIn("frame-ancestors 'none'", response.headers["Content-Security-Policy"])
                     self.assertIn("Prickly IMAX Helper", response.read().decode("utf-8"))
                 token = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["token"][0]
                 payload = urllib.parse.urlencode(
