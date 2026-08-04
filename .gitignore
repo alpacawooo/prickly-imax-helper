@@ -1,0 +1,15 @@
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+state/
+logs/
+browser-profile/
+config.local.json
+dist/
+build/
+*.egg-info/
+*.token
+*.cookie
+*.secret

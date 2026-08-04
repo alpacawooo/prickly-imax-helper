@@ -1,0 +1,20 @@
+{
+  "name": "prickly-ai",
+  "interface": {
+    "displayName": "Prickly Ai"
+  },
+  "plugins": [
+    {
+      "name": "prickly-imax-helper",
+      "source": {
+        "source": "local",
+        "path": "./plugins/prickly-imax-helper"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

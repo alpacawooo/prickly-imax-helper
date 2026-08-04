@@ -1,0 +1,13 @@
+{
+  "approved_at": "YYYY-MM-DD",
+  "scope": [
+    "automated_availability_query",
+    "automated_seat_selection",
+    "voucher_submission",
+    "private_beta_distribution"
+  ],
+  "request_limit_scope": "public_ip",
+  "max_requests_per_ip_per_second": 1.0,
+  "authorization_reference": "OPTIONAL_PUBLIC_APPROVAL_OR_CONTRACT_REFERENCE",
+  "document_sha256": "REPLACE_WITH_64_CHARACTER_SHA256_OF_PRIVATE_SOURCE_DOCUMENT"
+}

@@ -1,0 +1,21 @@
+# Runtime Contract
+
+The public runtime must be configuration-driven and contain no developer-specific absolute paths, customer numbers, cookies, tokens, or payment data.
+
+State machine:
+
+`unconfigured -> login_required -> armed -> staging -> submitting -> completed`
+
+Failure states:
+
+`recovering`, `rate_limited`, `blocked_duplicate`, `blocked_payment`, `unknown_after_submit`, `fatal`.
+
+Runtime files live below `~/.prickly-imax-helper/`:
+
+- `config.json`: non-secret booking policy
+- `browser-profile/`: dedicated Chrome state; never committed
+- `state/heartbeat.json`: health and scan telemetry
+- `state/checkout.json`: current transaction state
+- `logs/`: redacted operational logs
+
+The monitor must keep the booking page pre-positioned, use a bounded request budget, fetch seat maps only after relevant changes or scheduled verification, lock the browser through submission, revalidate the pair and duplicate guard, and stop after one completed or uncertain transaction.

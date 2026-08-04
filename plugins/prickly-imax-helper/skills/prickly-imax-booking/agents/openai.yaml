@@ -1,0 +1,6 @@
+interface:
+  display_name: "Prickly IMAX Booking"
+  short_description: "CGV IMAX 취소표 감시와 안전한 자동 예매"
+  default_prompt: "Use $prickly-imax-booking to install the local helper and configure my CGV IMAX booking rules."
+policy:
+  allow_implicit_invocation: true
