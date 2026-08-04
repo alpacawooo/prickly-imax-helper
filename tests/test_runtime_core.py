@@ -38,7 +38,7 @@ VALID_CONFIG = {
         "automatic_submission": True,
     },
     "request_policy": {"minimum_interval_seconds": 1.0},
-    "notification": {"email": "tester@example.com"},
+    "notification": {"email": "tester@example.com", "method": "apple_mail"},
     "consent": {
         "automatic_submission": True,
         "one_active_device_per_public_ip": True,

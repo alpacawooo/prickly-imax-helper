@@ -1,19 +1,21 @@
 # Prickly IMAX Helper
 
-Prickly IMAX Helper is a macOS-local CGV IMAX availability monitor and fail-closed voucher booking runtime. The standalone runtime is the product; the Codex plugin is an optional conversational setup and diagnostics layer.
+Prickly IMAX Helper is a local-first CGV IMAX availability monitor and fail-closed voucher booking runtime for macOS and Windows 10/11. The standalone runtime is the product; the Codex plugin is an optional conversational setup and diagnostics layer.
 
 The repository contains no CGV credentials, customer identifiers, cookies, voucher numbers, email credentials, or developer-specific paths.
 
 ## Private beta flow
 
 1. Accept the private GitHub repository invitation and download the pinned release plus its SHA-256 file.
-2. Verify the checksum, extract the release, and open `scripts/Install.command`.
+2. Verify the checksum, extract the release, and run `scripts/Install.command` on macOS or `scripts/Install.ps1` on Windows.
 3. In the localhost-only setup page, open the dedicated Chrome profile and log in to CGV personally.
 4. Confirm the Odyssey preset, notification email, and one-time automatic voucher-submission consent.
-5. The LaunchAgent starts the resident monitor. Check it with `~/.local/bin/prickly-imax status`.
+5. The macOS LaunchAgent or Windows Scheduled Task starts the resident monitor. Check it with the OS-specific launcher described in the onboarding guide.
 
 No password or payment credential is entered into Prickly AI, Codex, Notion, GitHub, or the helper.
 Python is not a user prerequisite; the installer bootstraps a checksum-verified, pinned `uv` binary and managed Python. It installs only the locked runtime dependencies and generates a local launcher without resolving a separate project build backend.
+
+Email notifications use the account already signed in to Apple Mail on macOS or classic Outlook desktop on Windows. The helper never asks for an email password. New Outlook for Windows does not expose the classic Outlook COM interface and is not yet supported for email delivery; Windows desktop notifications still work independently.
 
 ## Repository layout
 

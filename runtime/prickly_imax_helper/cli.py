@@ -3,13 +3,16 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import subprocess
+import platform
 from pathlib import Path
 
 from .config import ConfigError, load_config
+from .browser import chrome_executable
+from .notify import notification_method, powershell_executable
 from .paths import RuntimePaths
 from .redaction import redact
 from .setup_server import serve_setup
+from .service import start_service
 from .state import Status, read_state, transition
 
 
@@ -30,12 +33,18 @@ def main(argv: list[str] | None = None) -> int:
     paths = RuntimePaths(args.home.expanduser() if args.home else RuntimePaths.default().root)
 
     if args.command == "doctor":
+        system = platform.system()
         checks = {
             "configured": {"ok": paths.config.is_file(), "required": False},
             "state_directory": {"ok": paths.state_dir.is_dir(), "required": False},
             "browser_profile": {"ok": paths.browser_profile.is_dir(), "required": False},
-            "chrome": {"ok": Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome").is_file(), "required": True},
-            "osascript": {"ok": Path("/usr/bin/osascript").is_file(), "required": True},
+            "operating_system": {"ok": system in {"Darwin", "Windows"}, "value": system, "required": True},
+            "chrome": {"ok": chrome_executable() is not None, "required": True},
+            "notification_backend": {
+                "ok": Path("/usr/bin/osascript").is_file() if system == "Darwin" else powershell_executable() is not None,
+                "method": notification_method(),
+                "required": True,
+            },
         }
         required_ok = all(value["ok"] for value in checks.values() if value["required"])
         print(json.dumps({"ok": required_ok, "checks": checks}, ensure_ascii=False, indent=2))
@@ -113,11 +122,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if current != Status.LOGIN_REQUIRED.value:
             transition(paths.heartbeat, Status.LOGIN_REQUIRED, detail="start requested by user")
-        process = subprocess.run(
-            ["/bin/launchctl", "kickstart", "-k", f"gui/{os.getuid()}/ai.prickly.imax-helper"],
-            text=True,
-            capture_output=True,
-        )
+        process = start_service()
         print(json.dumps({"ok": process.returncode == 0, "status": "starting", "detail": (process.stderr or "").strip()}, ensure_ascii=False))
         return process.returncode
     return 2

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import fcntl
-import os
 import time
 from typing import Any
 
@@ -10,6 +8,7 @@ from .cgv import CgvSession, LoginRequired, RateLimited
 from .checkout import CheckoutError, CheckoutFlow, DuplicateBlocked, PaymentBlocked, SeatVanished, UnknownAfterSubmit
 from .config import load_config
 from .eventlog import write_event
+from .locks import LockUnavailable, locked_file
 from .notify import send_email, show_notification
 from .paths import RuntimePaths
 from .scheduler import FairScanState, changed_seat_targets, eligible_shows, match_for
@@ -25,7 +24,10 @@ class AlreadyRunning(RuntimeError):
 
 
 def _notify(paths: RuntimePaths, config: dict[str, Any], subject: str, body: str) -> None:
-    show_notification(subject, body)
+    try:
+        show_notification(subject, body)
+    except Exception as exc:
+        write_event(paths.logs, "desktop_notification_failed", error=str(exc))
     try:
         send_email(config["notification"]["email"], subject, body)
     except Exception as exc:
@@ -82,12 +84,12 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
     paths.prepare()
     config = load_config(paths.config)
     lock_path = paths.state_dir / "monitor.lock"
-    with lock_path.open("a+", encoding="utf-8") as daemon_lock:
-        os.chmod(lock_path, 0o600)
-        try:
-            fcntl.flock(daemon_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError as exc:
-            raise AlreadyRunning("monitor is already running") from exc
+    try:
+        daemon_lock = locked_file(lock_path, blocking=False)
+        daemon_lock.__enter__()
+    except LockUnavailable as exc:
+        raise AlreadyRunning("monitor is already running") from exc
+    try:
 
         current = read_state(paths.heartbeat).get("status")
         if paths.stop_requested.exists():
@@ -191,6 +193,8 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
                     if max_cycles is not None:
                         return 1
                     time.sleep(min(60.0, 2.0**min(consecutive_errors, 5)))
+    finally:
+        daemon_lock.__exit__(None, None, None)
 
 
 def main() -> int:

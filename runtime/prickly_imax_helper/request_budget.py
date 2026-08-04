@@ -8,12 +8,13 @@ rate accidentally.
 
 from __future__ import annotations
 
-import fcntl
 import json
 import os
 import time
 from pathlib import Path
 from typing import Callable
+
+from .locks import locked_file
 
 
 class RequestBudget:
@@ -63,9 +64,7 @@ class RequestBudget:
         """
 
         self._prepare()
-        with self.lock_path.open("a+", encoding="utf-8") as lock:
-            os.chmod(self.lock_path, 0o600)
-            fcntl.flock(lock, fcntl.LOCK_EX)
+        with locked_file(self.lock_path):
             state = self._read()
             now = self.clock()
             target = max(state["next_allowed_at"], state["cooldown_until"])
@@ -86,9 +85,7 @@ class RequestBudget:
         if seconds <= 0:
             raise ValueError("cooldown must be positive")
         self._prepare()
-        with self.lock_path.open("a+", encoding="utf-8") as lock:
-            os.chmod(self.lock_path, 0o600)
-            fcntl.flock(lock, fcntl.LOCK_EX)
+        with locked_file(self.lock_path):
             state = self._read()
             cooldown_until = self.clock() + seconds
             state["cooldown_until"] = max(state["cooldown_until"], cooldown_until)

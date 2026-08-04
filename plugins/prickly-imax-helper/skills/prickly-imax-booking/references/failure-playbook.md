@@ -2,7 +2,7 @@
 
 ## Browser not ready
 
-Check Chrome, the dedicated profile, CDP port ownership, login state, managed Python environment, and Playwright package. LaunchAgents use installer-resolved absolute paths and must not depend on an interactive shell PATH.
+Check Chrome, the dedicated profile, CDP port ownership, login state, managed Python environment, and Playwright package. LaunchAgents and Windows Scheduled Tasks use installer-resolved absolute paths and must not depend on an interactive shell PATH.
 
 ## Theater modal timeout
 

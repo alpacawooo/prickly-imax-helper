@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import platform
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -12,7 +13,12 @@ class RuntimePaths:
     @classmethod
     def default(cls) -> "RuntimePaths":
         configured = os.environ.get("PRICKLY_IMAX_HOME")
-        return cls(Path(configured).expanduser() if configured else Path.home() / ".prickly-imax-helper")
+        if configured:
+            return cls(Path(configured).expanduser())
+        if platform.system() == "Windows":
+            local = os.environ.get("LOCALAPPDATA")
+            return cls(Path(local) / "PricklyIMAXHelper" if local else Path.home() / "AppData" / "Local" / "PricklyIMAXHelper")
+        return cls(Path.home() / ".prickly-imax-helper")
 
     @property
     def config(self) -> Path:

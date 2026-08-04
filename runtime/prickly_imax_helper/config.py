@@ -62,6 +62,9 @@ def validate_config(value: dict[str, Any]) -> list[str]:
     if consent.get("one_active_device_per_public_ip") is not True:
         errors.append("consent.one_active_device_per_public_ip must be true")
     notification = value.get("notification", {})
+    method = notification.get("method")
+    if method not in {"apple_mail", "outlook_desktop"}:
+        errors.append("notification.method must be apple_mail or outlook_desktop")
     email = notification.get("email", "")
     if not isinstance(email, str) or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
         errors.append("notification.email must be a valid email address")

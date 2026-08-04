@@ -4,16 +4,23 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import shutil
+import platform
 from pathlib import Path
 
 from policy import load_json, validate
 
 
+def default_home() -> Path:
+    if platform.system() == "Windows":
+        local = os.environ.get("LOCALAPPDATA")
+        return Path(local) / "PricklyIMAXHelper" if local else Path.home() / "AppData" / "Local" / "PricklyIMAXHelper"
+    return Path.home() / ".prickly-imax-helper"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
-    parser.add_argument("--home", default=str(Path.home() / ".prickly-imax-helper"))
+    parser.add_argument("--home", default=str(default_home()))
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
 

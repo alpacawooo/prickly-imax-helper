@@ -5,7 +5,7 @@ import argparse
 import json
 import math
 import re
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 
 

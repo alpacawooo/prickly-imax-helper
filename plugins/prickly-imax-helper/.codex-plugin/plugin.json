@@ -1,6 +1,6 @@
 {
   "name": "prickly-imax-helper",
-  "version": "0.1.0+codex.20260804190022",
+  "version": "0.1.0+codex.20260804192200",
   "description": "Set up and operate a local CGV IMAX availability monitor and authorized booking assistant.",
   "author": {
     "name": "Prickly AI"

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import platform
 import shutil
 import subprocess
@@ -22,13 +23,30 @@ def command_version(command: str, flag: str = "--version") -> dict:
 
 
 def main() -> int:
-    chrome = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+    system = platform.system()
+    if system == "Darwin":
+        chrome_candidates = [Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")]
+        service = shutil.which("launchctl")
+        notifier = Path("/usr/bin/osascript") if Path("/usr/bin/osascript").is_file() else None
+    elif system == "Windows":
+        chrome_candidates = []
+        for variable in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"):
+            base = os.environ.get(variable)
+            if base:
+                chrome_candidates.append(Path(base) / "Google" / "Chrome" / "Application" / "chrome.exe")
+        service = shutil.which("schtasks.exe")
+        notifier = shutil.which("powershell.exe") or shutil.which("powershell")
+    else:
+        chrome_candidates = []
+        service = None
+        notifier = None
+    chrome = next((candidate for candidate in chrome_candidates if candidate.is_file()), None)
     checks = {
-        "macos": {"ok": platform.system() == "Darwin", "value": platform.platform()},
+        "operating_system": {"ok": system in {"Darwin", "Windows"}, "value": platform.platform()},
         "python": {"ok": sys.version_info >= (3, 10), "value": sys.version.split()[0]},
-        "chrome": {"ok": chrome.is_file(), "path": str(chrome)},
-        "launchctl": {"ok": shutil.which("launchctl") is not None, "path": shutil.which("launchctl")},
-        "osascript": {"ok": Path("/usr/bin/osascript").is_file(), "path": "/usr/bin/osascript"},
+        "chrome": {"ok": chrome is not None, "path": str(chrome) if chrome else None},
+        "resident_service": {"ok": service is not None, "path": service},
+        "notification_backend": {"ok": notifier is not None, "path": str(notifier) if notifier else None},
     }
     required_ok = all(item["ok"] for item in checks.values())
     print(json.dumps({"status": "ok" if required_ok else "needs_setup", "checks": checks}, ensure_ascii=False, indent=2))

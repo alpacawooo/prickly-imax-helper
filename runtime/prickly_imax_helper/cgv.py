@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import contextlib
-import fcntl
 import json
 from dataclasses import dataclass
 from typing import Any, Iterator
 
 from .browser import CGV_BOOKING_URL, browser_info
+from .locks import locked_file
 from .paths import RuntimePaths
 from .request_budget import RequestBudget
 
@@ -44,8 +44,7 @@ class CgvSession:
     def locked(self) -> Iterator["CgvSession"]:
         self.paths.prepare()
         lock_path = self.paths.state_dir / "browser.lock"
-        with lock_path.open("a+", encoding="utf-8") as lock:
-            fcntl.flock(lock, fcntl.LOCK_EX)
+        with locked_file(lock_path):
             try:
                 self.connect()
                 yield self

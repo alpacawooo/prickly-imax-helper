@@ -7,6 +7,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 
@@ -24,6 +25,19 @@ class ReleaseTests(unittest.TestCase):
         for name in ("Install.command", "Uninstall.command"):
             script = (ROOT / "scripts" / name).read_text(encoding="utf-8")
             self.assertIn('[[ ${APP_HOME} != "${USER_HOME}/"* ]]', script)
+
+    def test_windows_installer_is_pinned_and_user_scoped(self):
+        installer = (ROOT / "scripts/Install.ps1").read_text(encoding="utf-8")
+        uninstaller = (ROOT / "scripts/Uninstall.ps1").read_text(encoding="utf-8")
+        self.assertIn('$UvVersion = "0.11.15"', installer)
+        self.assertIn('$ManagedPythonVersion = "3.12.12"', installer)
+        self.assertIn("--no-install-project", installer)
+        self.assertIn("Register-ScheduledTask", installer)
+        self.assertIn("Stop-ScheduledTask", installer)
+        self.assertIn("-RunLevel Limited", installer)
+        self.assertIn("$ExpectedPrefix", installer)
+        self.assertIn("$ExpectedPrefix", uninstaller)
+        self.assertNotIn("password", installer.lower())
 
     def test_fingerprint_keeps_source_private(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -93,6 +107,15 @@ class ReleaseTests(unittest.TestCase):
                 self.assertTrue(any(name.endswith("uv.lock") for name in names))
                 self.assertTrue(any(name.endswith("AUTHORIZATION.json") for name in names))
                 self.assertFalse(any(".egg-info" in name or "__pycache__" in name for name in names))
+            windows = next(item for item in result["artifacts"] if item["operating_system"] == "windows")
+            windows_archive = Path(windows["archive"])
+            self.assertEqual(hashlib.sha256(windows_archive.read_bytes()).hexdigest(), windows["sha256"])
+            with zipfile.ZipFile(windows_archive) as bundle:
+                names = bundle.namelist()
+                self.assertTrue(any(name.endswith("scripts/Install.ps1") for name in names))
+                self.assertTrue(any(name.endswith("scripts/Update.ps1") for name in names))
+                self.assertTrue(any(name.endswith("scripts/Uninstall.ps1") for name in names))
+                self.assertTrue(any(name.endswith("AUTHORIZATION.json") for name in names))
 
     def test_release_rejects_rate_above_approval(self):
         with tempfile.TemporaryDirectory() as temp:

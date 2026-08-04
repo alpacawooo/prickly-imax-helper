@@ -20,7 +20,7 @@ HTML = """<!doctype html><meta charset=utf-8>
 <button id=submit onclick=\"window.clicked=(window.clicked||0)+1\">0원 결제하기</button>"""
 
 
-@unittest.skipIf(sync_playwright is None or not CHROME.is_file(), "Playwright and system Chrome are required")
+@unittest.skipIf(sync_playwright is None or CHROME is None or not CHROME.is_file(), "Playwright and system Chrome are required")
 class CheckoutBrowserTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

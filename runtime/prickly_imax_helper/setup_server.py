@@ -11,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from .browser import BrowserError, launch_browser
 from .cgv import CgvError, CgvSession
 from .config import ConfigError, write_config
-from .notify import send_email
+from .notify import notification_label, notification_method, send_email
 from .paths import RuntimePaths
 from .presets import odyssey
 from .state import Status, transition
@@ -23,7 +23,7 @@ PAGE = """<!doctype html><html lang=\"ko\"><meta charset=\"utf-8\"><meta name=\"
 <form method=post action=\"/action\"><input type=hidden name=token value=\"__TOKEN__\">
 <fieldset><legend>1. CGV 로그인</legend><button class=secondary name=action value=login>전용 Chrome 열기</button><p>__MESSAGE__</p></fieldset>
 <fieldset><legend>2. 오디세이 기본 조건</legend><p>용산아이파크몰 IMAX · 2명 연속 · D~J열 · 양끝 20% 제외 · 중앙 우선</p><p>평일 19:00 이후 · 토요일 전체 · 일요일 22:00 이전 · 새로 열리는 날짜 자동 포함</p>
-<label>결과를 받을 이메일<input required type=email name=email value=\"__EMAIL__\" autocomplete=email></label><p>설정 저장 시 Apple Mail로 테스트 메일을 한 번 보냅니다.</p></fieldset>
+<label>결과를 받을 이메일<input required type=email name=email value=\"__EMAIL__\" autocomplete=email></label><p>설정 저장 시 __NOTIFIER__로 테스트 메일을 한 번 보냅니다.</p></fieldset>
 <fieldset><legend>3. 자동 예매 사전동의</legend><div class=warning>등록된 IMAX 관람권 정확히 2매로 결제 잔액이 0원일 때만 조건에 맞는 좌석을 한 번 자동 예매합니다. 기존 예매 취소·변경과 중복 제출은 하지 않습니다.</div>
 <label><input style=\"width:auto\" required type=checkbox name=consent value=yes> 위 조건의 자동 좌석 선택과 1회 최종 제출에 동의합니다.</label>
 <label><input style=\"width:auto\" required type=checkbox name=network value=yes> 같은 공인 IP를 사용하는 집·회사 네트워크에서 이 Helper를 한 대만 실행합니다.</label></fieldset>
@@ -31,7 +31,12 @@ PAGE = """<!doctype html><html lang=\"ko\"><meta charset=\"utf-8\"><meta name=\"
 
 
 def _render_page(token: str, message: str, email: str) -> str:
-    return PAGE.replace("__TOKEN__", html.escape(token)).replace("__MESSAGE__", html.escape(message)).replace("__EMAIL__", html.escape(email))
+    return (
+        PAGE.replace("__TOKEN__", html.escape(token))
+        .replace("__MESSAGE__", html.escape(message))
+        .replace("__EMAIL__", html.escape(email))
+        .replace("__NOTIFIER__", html.escape(notification_label()))
+    )
 
 
 def login_verified(paths: RuntimePaths) -> bool:
@@ -101,13 +106,14 @@ def run_setup(paths: RuntimePaths, *, open_page: bool = True) -> tuple[Threading
                 self._send(400, _render_page(token, message, email))
                 return
             try:
-                send_email(email, "Prickly IMAX Helper 설정 확인", "Apple Mail 알림이 정상적으로 연결됐습니다.")
+                label = notification_label()
+                send_email(email, "Prickly IMAX Helper 설정 확인", f"{label} 알림이 정상적으로 연결됐습니다.")
             except Exception as exc:
-                message = f"Apple Mail 테스트 발송에 실패했습니다: {exc}"
+                message = f"{notification_label()} 테스트 발송에 실패했습니다: {exc}"
                 self._send(400, _render_page(token, message, email))
                 return
             config = odyssey()
-            config["notification"] = {"email": email, "method": "apple_mail"}
+            config["notification"] = {"email": email, "method": notification_method()}
             config["consent"] = {
                 "automatic_submission": True,
                 "one_active_device_per_public_ip": True,
@@ -136,7 +142,7 @@ def run_setup(paths: RuntimePaths, *, open_page: bool = True) -> tuple[Threading
 
 def serve_setup(paths: RuntimePaths) -> None:
     server, url = run_setup(paths)
-    print(f"설정 페이지가 열리지 않으면 이 주소를 같은 Mac의 브라우저에서 여세요:\n{url}", flush=True)
+    print(f"설정 페이지가 열리지 않으면 이 주소를 같은 PC의 브라우저에서 여세요:\n{url}", flush=True)
     try:
         server.serve_forever()
     finally:

@@ -1,21 +1,21 @@
 ---
 name: prickly-imax-booking
-description: Set up, configure, diagnose, start, stop, and inspect the Prickly local CGV IMAX seat monitor and authorized booking assistant on macOS. Use when a user asks to install the helper, open the CGV login window, configure movie/theater/time/seat rules, monitor cancellations, diagnose browser or rate-limit failures, or check booking results.
+description: Set up, configure, diagnose, start, stop, and inspect the Prickly local CGV IMAX seat monitor and authorized booking assistant on macOS or Windows 10/11. Use when a user asks to install the helper, open the CGV login window, configure movie/theater/time/seat rules, monitor cancellations, diagnose browser or rate-limit failures, or check booking results.
 ---
 
 # Prickly IMAX Booking
 
 Operate the installed standalone runtime. Keep CGV login, customer identifiers,
-vouchers, notification address, and payment state on the user's Mac.
+vouchers, notification address, and payment state on the user's PC.
 
 ## Workflow
 
-1. Find the installed CLI at `~/.local/bin/prickly-imax`. If absent, direct the user to the version-pinned Notion/GitHub release installer; do not invent an unverified download URL.
-2. Run `~/.local/bin/prickly-imax doctor` and fix required checks.
-3. Run `~/.local/bin/prickly-imax setup` when configuration is absent. The user logs in personally in the dedicated Chrome window and records consent in the localhost setup page.
+1. Find the installed CLI at `~/.local/bin/prickly-imax` on macOS or `%LOCALAPPDATA%\PricklyIMAXHelper\bin\prickly-imax.cmd` on Windows. If absent, direct the user to the version-pinned Notion/GitHub release installer; do not invent an unverified download URL.
+2. Run the OS-specific CLI with `doctor` and fix required checks.
+3. Run the OS-specific CLI with `setup` when configuration is absent. The user logs in personally in the dedicated Chrome window and records consent in the localhost setup page.
 4. Never ask for or store a CGV password, voucher number, card number, or email password.
-5. Start or inspect the LaunchAgent only after the configuration validates.
-6. Report status from `~/.local/bin/prickly-imax status` and redacted local logs, not assumptions.
+5. Start or inspect the macOS LaunchAgent or Windows Scheduled Task only after the configuration validates.
+6. Report status from the OS-specific CLI and redacted local logs, not assumptions.
 
 ## Invariants
 
@@ -36,6 +36,8 @@ vouchers, notification address, and payment state on the user's Mac.
 - Configure: `~/.local/bin/prickly-imax setup`
 - Inspect: `~/.local/bin/prickly-imax status`
 - Stop: `~/.local/bin/prickly-imax stop`
+
+On Windows, replace `~/.local/bin/prickly-imax` with `%LOCALAPPDATA%\PricklyIMAXHelper\bin\prickly-imax.cmd`.
 
 ## References
 

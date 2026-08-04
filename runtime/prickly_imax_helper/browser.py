@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import platform
+import shutil
 import socket
 import subprocess
 import time
@@ -14,12 +16,30 @@ from typing import Any
 from .paths import RuntimePaths
 
 
-CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 CGV_BOOKING_URL = "https://cgv.co.kr/cnm/movieBook"
 
 
 class BrowserError(RuntimeError):
     pass
+
+
+def chrome_executable() -> Path | None:
+    override = os.environ.get("PRICKLY_CHROME")
+    candidates: list[Path] = [Path(override).expanduser()] if override else []
+    system = platform.system()
+    if system == "Darwin":
+        candidates.append(Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"))
+    elif system == "Windows":
+        for variable in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"):
+            base = os.environ.get(variable)
+            if base:
+                candidates.append(Path(base) / "Google" / "Chrome" / "Application" / "chrome.exe")
+    else:
+        candidates.extend(Path(path) for path in ("/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/usr/bin/chromium"))
+    return next((candidate for candidate in candidates if candidate.is_file()), None)
+
+
+CHROME = chrome_executable()
 
 
 def _free_port() -> int:
@@ -39,10 +59,31 @@ def browser_info(paths: RuntimePaths) -> dict[str, Any]:
         value = json.loads(info_path.read_text(encoding="utf-8"))
         port = int(value["port"])
         pid = int(value["pid"])
-        process = subprocess.run(["/bin/ps", "-p", str(pid), "-o", "command="], text=True, capture_output=True, timeout=2)
-        expected_profile = f"--user-data-dir={paths.browser_profile}"
-        if process.returncode != 0 or expected_profile not in process.stdout:
-            return {}
+        if platform.system() == "Windows":
+            powershell = shutil.which("powershell.exe") or shutil.which("powershell")
+            if not powershell:
+                return {}
+            process = subprocess.run(
+                [
+                    powershell,
+                    "-NoLogo",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-Command",
+                    f"(Get-CimInstance Win32_Process -Filter 'ProcessId = {pid}').CommandLine",
+                ],
+                text=True,
+                capture_output=True,
+                timeout=3,
+            )
+            expected_profile = f"--user-data-dir={paths.browser_profile}"
+            if process.returncode != 0 or expected_profile not in process.stdout:
+                return {}
+        else:
+            process = subprocess.run(["/bin/ps", "-p", str(pid), "-o", "command="], text=True, capture_output=True, timeout=2)
+            expected_profile = f"--user-data-dir={paths.browser_profile}"
+            if process.returncode != 0 or expected_profile not in process.stdout:
+                return {}
         _json_url(f"http://127.0.0.1:{port}/json/version")
         return value
     except (OSError, ValueError, KeyError, json.JSONDecodeError, subprocess.SubprocessError, urllib.error.URLError):
@@ -50,8 +91,9 @@ def browser_info(paths: RuntimePaths) -> dict[str, Any]:
 
 
 def launch_browser(paths: RuntimePaths, url: str = CGV_BOOKING_URL, *, headless: bool = False) -> dict[str, Any]:
-    if not CHROME.is_file():
-        raise BrowserError("Google Chrome is not installed in /Applications")
+    chrome = chrome_executable()
+    if chrome is None:
+        raise BrowserError("Google Chrome is not installed in a supported location")
     paths.prepare()
     current = browser_info(paths)
     if current:
@@ -72,7 +114,7 @@ def launch_browser(paths: RuntimePaths, url: str = CGV_BOOKING_URL, *, headless:
         return current
     port = _free_port()
     arguments = [
-            str(CHROME),
+            str(chrome),
             f"--remote-debugging-port={port}",
             "--remote-debugging-address=127.0.0.1",
             f"--user-data-dir={paths.browser_profile}",
@@ -82,12 +124,12 @@ def launch_browser(paths: RuntimePaths, url: str = CGV_BOOKING_URL, *, headless:
     if headless:
         arguments.append("--headless=new")
     arguments.append(url)
-    process = subprocess.Popen(
-        arguments,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True,
-    )
+    process_options: dict[str, Any] = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+    if platform.system() == "Windows":
+        process_options["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        process_options["start_new_session"] = True
+    process = subprocess.Popen(arguments, **process_options)
     deadline = time.monotonic() + 15
     while time.monotonic() < deadline:
         try:

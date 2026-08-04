@@ -10,7 +10,7 @@ Failure states:
 
 `recovering`, `rate_limited`, `blocked_duplicate`, `blocked_payment`, `unknown_after_submit`, `fatal`.
 
-Runtime files live below `~/.prickly-imax-helper/`:
+Runtime files live below `~/.prickly-imax-helper/` on macOS or `%LOCALAPPDATA%\PricklyIMAXHelper\` on Windows:
 
 - `config.json`: non-secret booking policy
 - `browser-profile/`: dedicated Chrome state; never committed

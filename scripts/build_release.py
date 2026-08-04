@@ -10,6 +10,7 @@ import shutil
 import tarfile
 import tempfile
 import tomllib
+import zipfile
 from pathlib import Path
 
 
@@ -31,10 +32,14 @@ def main() -> int:
     project_version = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
     if args.version != project_version:
         raise SystemExit(f"release version {args.version} does not match pyproject version {project_version}")
-    installer = (root / "scripts" / "Install.command").read_text(encoding="utf-8")
-    installer_version = re.search(r"^APP_VERSION=([^\s]+)$", installer, re.MULTILINE)
-    if not installer_version or installer_version.group(1) != args.version:
+    mac_installer = (root / "scripts" / "Install.command").read_text(encoding="utf-8")
+    mac_version = re.search(r"^APP_VERSION=([^\s]+)$", mac_installer, re.MULTILINE)
+    if not mac_version or mac_version.group(1) != args.version:
         raise SystemExit("Install.command APP_VERSION does not match the release version")
+    windows_installer = (root / "scripts" / "Install.ps1").read_text(encoding="utf-8")
+    windows_version = re.search(r'^\$AppVersion = "([^"]+)"$', windows_installer, re.MULTILINE)
+    if not windows_version or windows_version.group(1) != args.version:
+        raise SystemExit("Install.ps1 AppVersion does not match the release version")
     authorization = json.loads(args.authorization.read_text(encoding="utf-8"))
     required = {"approved_at", "scope", "request_limit_scope", "max_requests_per_ip_per_second"}
     missing = sorted(required - authorization.keys())
@@ -77,6 +82,7 @@ def main() -> int:
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     archive = output / f"prickly-imax-helper-{args.version}.tar.gz"
+    windows_archive = output / f"prickly-imax-helper-{args.version}.zip"
     with tempfile.TemporaryDirectory() as temporary:
         stage = Path(temporary) / f"prickly-imax-helper-{args.version}"
         stage.mkdir()
@@ -92,10 +98,25 @@ def main() -> int:
             os.chmod(command, 0o755)
         with tarfile.open(archive, "w:gz") as bundle:
             bundle.add(stage, arcname=stage.name)
-    digest = hash_file(archive)
-    checksum = archive.with_suffix(archive.suffix + ".sha256")
-    checksum.write_text(f"{digest}  {archive.name}\n", encoding="utf-8")
-    print(json.dumps({"archive": str(archive), "sha256": digest, "checksum": str(checksum)}, indent=2))
+        with zipfile.ZipFile(windows_archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
+            for item in stage.rglob("*"):
+                if item.is_file():
+                    bundle.write(item, arcname=str(Path(stage.name) / item.relative_to(stage)))
+    artifacts = []
+    for operating_system, artifact in (("macos", archive), ("windows", windows_archive)):
+        digest = hash_file(artifact)
+        checksum = artifact.with_suffix(artifact.suffix + ".sha256")
+        checksum.write_text(f"{digest}  {artifact.name}\n", encoding="utf-8")
+        artifacts.append(
+            {
+                "operating_system": operating_system,
+                "archive": str(artifact),
+                "sha256": digest,
+                "checksum": str(checksum),
+            }
+        )
+    mac = artifacts[0]
+    print(json.dumps({**mac, "artifacts": artifacts}, indent=2))
     return 0
 
 
