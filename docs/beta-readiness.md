@@ -24,6 +24,7 @@ This checklist is the release gate. A checked implementation item is not equival
 
 ## Required before inviting pilot users
 
+- [x] Create the private Notion onboarding draft: `https://app.notion.com/p/3b24fb8e6f4d81168194f4f4a4b68bef` (explicitly marked not ready to share).
 - [ ] Generate authorization metadata from the retained CGV approval document and its SHA-256 fingerprint.
 - [ ] Complete a logged-in, no-click `dry-run` with the new dedicated public runtime profile.
 - [ ] Capture current CGV checkout DOM fixtures without submitting an order and confirm selectors against them.
