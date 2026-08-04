@@ -40,4 +40,3 @@ ODYSSEY: dict[str, Any] = {
 
 def odyssey() -> dict[str, Any]:
     return deepcopy(ODYSSEY)
-

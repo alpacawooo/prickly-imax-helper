@@ -18,4 +18,3 @@ def write_event(log_dir: str | Path, event: str, **fields: Any) -> None:
     with target.open("a", encoding="utf-8") as stream:
         stream.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n")
     os.chmod(target, 0o600)
-

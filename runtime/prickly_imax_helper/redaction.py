@@ -20,4 +20,3 @@ def redact(value: Any, key: str = "") -> Any:
         value = EMAIL.sub(r"\1***@\2", value)
         return LONG_DIGITS.sub("[REDACTED_NUMBER]", value)
     return value
-

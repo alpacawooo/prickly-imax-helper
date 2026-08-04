@@ -95,4 +95,3 @@ class RequestBudget:
             state["next_allowed_at"] = max(state["next_allowed_at"], state["cooldown_until"])
             self._write(state)
             return state["cooldown_until"]
-

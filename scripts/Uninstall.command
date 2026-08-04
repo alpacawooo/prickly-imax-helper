@@ -28,4 +28,3 @@ else
   /bin/rm -rf "${APP_HOME}/app" "${APP_HOME}/venv"
   print "프로그램만 제거했습니다. 설정과 CGV 로그인 프로필은 ${APP_HOME}에 보존했습니다."
 fi
-

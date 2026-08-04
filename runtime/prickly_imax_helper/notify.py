@@ -39,4 +39,3 @@ def show_notification(title: str, message: str, timeout: int = 10) -> None:
         timeout=timeout,
         check=False,
     )
-

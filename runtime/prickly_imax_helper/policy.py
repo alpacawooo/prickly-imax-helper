@@ -51,4 +51,3 @@ def rank_best_block(seat_map: dict[str, Any], config: dict[str, Any]) -> dict[st
         "center_distance": round(distance, 4),
         "available_count": len(available),
     }
-
