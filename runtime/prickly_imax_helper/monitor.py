@@ -68,7 +68,7 @@ def _checkout(paths: RuntimePaths, config: dict[str, Any], session: CgvSession, 
     _heartbeat(paths, Status.SUBMITTING, "all final checks passed; one submission attempt", match=match)
     try:
         flow.submit_once()
-        result = flow.verify_mobile_ticket()
+        result = flow.verify_mobile_ticket(match)
     except UnknownAfterSubmit as exc:
         _heartbeat(paths, Status.UNKNOWN_AFTER_SUBMIT, str(exc), match=match)
         _notify(paths, config, "Prickly IMAX 결과 확인 필요", "최종 제출 이후 모바일티켓 확인에 실패했습니다. 안전을 위해 재시도하지 않습니다.")

@@ -69,6 +69,33 @@ def payment_proof(text: str, *, voucher_count: int, selected_voucher_count: int,
     return errors
 
 
+def mobile_ticket_proof(text: str, match: dict[str, Any], config: dict[str, Any]) -> tuple[list[str], dict[str, Any]]:
+    normalized = re.sub(r"\s+", " ", text).strip()
+    errors = []
+    exact_show = duplicate_status(normalized, match, str(config["movie"])) == "duplicate"
+    if not exact_show:
+        errors.append("exact movie date and time not proven")
+    theater = str(config["theater"])
+    theater_proven = theater in normalized
+    if not theater_proven:
+        errors.append("theater not proven")
+    format_name = str(config["format"])
+    format_proven = format_name in normalized
+    if not format_proven:
+        errors.append("format not proven")
+    seats = [str(seat) for seat in match["seats"]]
+    missing_seats = [seat for seat in seats if seat not in normalized]
+    if missing_seats:
+        errors.append("selected seats not proven: " + ", ".join(missing_seats))
+    proof = {
+        "exact_show": exact_show,
+        "theater": theater_proven,
+        "format": format_proven,
+        "seats": seats if not missing_seats else [],
+    }
+    return errors, proof
+
+
 @dataclass
 class CheckoutResult:
     status: str
@@ -278,7 +305,7 @@ class CheckoutFlow:
         self.prove_ready(match)
         self.submit_once()
 
-    def verify_mobile_ticket(self) -> CheckoutResult:
+    def verify_mobile_ticket(self, match: dict[str, Any]) -> CheckoutResult:
         if not self.submitted:
             raise CheckoutError("submission has not occurred")
         try:
@@ -291,10 +318,13 @@ class CheckoutFlow:
             proof = self.page.evaluate(
                 r"""() => { const text = document.body.innerText.replace(/\s+/g, ' ').trim();
                 const b = [...document.querySelectorAll('button')].find(x => x.innerText.trim().startsWith('시네마 '));
-                const m = b?.innerText.match(/시네마\s+(\d+)/); return {count:m ? Number(m[1]) : -1, odyssey:text.includes('오디세이')}; }"""
+                const m = b?.innerText.match(/시네마\s+(\d+)/); return {count:m ? Number(m[1]) : -1, text}; }"""
             )
-            if int(proof.get("count", -1)) < 1 or proof.get("odyssey") is not True:
-                raise RuntimeError("mobile ticket proof missing")
-            return CheckoutResult("completed", proof)
+            errors, exact_proof = mobile_ticket_proof(str(proof.get("text", "")), match, self.config)
+            if int(proof.get("count", -1)) < 1:
+                errors.append("mobile ticket count missing")
+            if errors:
+                raise RuntimeError("; ".join(errors))
+            return CheckoutResult("completed", {"count": int(proof["count"]), **exact_proof})
         except Exception as exc:
             raise UnknownAfterSubmit(f"final click occurred but ticket proof failed: {exc}") from exc
