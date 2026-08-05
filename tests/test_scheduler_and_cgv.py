@@ -27,6 +27,13 @@ class SchedulerTests(unittest.TestCase):
         shows[0]["frSeatCnt"] = 3
         self.assertEqual(len(changed_seat_targets(state, shows)), 1)
 
+    def test_changed_count_respects_configured_party_size(self):
+        state = FairScanState()
+        shows = [{"ymd": "20260808", "scnsNo": "018", "scnSseq": "1", "frSeatCnt": 2}]
+        self.assertEqual(changed_seat_targets(state, shows, 3), [])
+        shows[0]["frSeatCnt"] = 3
+        self.assertEqual(len(changed_seat_targets(state, shows, 3)), 1)
+
     def test_schedule_and_pair_policy_are_preserved(self):
         config = odyssey()
         schedules = [
@@ -40,6 +47,15 @@ class SchedulerTests(unittest.TestCase):
         seats = [f"H{i}" for i in range(1, 31)]
         result = match_for(saturday[0], {"all": seats, "available": ["H15", "H16"]}, config)
         self.assertEqual(result["pair"], "H15-H16")
+
+    def test_format_filter_uses_configured_imax_label(self):
+        config = odyssey()
+        config["format"] = "IMAX LASER"
+        schedules = [
+            {"movkndDsplNm": "IMAX 2D", "scnsrtTm": "1900"},
+            {"movkndDsplNm": "IMAX LASER 2D", "scnsrtTm": "1930"},
+        ]
+        self.assertEqual([show["time"] for show in eligible_shows("20260806", schedules, config)], ["19:30"])
 
 
 class FakeBudget:
@@ -57,8 +73,10 @@ class FakeBudget:
 class FakePage:
     def __init__(self, value: dict) -> None:
         self.value = value
+        self.last_path: str | None = None
 
-    def evaluate(self, script: str, path: str) -> dict:
+    def evaluate(self, script: str, path: str | None = None) -> dict:
+        self.last_path = path
         return self.value
 
 
@@ -88,6 +106,39 @@ class CgvApiTests(unittest.TestCase):
             session.page = FakePage({"status": 403, "retryAfter": None, "text": "forbidden"})
             with self.assertRaises(LoginRequired):
                 session.api_get("/test")
+
+    def test_booking_target_is_resolved_from_selected_schedule_request(self):
+        with tempfile.TemporaryDirectory() as temp:
+            session = CgvSession(RuntimePaths(Path(temp)))
+            session.page = FakePage(
+                [
+                    "https://cgv.co.kr/api/v1/booking/searchSchByMov?coCd=A420&siteNo=0099&movNo=movie123&scnYmd=20260808",
+                ]
+            )
+            self.assertEqual(
+                session.booking_target_from_page(),
+                {"company_code": "A420", "site_no": "0099", "movie_no": "movie123"},
+            )
+
+    def test_custom_target_identifiers_drive_availability_request(self):
+        with tempfile.TemporaryDirectory() as temp:
+            session = CgvSession(
+                RuntimePaths(Path(temp)),
+                company_code="TEST",
+                site_no="0099",
+                movie_no="movie123",
+            )
+            session.budget = FakeBudget()
+            page = FakePage(
+                {
+                    "status": 200,
+                    "retryAfter": None,
+                    "text": json.dumps({"statusCode": 0, "data": [{"scnYmd": "20260808"}]}),
+                }
+            )
+            session.page = page
+            self.assertEqual(session.open_dates(), ["20260808"])
+            self.assertIn("coCd=TEST&siteNo=0099&movNo=movie123", str(page.last_path))
 
 
 if __name__ == "__main__":

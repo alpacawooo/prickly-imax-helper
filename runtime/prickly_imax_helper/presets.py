@@ -8,6 +8,11 @@ ODYSSEY: dict[str, Any] = {
     "movie": "오디세이",
     "theater": "용산아이파크몰",
     "format": "IMAX",
+    "target": {
+        "company_code": "A420",
+        "site_no": "0013",
+        "movie_no": "30001323",
+    },
     "party_size": 2,
     "dates": "all_open",
     "time_rules": {

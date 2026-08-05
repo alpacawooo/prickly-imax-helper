@@ -147,24 +147,24 @@ class CheckoutFlow:
             raise DuplicateBlocked(f"existing matching ticket status is {status}")
 
     def open_movie_and_theater(self) -> None:
+        movie = str(self.config["movie"])
+        theater = str(self.config["theater"])
+        format_name = str(self.config["format"])
         self.page.goto(CGV_BOOKING_URL, wait_until="domcontentloaded")
-        self._wait("() => [...document.images].some(i => i.alt === '오디세이')", 30_000)
+        self._wait("movie => [...document.images].some(i => i.alt.trim() === movie)", 30_000, movie)
         clicked = self.page.evaluate(
-            r"""() => { const image = [...document.images].find(i => i.alt === '오디세이');
-            const button = image?.closest('button'); if (!button) return false; button.click(); return true; }"""
+            r"""movie => { const image = [...document.images].find(i => i.alt.trim() === movie);
+            const button = image?.closest('button'); if (!button) return false; button.click(); return true; }""",
+            movie,
         )
         if not clicked:
-            raise CheckoutError("Odyssey movie button not found")
+            raise CheckoutError(f"movie button not found: {movie}")
         self._wait("() => location.pathname === '/cnm/movieBook/movie'")
         ready = self.page.evaluate(
             r"""() => ({
-              picker: !![...document.querySelectorAll('input')].find(x => x.offsetParent && x.placeholder === '지역을 입력해주세요'),
-              schedules: [...document.querySelectorAll('button')].some(b => /\d{2}:\d{2}-\d{2}:\d{2}/.test(b.textContent)),
-              yongsan: [...document.querySelectorAll('button')].some(b => b.textContent.trim() === '용산아이파크몰')
+              picker: !![...document.querySelectorAll('input')].find(x => x.offsetParent && x.placeholder === '지역을 입력해주세요')
             })"""
         )
-        if ready["schedules"] and ready["yongsan"]:
-            return
         if not ready["picker"]:
             opened = self.page.evaluate(
                 r"""() => { const b = [...document.querySelectorAll('button')].find(x =>
@@ -174,18 +174,27 @@ class CheckoutFlow:
             if not opened:
                 raise CheckoutError("theater picker launcher not found")
         self._wait("() => !![...document.querySelectorAll('input')].find(x => x.offsetParent && x.placeholder === '지역을 입력해주세요')")
-        self.page.locator('input[placeholder="지역을 입력해주세요"]:visible').fill("용산")
-        self._wait("() => [...document.querySelectorAll('button')].some(b => b.offsetParent && b.textContent.trim() === '용산아이파크몰')")
+        self.page.locator('input[placeholder="지역을 입력해주세요"]:visible').fill(theater)
+        self._wait(
+            "theater => [...document.querySelectorAll('button')].some(b => b.offsetParent && b.textContent.trim() === theater)",
+            20_000,
+            theater,
+        )
         selected = self.page.evaluate(
-            r"""() => { const values = [...document.querySelectorAll('button')].filter(b =>
-            b.offsetParent && !b.disabled && b.textContent.trim() === '용산아이파크몰');
-            if (!values.length) return false; values[values.length - 1].click(); return true; }"""
+            r"""theater => { const values = [...document.querySelectorAll('button')].filter(b =>
+            b.offsetParent && !b.disabled && b.textContent.trim() === theater);
+            if (!values.length) return false; values[values.length - 1].click(); return true; }""",
+            theater,
         )
         if not selected:
-            raise CheckoutError("actual Yongsan theater row not found")
+            raise CheckoutError(f"actual theater row not found: {theater}")
         self._wait("() => [...document.querySelectorAll('button')].some(b => b.offsetParent && !b.disabled && b.textContent.trim() === '극장선택')")
         self.page.get_by_role("button", name="극장선택", exact=True).click()
-        self._wait("() => [...document.querySelectorAll('h3')].some(h => h.innerText.includes('IMAX관'))")
+        self._wait(
+            "formatName => document.body.innerText.toLocaleLowerCase().includes(formatName.toLocaleLowerCase())",
+            20_000,
+            format_name,
+        )
 
     def open_match(self, match: dict[str, Any]) -> None:
         year, month, day = map(int, match["date"].split("-"))

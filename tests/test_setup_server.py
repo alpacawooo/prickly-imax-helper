@@ -40,7 +40,9 @@ class SetupServerTests(unittest.TestCase):
                     self.assertRegex(page, r"<button[^>]+value=login[^>]+formnovalidate")
                     for provider in ("gmail", "naver", "icloud", "other"):
                         self.assertIn(f'value="{provider}"', page)
-                    self.assertNotIn("__PROVIDER_", page)
+                    for field in ("movie", "theater", "screen_format", "party_size", "rows", "edge_percent"):
+                        self.assertIn(f'name={field}', page)
+                    self.assertNotRegex(page, r"__[A-Z_]+__")
                 token = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["token"][0]
                 payload = urllib.parse.urlencode(
                     {
@@ -48,12 +50,28 @@ class SetupServerTests(unittest.TestCase):
                         "action": "save",
                         "email": "pilot@example.com",
                         "email_provider": "gmail",
+                        "movie": "테스트 영화",
+                        "theater": "테스트CGV",
+                        "screen_format": "IMAX 2D",
+                        "weekday_after": "18:30",
+                        "weekday_before": "23:00",
+                        "saturday_after": "10:00",
+                        "saturday_before": "",
+                        "sunday_after": "",
+                        "sunday_before": "21:30",
+                        "party_size": "3",
+                        "rows": "F, G, H",
+                        "edge_percent": "10",
+                        "preference": "row_order_then_left",
                         "consent": "yes",
                         "network": "yes",
                     }
                 ).encode("utf-8")
                 request = urllib.request.Request(base + "/action", data=payload, method="POST")
-                with patch("prickly_imax_helper.setup_server.login_verified", return_value=True), patch("prickly_imax_helper.setup_server.send_email"):
+                target = {"company_code": "A420", "site_no": "0099", "movie_no": "movie123"}
+                with patch("prickly_imax_helper.setup_server.login_verified", return_value=True), patch(
+                    "prickly_imax_helper.setup_server.resolve_target", return_value=target
+                ), patch("prickly_imax_helper.setup_server.send_email"):
                     with urllib.request.urlopen(request, timeout=2) as response:
                         self.assertIn("설정 저장 완료", response.read().decode("utf-8"))
                 config = json.loads(paths.config.read_text(encoding="utf-8"))
@@ -61,6 +79,15 @@ class SetupServerTests(unittest.TestCase):
                 self.assertEqual(config["request_policy"]["minimum_interval_seconds"], 1.0)
                 self.assertEqual(config["notification"]["email"], "pilot@example.com")
                 self.assertEqual(config["notification"]["recipient_provider"], "gmail")
+                self.assertEqual(config["movie"], "테스트 영화")
+                self.assertEqual(config["theater"], "테스트CGV")
+                self.assertEqual(config["format"], "IMAX 2D")
+                self.assertEqual(config["party_size"], 3)
+                self.assertEqual(config["payment"]["voucher_count"], 3)
+                self.assertEqual(config["rows"], ["F", "G", "H"])
+                self.assertEqual(config["edge_exclusion"], 0.1)
+                self.assertEqual(config["preference"], "row_order_then_left")
+                self.assertEqual(config["target"], target)
                 heartbeat = json.loads(paths.heartbeat.read_text(encoding="utf-8"))
                 self.assertEqual(heartbeat["status"], "login_required")
             finally:

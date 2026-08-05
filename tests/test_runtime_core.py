@@ -75,15 +75,29 @@ class ConfigTests(unittest.TestCase):
         self.assertTrue(any("maximum_remaining_balance" in item for item in errors))
         self.assertTrue(any("voucher_count" in item for item in errors))
 
-    def test_rejects_any_weakening_of_the_fixed_odyssey_policy(self):
+    def test_custom_booking_policy_is_valid_with_resolved_target(self):
         value = copy.deepcopy(VALID_CONFIG)
         value["movie"] = "다른 영화"
-        value["party_size"] = 1
-        value["rows"] = ["H"]
+        value["theater"] = "다른CGV"
+        value["format"] = "IMAX 2D"
+        value["target"] = {"company_code": "A420", "site_no": "0099", "movie_no": "movie123"}
+        value["party_size"] = 3
+        value["payment"]["voucher_count"] = 3
+        value["rows"] = ["F", "G", "H"]
+        value["edge_exclusion"] = 0.1
+        value["preference"] = "row_order_then_left"
         value["time_rules"]["weekday"]["at_or_after"] = "18:00"
-        errors = validate_config(value)
-        for field in ("movie", "party_size", "rows", "time_rules"):
-            self.assertTrue(any(field in item for item in errors), errors)
+        self.assertEqual(validate_config(value), [])
+
+    def test_custom_target_and_time_bounds_are_validated(self):
+        value = copy.deepcopy(VALID_CONFIG)
+        value["movie"] = "다른 영화"
+        self.assertTrue(any("target identifiers" in item for item in validate_config(value)))
+        value["target"] = {"company_code": "A420", "site_no": "bad space", "movie_no": "123"}
+        self.assertTrue(any("target.site_no" in item for item in validate_config(value)))
+        value["target"]["site_no"] = "0099"
+        value["time_rules"]["weekday"] = {"at_or_after": "23:00", "before": "19:00"}
+        self.assertTrue(any("start must be earlier" in item for item in validate_config(value)))
 
     def test_rejects_short_cooldown_or_unscoped_consent(self):
         value = copy.deepcopy(VALID_CONFIG)

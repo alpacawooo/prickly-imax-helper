@@ -28,5 +28,7 @@ Default Odyssey profile:
 - preference: consecutive same-row seats closest to center
 - duplicate booking, cancellation, and seat changes: forbidden
 
+Movie, CGV theater, IMAX display format, party size, time windows, rows, edge exclusion, and center preference are user-editable defaults. Same-row adjacency, all-open-date refresh, duplicate prevention, no cancellation/change, voucher-only zero-balance submission, and the request budget remain enforced safety boundaries.
+
 The user logs in personally in the dedicated Chrome window. Confirm login by visible account state, not by reading credentials.
 The recipient provider is independent of the operating system. Use Apple Mail on macOS or classic Outlook desktop on Windows only as the local sending bridge, and never request an email password or app password.

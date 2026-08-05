@@ -30,7 +30,7 @@ def eligible_shows(ymd: str, schedules: list[dict[str, Any]], config: dict[str, 
     day = date(int(ymd[:4]), int(ymd[4:6]), int(ymd[6:8]))
     result = []
     for show in schedules:
-        if "IMAX" not in str(show.get("movkndDsplNm", "")):
+        if str(config["format"]).casefold() not in str(show.get("movkndDsplNm", "")).casefold():
             continue
         raw = str(show.get("scnsrtTm", ""))
         if not raw.isdigit() or len(raw) != 4:
@@ -41,14 +41,14 @@ def eligible_shows(ymd: str, schedules: list[dict[str, Any]], config: dict[str, 
     return result
 
 
-def changed_seat_targets(state: FairScanState, shows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def changed_seat_targets(state: FairScanState, shows: list[dict[str, Any]], party_size: int = 2) -> list[dict[str, Any]]:
     targets = []
     for show in shows:
         key = f"{show['ymd']}|{show.get('scnsNo')}|{show.get('scnSseq')}"
         count = int(show.get("frSeatCnt") or 0)
         previous = state.free_counts.get(key)
         state.free_counts[key] = count
-        if count >= 2 and previous != count:
+        if count >= party_size and previous != count:
             targets.append(show)
     return targets
 
