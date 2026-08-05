@@ -91,6 +91,15 @@ class CgvApiTests(unittest.TestCase):
             self.assertEqual(session.budget.acquired, 1)
             self.assertEqual(session.budget.deferred, [900.0])
 
+    def test_429_exposes_server_cooldown_to_monitor(self):
+        with tempfile.TemporaryDirectory() as temp:
+            session = CgvSession(RuntimePaths(Path(temp)))
+            session.budget = FakeBudget()
+            session.page = FakePage({"status": 429, "retryAfter": "900", "text": "rate limited"})
+            with self.assertRaises(RateLimited) as raised:
+                session.api_get("/test")
+            self.assertEqual(raised.exception.cooldown_seconds, 900.0)
+
     def test_success_requires_cgv_status_code_zero(self):
         with tempfile.TemporaryDirectory() as temp:
             session = CgvSession(RuntimePaths(Path(temp)))

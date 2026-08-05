@@ -26,7 +26,9 @@ class LoginRequired(CgvError):
 
 
 class RateLimited(CgvError):
-    pass
+    def __init__(self, message: str, *, cooldown_seconds: float) -> None:
+        super().__init__(message)
+        self.cooldown_seconds = cooldown_seconds
 
 
 @dataclass
@@ -112,7 +114,7 @@ class CgvSession:
             except ValueError:
                 cooldown = self.cooldown_seconds
             self.budget.defer(cooldown)
-            raise RateLimited(f"CGV returned HTTP 429; cooldown {cooldown:.0f}s")
+            raise RateLimited(f"CGV returned HTTP 429; cooldown {cooldown:.0f}s", cooldown_seconds=cooldown)
         if int(result["status"]) in {401, 403}:
             raise LoginRequired(f"CGV returned HTTP {result['status']}; login or session verification is required")
         try:

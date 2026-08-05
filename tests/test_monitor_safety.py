@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from prickly_imax_helper.config import write_config
 from prickly_imax_helper.cli import main as cli_main
-from prickly_imax_helper.monitor import OPEN_DATE_REFRESH_SECONDS, run
+from prickly_imax_helper.monitor import OPEN_DATE_REFRESH_SECONDS, rate_limit_backoff_seconds, run
 from prickly_imax_helper.paths import RuntimePaths
 from prickly_imax_helper.state import Status, read_state, transition
 from test_runtime_core import VALID_CONFIG
@@ -19,6 +19,10 @@ from test_runtime_core import VALID_CONFIG
 class MonitorRestartSafetyTests(unittest.TestCase):
     def test_new_booking_dates_are_refreshed_within_thirty_seconds(self):
         self.assertLessEqual(OPEN_DATE_REFRESH_SECONDS, 30.0)
+
+    def test_repeated_429_backoff_grows_and_is_capped(self):
+        self.assertEqual([rate_limit_backoff_seconds(streak, 300) for streak in range(1, 6)], [300, 600, 1200, 2400, 3600])
+        self.assertEqual(rate_limit_backoff_seconds(8, 300), 3600)
 
     def test_invalid_config_fails_closed_without_launch_or_restart_error(self):
         with tempfile.TemporaryDirectory() as temp:
