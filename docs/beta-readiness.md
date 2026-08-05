@@ -21,6 +21,7 @@ This checklist is the release gate. A checked implementation item is not equival
 - [x] macOS and Windows installer/updater/uninstaller, LaunchAgent/Scheduled Task registration, diagnostic output, and redacted event logs exist.
 - [x] Release builder emits macOS tar.gz and Windows zip artifacts with SHA-256 files and rejects missing authorization evidence, a non-public-IP limit scope, or an invalid request rate.
 - [x] Codex marketplace and optional plugin install successfully on the development Mac.
+- [x] A least-privilege GitHub Actions workflow is ready to run the same suite on hosted macOS and Windows runners as soon as the private repository is created.
 
 ## Required before inviting pilot users
 
@@ -30,7 +31,7 @@ This checklist is the release gate. A checked implementation item is not equival
 - [ ] Capture current CGV checkout DOM fixtures without submitting an order and confirm selectors against them.
 - [ ] Confirm the Apple Mail test message from the installed LaunchAgent environment, not only an interactive shell.
 - [ ] Complete a clean Windows 10/11 install and confirm the Scheduled Task, dedicated Chrome profile, toast, and classic Outlook test message under a standard non-admin user.
-- [ ] Run the full automated test suite on an actual Windows runner; local macOS tests currently validate Windows branches by simulation only.
+- [ ] Publish the prepared workflow and confirm a green run on the hosted Windows runner; local macOS tests currently validate Windows branches by simulation only.
 - [ ] Run a 24-hour monitor soak with no 429, duplicate process, memory growth, or login-profile loss.
 - [ ] Create the private GitHub repository, publish tag `0.1.0`, and attach the gated archive and checksum.
 - [ ] Replace the private-beta guide's generic GitHub wording with the exact repository/release link.
