@@ -12,6 +12,7 @@ Required fields:
 - center preference
 - payment method and maximum payable balance
 - duplicate-booking behavior
+- notification recipient provider (Gmail, Naver Mail, iCloud Mail, or other) and address
 
 Default Odyssey profile:
 
@@ -28,3 +29,4 @@ Default Odyssey profile:
 - duplicate booking, cancellation, and seat changes: forbidden
 
 The user logs in personally in the dedicated Chrome window. Confirm login by visible account state, not by reading credentials.
+The recipient provider is independent of the operating system. Use Apple Mail on macOS or classic Outlook desktop on Windows only as the local sending bridge, and never request an email password or app password.

@@ -35,6 +35,7 @@ Notion 안내의 버전 고정 명령은 체크섬이 일치할 때만 설치기
 - Google Chrome
 - 본인 CGV 계정과 등록된 IMAX 관람권 2매
 - macOS Apple Mail 또는 Windows 클래식 Outlook 데스크톱
+- 운영체제와 상관없이 Gmail·네이버 메일·iCloud Mail·기타 수신 주소 선택
 - 동일 공인 IP에서 Prickly IMAX Helper 한 대만 실행
 
 Python, Codex, Prickly AI 플러그인은 필수 설치 항목이 아니다. Codex 플러그인은 상태 확인과 진단을 돕는 선택 기능이다.

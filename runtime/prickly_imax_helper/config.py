@@ -20,6 +20,12 @@ REQUIRED_AUTHORIZATION = {
     "automatic_submission",
 }
 
+SUPPORTED_NOTIFICATION_PROVIDERS = {"gmail", "naver", "icloud", "other"}
+
+
+def valid_email_address(value: object) -> bool:
+    return isinstance(value, str) and re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value) is not None
+
 LOCKED_ODYSSEY_FIELDS = (
     "movie",
     "theater",
@@ -104,8 +110,11 @@ def validate_config(value: dict[str, Any]) -> list[str]:
     if method not in {"apple_mail", "outlook_desktop"}:
         errors.append("notification.method must be apple_mail or outlook_desktop")
     email = notification.get("email", "")
-    if not isinstance(email, str) or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+    if not valid_email_address(email):
         errors.append("notification.email must be a valid email address")
+    recipient_provider = notification.get("recipient_provider")
+    if recipient_provider is not None and recipient_provider not in SUPPORTED_NOTIFICATION_PROVIDERS:
+        errors.append("notification.recipient_provider must be gmail, naver, icloud, or other")
     return errors
 
 

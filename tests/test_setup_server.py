@@ -38,12 +38,16 @@ class SetupServerTests(unittest.TestCase):
                     page = response.read().decode("utf-8")
                     self.assertIn("Prickly IMAX Helper", page)
                     self.assertRegex(page, r"<button[^>]+value=login[^>]+formnovalidate")
+                    for provider in ("gmail", "naver", "icloud", "other"):
+                        self.assertIn(f'value="{provider}"', page)
+                    self.assertNotIn("__PROVIDER_", page)
                 token = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["token"][0]
                 payload = urllib.parse.urlencode(
                     {
                         "token": token,
                         "action": "save",
                         "email": "pilot@example.com",
+                        "email_provider": "gmail",
                         "consent": "yes",
                         "network": "yes",
                     }
@@ -56,6 +60,7 @@ class SetupServerTests(unittest.TestCase):
                 self.assertTrue(config["consent"]["automatic_submission"])
                 self.assertEqual(config["request_policy"]["minimum_interval_seconds"], 1.0)
                 self.assertEqual(config["notification"]["email"], "pilot@example.com")
+                self.assertEqual(config["notification"]["recipient_provider"], "gmail")
                 heartbeat = json.loads(paths.heartbeat.read_text(encoding="utf-8"))
                 self.assertEqual(heartbeat["status"], "login_required")
             finally:
@@ -72,7 +77,14 @@ class SetupServerTests(unittest.TestCase):
             try:
                 token = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["token"][0]
                 payload = urllib.parse.urlencode(
-                    {"token": token, "action": "save", "email": "pilot@example.com", "consent": "yes", "network": "yes"}
+                    {
+                        "token": token,
+                        "action": "save",
+                        "email": "pilot@example.com",
+                        "email_provider": "naver",
+                        "consent": "yes",
+                        "network": "yes",
+                    }
                 ).encode("utf-8")
                 request = urllib.request.Request(f"http://127.0.0.1:{server.server_port}/action", data=payload, method="POST")
                 with patch("prickly_imax_helper.setup_server.login_verified", return_value=False):
@@ -84,6 +96,42 @@ class SetupServerTests(unittest.TestCase):
                         denied.close()
                     else:
                         self.fail("setup must not save before login verification")
+                self.assertFalse(paths.config.exists())
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=2)
+
+    def test_rejects_missing_or_unknown_recipient_provider(self):
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp) / "runtime")
+            server, url = run_setup(paths, open_page=False)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                token = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["token"][0]
+                payload = urllib.parse.urlencode(
+                    {
+                        "token": token,
+                        "action": "save",
+                        "email": "pilot@example.com",
+                        "email_provider": "unknown",
+                        "consent": "yes",
+                        "network": "yes",
+                    }
+                ).encode("utf-8")
+                request = urllib.request.Request(f"http://127.0.0.1:{server.server_port}/action", data=payload, method="POST")
+                with patch("prickly_imax_helper.setup_server.login_verified", return_value=True), patch(
+                    "prickly_imax_helper.setup_server.send_email"
+                ) as send_email:
+                    with self.assertRaises(urllib.error.HTTPError) as denied:
+                        urllib.request.urlopen(request, timeout=2)
+                    try:
+                        self.assertEqual(denied.exception.code, 400)
+                        self.assertIn("메일 서비스", denied.exception.read().decode("utf-8"))
+                    finally:
+                        denied.exception.close()
+                    send_email.assert_not_called()
                 self.assertFalse(paths.config.exists())
             finally:
                 server.shutdown()

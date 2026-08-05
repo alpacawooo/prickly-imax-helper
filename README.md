@@ -15,7 +15,7 @@ The repository contains no CGV credentials, customer identifiers, cookies, vouch
 No password or payment credential is entered into Prickly AI, Codex, Notion, GitHub, or the helper.
 Python is not a user prerequisite; the installer bootstraps a checksum-verified, pinned `uv` binary and managed Python. It installs only the locked runtime dependencies and generates a local launcher without resolving a separate project build backend.
 
-Email notifications use the account already signed in to Apple Mail on macOS or classic Outlook desktop on Windows. The helper never asks for an email password. New Outlook for Windows does not expose the classic Outlook COM interface and is not yet supported for email delivery; Windows desktop notifications still work independently.
+Users choose a Gmail, Naver Mail, iCloud Mail, or other recipient address during setup. Email delivery uses the account already signed in to Apple Mail on macOS or classic Outlook desktop on Windows, so the helper never asks for an email or app password. New Outlook for Windows does not expose the classic Outlook COM interface and is not yet supported as the local sending bridge; Windows desktop notifications still work independently.
 
 ## Repository layout
 
