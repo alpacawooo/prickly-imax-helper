@@ -18,7 +18,7 @@ Use one shared file lock for read-only polling, status checks, staging, and subm
 
 ## HTTP 429
 
-Stop concurrent all-date bursts. Enter a cooldown, lower the request budget, and stagger date checks. Repeated short retries extend the block. Report monitoring gaps honestly.
+Stop concurrent all-date bursts. Enter a shared cooldown of at least five minutes and stagger date checks. Double consecutive cooldowns up to one hour, while honoring a longer server `Retry-After`. A successful scan resets the streak. Repeated short retries are forbidden because they extend the block. Report monitoring gaps honestly.
 
 ## Final result unknown
 

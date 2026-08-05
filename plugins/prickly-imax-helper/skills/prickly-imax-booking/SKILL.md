@@ -12,7 +12,7 @@ vouchers, notification address, and payment state on the user's PC.
 
 1. Find the installed CLI at `~/.local/bin/prickly-imax` on macOS or `%LOCALAPPDATA%\PricklyIMAXHelper\bin\prickly-imax.cmd` on Windows. If absent, direct the user to the version-pinned Notion/GitHub release installer; do not invent an unverified download URL.
 2. Run the OS-specific CLI with `doctor` and fix required checks.
-3. Run the OS-specific CLI with `setup` when configuration is absent. The user logs in personally in the dedicated Chrome window and records consent in the localhost setup page.
+3. Run the OS-specific CLI with `setup` when configuration is absent. The user logs in personally in the dedicated Chrome window and records consent in the localhost setup page. If the resident monitor is active, run `stop`, wait for `stopped`, then run `setup` and `start`; never compete for the browser lock.
 4. Never ask for or store a CGV password, voucher number, card number, or email password.
 5. Start or inspect the macOS LaunchAgent or Windows Scheduled Task only after the configuration validates.
 6. Report status from the OS-specific CLI and redacted local logs, not assumptions.
@@ -27,7 +27,7 @@ vouchers, notification address, and payment state on the user's PC.
 - Submit only when the configured payment method covers the full amount and the remaining balance is zero.
 - Verify completion from the resulting mobile ticket before reporting success.
 - Enforce the documented IP-wide minimum one-second interval for every explicit CGV availability request.
-- Treat `429` as a hard rate-limit signal. Stop traffic, honor cooldown, and resume through the shared request budget.
+- Treat `429` as a hard rate-limit signal. Stop traffic for at least five minutes, double repeated cooldowns up to one hour, honor a longer server `Retry-After`, and resume through the shared request budget.
 - Never silently weaken the user's seat, time, duplicate-booking, or payment constraints.
 
 ## Commands
