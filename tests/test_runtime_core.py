@@ -40,7 +40,7 @@ VALID_CONFIG = {
         "automatic_submission": True,
     },
     "request_policy": {"minimum_interval_seconds": 1.0, "rate_limit_cooldown_seconds": 300},
-    "notification": {"email": "tester@example.com", "method": "apple_mail"},
+    "notification": {"email": "tester@example.com", "recipient_provider": "gmail", "method": "apple_mail"},
     "consent": {
         "automatic_submission": True,
         "one_active_device_per_public_ip": True,
@@ -94,6 +94,18 @@ class ConfigTests(unittest.TestCase):
         self.assertTrue(any("at least 300" in item for item in errors))
         self.assertTrue(any("consent.scope" in item for item in errors))
         self.assertTrue(any("ISO timestamp" in item for item in errors))
+
+    def test_recipient_provider_is_user_selectable_and_legacy_config_remains_valid(self):
+        for provider in ("gmail", "naver", "icloud", "other"):
+            value = copy.deepcopy(VALID_CONFIG)
+            value["notification"]["recipient_provider"] = provider
+            self.assertEqual(validate_config(value), [])
+        legacy = copy.deepcopy(VALID_CONFIG)
+        legacy["notification"].pop("recipient_provider")
+        self.assertEqual(validate_config(legacy), [])
+        invalid = copy.deepcopy(VALID_CONFIG)
+        invalid["notification"]["recipient_provider"] = "unsupported"
+        self.assertTrue(any("recipient_provider" in item for item in validate_config(invalid)))
 
 
 class StateTests(unittest.TestCase):
