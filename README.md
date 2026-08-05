@@ -24,6 +24,8 @@ Users choose a Gmail, Naver Mail, iCloud Mail, or other recipient address during
 - `runtime/`: independent local runtime
 - `scripts/`: installer, uninstaller, and gated release builder
 - `docs/notion-quick-start.md`: copy-ready private-beta guide
+- `docs/dm-operator-pack.md`: copy-ready DM recruitment, waitlist, invite, and completion replies
+- `docs/pilot-runbook.md`: three-person operator checklist and privacy-safe evidence workflow
 - `docs/beta-readiness.md`: evidence-backed release and pilot gate
 - `tests/`: deterministic policy tests
 
