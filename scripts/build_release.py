@@ -24,6 +24,19 @@ FORBIDDEN_RUNTIME_NAMES = {
 }
 FORBIDDEN_RUNTIME_DIRECTORIES = {"browser-profile", "logs", "state"}
 FORBIDDEN_SECRET_SUFFIXES = {".cookie", ".secret", ".token"}
+REQUIRED_AUTHORIZATION_FIELDS = {
+    "approved_at",
+    "scope",
+    "request_limit_scope",
+    "max_requests_per_ip_per_second",
+}
+OPTIONAL_AUTHORIZATION_FIELDS = {"authorization_reference", "document_sha256"}
+REQUIRED_AUTHORIZATION_SCOPES = {
+    "automated_availability_query",
+    "automated_seat_selection",
+    "voucher_submission",
+    "private_beta_distribution",
+}
 
 
 def hash_file(path: Path) -> str:
@@ -79,43 +92,67 @@ def main() -> int:
     if not windows_version or windows_version.group(1) != args.version:
         raise SystemExit("Install.ps1 AppVersion does not match the release version")
     authorization = json.loads(args.authorization.read_text(encoding="utf-8"))
-    required = {"approved_at", "scope", "request_limit_scope", "max_requests_per_ip_per_second"}
-    missing = sorted(required - authorization.keys())
+    if not isinstance(authorization, dict):
+        raise SystemExit("authorization metadata must be a JSON object")
+    allowed_fields = REQUIRED_AUTHORIZATION_FIELDS | OPTIONAL_AUTHORIZATION_FIELDS
+    unknown = sorted(set(authorization) - allowed_fields)
+    if unknown:
+        raise SystemExit("authorization metadata contains non-public or unknown fields: " + ", ".join(unknown))
+    missing = sorted(REQUIRED_AUTHORIZATION_FIELDS - authorization.keys())
     if missing:
         raise SystemExit("authorization metadata missing: " + ", ".join(missing))
     if authorization["request_limit_scope"] != "public_ip":
         raise SystemExit("request_limit_scope must be public_ip")
+    if isinstance(authorization["max_requests_per_ip_per_second"], bool):
+        raise SystemExit("max_requests_per_ip_per_second must be numeric")
     try:
         request_rate = float(authorization["max_requests_per_ip_per_second"])
     except (TypeError, ValueError) as exc:
         raise SystemExit("max_requests_per_ip_per_second must be numeric") from exc
     if not 0 < request_rate <= 1.0:
         raise SystemExit("release metadata exceeds the approved request rate")
-    required_scopes = {
-        "automated_availability_query",
-        "automated_seat_selection",
-        "voucher_submission",
-        "private_beta_distribution",
-    }
-    missing_scopes = sorted(required_scopes - set(authorization["scope"]))
+    scopes = authorization["scope"]
+    if not isinstance(scopes, list) or not all(isinstance(scope, str) for scope in scopes):
+        raise SystemExit("authorization scope must be a JSON string list")
+    scope_set = set(scopes)
+    missing_scopes = sorted(REQUIRED_AUTHORIZATION_SCOPES - scope_set)
     if missing_scopes:
         raise SystemExit("authorization scope missing: " + ", ".join(missing_scopes))
+    extra_scopes = sorted(scope_set - REQUIRED_AUTHORIZATION_SCOPES)
+    if extra_scopes:
+        raise SystemExit("authorization scope contains unsupported capabilities: " + ", ".join(extra_scopes))
     document_sha256 = authorization.get("document_sha256")
     authorization_reference = authorization.get("authorization_reference")
     if not document_sha256 and not authorization_reference:
         raise SystemExit("authorization_reference or document_sha256 is required")
-    if document_sha256 and not re.fullmatch(r"[0-9a-fA-F]{64}", str(document_sha256)):
+    if document_sha256 and (not isinstance(document_sha256, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", document_sha256)):
         raise SystemExit("document_sha256 must be a 64-character hexadecimal SHA-256 digest")
     if authorization_reference:
-        reference = str(authorization_reference).strip()
-        if not 3 <= len(reference) <= 200 or any(character in reference for character in "\r\n"):
+        if not isinstance(authorization_reference, str):
+            raise SystemExit("authorization_reference must be text")
+        reference = authorization_reference.strip()
+        if not 3 <= len(reference) <= 200 or any(ord(character) < 32 or ord(character) == 127 for character in reference):
             raise SystemExit("authorization_reference must be a single public-safe line of 3-200 characters")
+    approved_at = authorization["approved_at"]
+    if not isinstance(approved_at, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", approved_at):
+        raise SystemExit("approved_at must be an ISO date (YYYY-MM-DD)")
     try:
         from datetime import date
 
-        date.fromisoformat(str(authorization["approved_at"]))
+        date.fromisoformat(approved_at)
     except ValueError as exc:
         raise SystemExit("approved_at must be an ISO date (YYYY-MM-DD)") from exc
+
+    public_authorization = {
+        "approved_at": approved_at,
+        "scope": sorted(REQUIRED_AUTHORIZATION_SCOPES),
+        "request_limit_scope": "public_ip",
+        "max_requests_per_ip_per_second": request_rate,
+    }
+    if document_sha256:
+        public_authorization["document_sha256"] = str(document_sha256).lower()
+    if authorization_reference:
+        public_authorization["authorization_reference"] = reference
 
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -131,7 +168,10 @@ def main() -> int:
                 shutil.copytree(source, destination, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.egg-info"))
             else:
                 shutil.copy2(source, destination)
-        (stage / "AUTHORIZATION.json").write_text(json.dumps(authorization, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        (stage / "AUTHORIZATION.json").write_text(
+            json.dumps(public_authorization, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
         validate_stage(stage)
         for command in (stage / "scripts" / "Install.command", stage / "scripts" / "Update.command", stage / "scripts" / "Uninstall.command"):
             os.chmod(command, 0o755)
