@@ -18,6 +18,7 @@ This checklist is the release gate. A checked implementation item is not equival
 - [x] Custom movie/theater identifiers drive open-date, schedule, and seat-map requests without falling back to the Odyssey/Yongsan preset.
 - [x] Seat ranking enforces same-row adjacency, allowed rows, edge exclusion, and center priority.
 - [x] Duplicate checks run before staging and again immediately before submission.
+- [x] The current CGV mobile-ticket empty state and the legacy count state are both recognized; conflicting or unknown markup remains pre-submit `recovering` and is retried no faster than every five minutes.
 - [x] Exact selected voucher count, requested seats, zero remaining balance, and one final button are required.
 - [x] Submission is single-use; restart across the submission boundary becomes `unknown_after_submit`.
 - [x] macOS and Windows installer/updater/uninstaller, LaunchAgent/Scheduled Task registration, diagnostic output, and redacted event logs exist.
@@ -30,11 +31,11 @@ This checklist is the release gate. A checked implementation item is not equival
 - [x] Create the private Notion onboarding draft: `https://app.notion.com/p/3b24fb8e6f4d81168194f4f4a4b68bef` (explicitly marked not ready to share).
 - [x] Generate authorization metadata from the locally retained CGV approval document without copying the confidential source (2026-08-05); only its SHA-256 fingerprint is embedded in the release candidate.
 - [x] Complete a logged-in, no-click `dry-run` with the new dedicated runtime profile on macOS (2026-08-05); the installed LaunchAgent then reached `armed` without Hermes running concurrently.
-- [ ] Capture current CGV checkout DOM fixtures without submitting an order and confirm selectors against them.
+- [x] Capture the current CGV mobile-ticket empty-state structure without submitting an order (2026-08-05); only the sanitized path, heading, tag/class, and empty-state text are retained in `tests/fixtures/cgv-mobile-ticket-empty-2026-08-05.json`.
 - [x] Confirm the Apple Mail test message from the installed LaunchAgent environment, not only an interactive shell (2026-08-05; one-shot GUI launchd probe exited successfully and its unique subject token was found in Apple Mail without exposing the configured recipient).
 - [ ] Complete a clean Windows 10/11 install and confirm the Scheduled Task, dedicated Chrome profile, toast, and classic Outlook test message under a standard non-admin user.
 - [x] Publish the workflow and confirm green hosted macOS and Windows install smoke tests: `https://github.com/alpacawooo/prickly-imax-helper/actions/runs/30974254293`.
-- [ ] Run a 24-hour monitor soak with no 429, duplicate process, memory growth, or login-profile loss.
+- [ ] Run a fresh 24-hour monitor soak with no 429, duplicate process, memory growth, login-profile loss, or checkout-guard failure. The first soak was invalidated on 2026-08-05 when a real seat match exposed a changed CGV mobile-ticket empty-state selector; it stopped before seat selection or payment.
 - [x] Create the private GitHub repository.
 - [ ] Publish tag `0.1.0` and attach the authorization-gated macOS/Windows archives and checksums.
 - [x] Upload the authorization-gated macOS/Windows archives and checksums to a private GitHub draft release for owner review; download count remained zero at creation (2026-08-05).

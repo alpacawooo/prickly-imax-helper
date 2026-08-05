@@ -8,9 +8,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from prickly_imax_helper.checkout import TicketCheckUnavailable
 from prickly_imax_helper.config import write_config
 from prickly_imax_helper.cli import main as cli_main
-from prickly_imax_helper.monitor import OPEN_DATE_REFRESH_SECONDS, rate_limit_backoff_seconds, run
+from prickly_imax_helper.monitor import CHECKOUT_GUARD_RETRY_SECONDS, OPEN_DATE_REFRESH_SECONDS, _checkout, rate_limit_backoff_seconds, run
 from prickly_imax_helper.paths import RuntimePaths
 from prickly_imax_helper.state import Status, read_state, transition
 from test_runtime_core import VALID_CONFIG
@@ -23,6 +24,33 @@ class MonitorRestartSafetyTests(unittest.TestCase):
     def test_repeated_429_backoff_grows_and_is_capped(self):
         self.assertEqual([rate_limit_backoff_seconds(streak, 300) for streak in range(1, 6)], [300, 600, 1200, 2400, 3600])
         self.assertEqual(rate_limit_backoff_seconds(8, 300), 3600)
+
+    def test_unavailable_duplicate_guard_recovers_before_any_booking_click(self):
+        class GuardUnavailableFlow:
+            def __init__(self, *_args, **_kwargs):
+                pass
+
+            def ensure_no_existing_ticket(self, *_args, **_kwargs):
+                raise TicketCheckUnavailable("ticket list ambiguous")
+
+            def open_movie_and_theater(self):
+                raise AssertionError("booking page must not open")
+
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+            transition(paths.heartbeat, Status.ARMED)
+            match = {"date": "2026-08-13", "time": "20:30", "seats": ["D28", "D29"]}
+            session = type("Session", (), {"page": object()})()
+            with patch("prickly_imax_helper.monitor.CheckoutFlow", GuardUnavailableFlow), patch(
+                "prickly_imax_helper.monitor._notify"
+            ):
+                self.assertEqual(_checkout(paths, copy.deepcopy(VALID_CONFIG), session, match), Status.RECOVERING.value)
+            self.assertEqual(read_state(paths.heartbeat)["status"], Status.RECOVERING.value)
+
+    def test_checkout_guard_retry_is_not_a_fast_loop(self):
+        self.assertGreaterEqual(CHECKOUT_GUARD_RETRY_SECONDS, 300)
 
     def test_invalid_config_fails_closed_without_launch_or_restart_error(self):
         with tempfile.TemporaryDirectory() as temp:

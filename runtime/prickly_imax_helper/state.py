@@ -41,6 +41,10 @@ ALLOWED: dict[Status, set[Status]] = {
     Status.SUBMITTING: {Status.COMPLETED, Status.UNKNOWN_AFTER_SUBMIT},
     Status.RECOVERING: {Status.ARMED, Status.LOGIN_REQUIRED, Status.RATE_LIMITED, Status.STOPPED, Status.FATAL},
     Status.RATE_LIMITED: {Status.ARMED, Status.LOGIN_REQUIRED, Status.STOPPED, Status.FATAL},
+    # A fresh, consented setup or an explicit reviewed recovery may re-arm these
+    # pre-submit blocks. Submission-boundary states remain intentionally terminal.
+    Status.BLOCKED_DUPLICATE: {Status.LOGIN_REQUIRED},
+    Status.BLOCKED_PAYMENT: {Status.LOGIN_REQUIRED},
     Status.STOPPED: {Status.LOGIN_REQUIRED},
     Status.FATAL: {Status.LOGIN_REQUIRED},
 }
