@@ -13,7 +13,7 @@ from .paths import RuntimePaths
 from .redaction import redact
 from .setup_server import serve_setup
 from .service import start_service
-from .state import Status, read_state, transition
+from .state import TERMINAL, Status, read_state, transition
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -100,7 +100,15 @@ def main(argv: list[str] | None = None) -> int:
         paths.stop_requested.touch(mode=0o600, exist_ok=True)
         os.chmod(paths.stop_requested, 0o600)
         current = read_state(paths.heartbeat).get("status", Status.UNCONFIGURED.value)
-        if current in {status.value for status in (Status.COMPLETED, Status.UNKNOWN_AFTER_SUBMIT, Status.STOPPED)}:
+        if current == Status.SUBMITTING.value:
+            result = transition(
+                paths.heartbeat,
+                Status.UNKNOWN_AFTER_SUBMIT,
+                detail="stop requested across submission boundary; automatic retry forbidden",
+            )
+            print(json.dumps({"ok": True, "status": result["status"]}, ensure_ascii=False))
+            return 0
+        if current in {status.value for status in TERMINAL}:
             print(json.dumps({"ok": True, "status": current}, ensure_ascii=False))
             return 0
         result = transition(paths.heartbeat, Status.STOPPED, detail="stopped by user")
