@@ -35,7 +35,9 @@ class SetupServerTests(unittest.TestCase):
                     self.assertEqual(response.headers["Referrer-Policy"], "no-referrer")
                     self.assertEqual(response.headers["Cross-Origin-Resource-Policy"], "same-origin")
                     self.assertIn("frame-ancestors 'none'", response.headers["Content-Security-Policy"])
-                    self.assertIn("Prickly IMAX Helper", response.read().decode("utf-8"))
+                    page = response.read().decode("utf-8")
+                    self.assertIn("Prickly IMAX Helper", page)
+                    self.assertRegex(page, r"<button[^>]+value=login[^>]+formnovalidate")
                 token = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["token"][0]
                 payload = urllib.parse.urlencode(
                     {

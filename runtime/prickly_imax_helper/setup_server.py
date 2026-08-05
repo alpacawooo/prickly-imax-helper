@@ -21,7 +21,7 @@ PAGE = """<!doctype html><html lang=\"ko\"><meta charset=\"utf-8\"><meta name=\"
 <style>body{font-family:-apple-system,sans-serif;max-width:720px;margin:48px auto;padding:0 20px;color:#171717}fieldset{border:1px solid #ddd;border-radius:12px;padding:18px;margin:18px 0}label{display:block;margin:12px 0}input{padding:9px;width:100%;box-sizing:border-box}button{padding:12px 18px;border:0;border-radius:9px;background:#111;color:white;font-weight:650}.secondary{background:#eee;color:#111}.warning{background:#fff7ed;padding:14px;border-radius:9px}</style>
 <h1>Prickly IMAX Helper 설정</h1><p>비밀번호와 관람권 번호는 입력하지 않습니다. CGV 로그인은 전용 Chrome 창에서 직접 하세요.</p>
 <form method=post action=\"/action\"><input type=hidden name=token value=\"__TOKEN__\">
-<fieldset><legend>1. CGV 로그인</legend><button class=secondary name=action value=login>전용 Chrome 열기</button><p>__MESSAGE__</p></fieldset>
+<fieldset><legend>1. CGV 로그인</legend><button class=secondary name=action value=login formnovalidate>전용 Chrome 열기</button><p>__MESSAGE__</p></fieldset>
 <fieldset><legend>2. 오디세이 기본 조건</legend><p>용산아이파크몰 IMAX · 2명 연속 · D~J열 · 양끝 20% 제외 · 중앙 우선</p><p>평일 19:00 이후 · 토요일 전체 · 일요일 22:00 이전 · 새로 열리는 날짜 자동 포함</p>
 <label>결과를 받을 이메일<input required type=email name=email value=\"__EMAIL__\" autocomplete=email></label><p>설정 저장 시 __NOTIFIER__로 테스트 메일을 한 번 보냅니다.</p></fieldset>
 <fieldset><legend>3. 자동 예매 사전동의</legend><div class=warning>등록된 IMAX 관람권 정확히 2매로 결제 잔액이 0원일 때만 조건에 맞는 좌석을 한 번 자동 예매합니다. 기존 예매 취소·변경과 중복 제출은 하지 않습니다.</div>
