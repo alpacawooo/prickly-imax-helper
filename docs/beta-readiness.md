@@ -26,7 +26,7 @@ This checklist is the release gate. A checked implementation item is not equival
 ## Required before inviting pilot users
 
 - [x] Create the private Notion onboarding draft: `https://app.notion.com/p/3b24fb8e6f4d81168194f4f4a4b68bef` (explicitly marked not ready to share).
-- [ ] Generate authorization metadata from the retained CGV approval document and its SHA-256 fingerprint.
+- [x] Generate authorization metadata from the locally retained CGV approval document without copying the confidential source (2026-08-05); only its SHA-256 fingerprint is embedded in the release candidate.
 - [x] Complete a logged-in, no-click `dry-run` with the new dedicated runtime profile on macOS (2026-08-05); the installed LaunchAgent then reached `armed` without Hermes running concurrently.
 - [ ] Capture current CGV checkout DOM fixtures without submitting an order and confirm selectors against them.
 - [x] Confirm the Apple Mail test message from the installed LaunchAgent environment, not only an interactive shell (2026-08-05; one-shot GUI launchd probe exited successfully and its unique subject token was found in Apple Mail without exposing the configured recipient).
@@ -35,6 +35,7 @@ This checklist is the release gate. A checked implementation item is not equival
 - [ ] Run a 24-hour monitor soak with no 429, duplicate process, memory growth, or login-profile loss.
 - [x] Create the private GitHub repository.
 - [ ] Publish tag `0.1.0` and attach the authorization-gated macOS/Windows archives and checksums.
+- [x] Upload the authorization-gated macOS/Windows archives and checksums to a private GitHub draft release for owner review; download count remained zero at creation (2026-08-05).
 - [ ] Replace the private-beta guide's generic GitHub wording with the exact repository/release link.
 
 ## Required before calling the beta successful
