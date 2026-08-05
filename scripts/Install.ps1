@@ -72,7 +72,7 @@ if (-not (Test-Path -LiteralPath $UvExe -PathType Leaf)) {
         throw "uv 체크섬이 일치하지 않습니다. 설치를 중단합니다."
     }
     if (Test-Path -LiteralPath $UvExtractDir) { Remove-Item -Recurse -Force -LiteralPath $UvExtractDir }
-    Expand-Archive -LiteralPath $UvArchive -DestinationPath $BootstrapDir -Force
+    Expand-Archive -LiteralPath $UvArchive -DestinationPath $UvExtractDir -Force
 }
 
 $env:UV_PYTHON_INSTALL_DIR = Join-Path $AppHome "python"

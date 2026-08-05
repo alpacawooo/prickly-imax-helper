@@ -71,6 +71,7 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn('$UvVersion = "0.11.15"', installer)
         self.assertIn('$ManagedPythonVersion = "3.12.12"', installer)
         self.assertIn("--no-install-project", installer)
+        self.assertIn("-DestinationPath $UvExtractDir", installer)
         self.assertIn("Register-ScheduledTask", installer)
         self.assertIn("Stop-ScheduledTask", installer)
         self.assertIn("-RunLevel Limited", installer)
