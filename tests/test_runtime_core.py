@@ -147,6 +147,17 @@ class StateTests(unittest.TestCase):
             transition(path, Status.LOGIN_REQUIRED)
             self.assertEqual(read_state(path)["status"], "login_required")
 
+    def test_pre_submit_blocks_can_return_to_login_required_after_review(self):
+        for blocked in (Status.BLOCKED_DUPLICATE, Status.BLOCKED_PAYMENT):
+            with self.subTest(blocked=blocked.value), tempfile.TemporaryDirectory() as temp:
+                path = Path(temp) / "heartbeat.json"
+                transition(path, Status.LOGIN_REQUIRED)
+                transition(path, Status.ARMED)
+                transition(path, Status.STAGING)
+                transition(path, blocked)
+                transition(path, Status.LOGIN_REQUIRED)
+                self.assertEqual(read_state(path)["status"], Status.LOGIN_REQUIRED.value)
+
 
 class RedactionTests(unittest.TestCase):
     def test_secrets_email_and_long_numbers_are_redacted(self):

@@ -1,0 +1,11 @@
+{
+  "captured_at": "2026-08-05",
+  "path": "/mcv/mobileTicketList",
+  "heading": "모바일 티켓",
+  "empty_element": {
+    "tag": "P",
+    "class": "dec",
+    "text": "예매하신 모바일 티켓이 없습니다."
+  },
+  "privacy": "Sanitized structural fixture; no cookies, account data, ticket data, or full DOM retained."
+}

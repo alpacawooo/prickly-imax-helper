@@ -20,6 +20,10 @@ class DuplicateBlocked(CheckoutError):
     pass
 
 
+class TicketCheckUnavailable(CheckoutError):
+    pass
+
+
 class PaymentBlocked(CheckoutError):
     pass
 
@@ -118,18 +122,54 @@ class CheckoutFlow:
     def _ticket_text(self, page: Any) -> str:
         page.goto(MOBILE_TICKETS_URL, wait_until="domcontentloaded")
         page.wait_for_function("() => location.pathname === '/mcv/mobileTicketList'", timeout=20_000)
+        try:
+            page.wait_for_function(
+                r"""() => {
+                  const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+                  const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+                  const hasCount = [...document.querySelectorAll('button')]
+                    .filter(visible)
+                    .some(element => /^시네마\s+\d+/.test(compact(element.innerText)));
+                  const hasEmpty = [...document.querySelectorAll('p,li,div')]
+                    .filter(element => visible(element) && !element.children.length)
+                    .some(element => compact(element.textContent) === '예매하신 모바일 티켓이 없습니다.');
+                  return hasCount || hasEmpty;
+                }""",
+                timeout=10_000,
+            )
+        except Exception:
+            # The snapshot below remains fail-closed if CGV never renders either
+            # authoritative state within the bounded wait.
+            pass
         result = page.evaluate(
             r"""() => {
-              const text = document.body.innerText.replace(/\s+/g, ' ').trim();
-              const button = [...document.querySelectorAll('button')].find(x => x.innerText.trim().startsWith('시네마 '));
+              const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+              const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+              const text = compact(document.body.innerText);
+              const button = [...document.querySelectorAll('button')]
+                .filter(visible)
+                .find(element => compact(element.innerText).startsWith('시네마 '));
               const match = button?.innerText.match(/시네마\s+(\d+)/);
-              return {count: match ? Number(match[1]) : -1, text};
+              const count = match ? Number(match[1]) : -1;
+              const emptyMessages = new Set([
+                '예매하신 모바일 티켓이 없습니다.',
+                '예매하신 모바일 티켓이 없습니다',
+              ]);
+              const empty = [...document.querySelectorAll('p,li,div')]
+                .filter(element => visible(element) && !element.children.length)
+                .some(element => emptyMessages.has(compact(element.textContent)));
+              return {count, empty, text};
             }"""
         )
         count = int(result.get("count", -1))
-        if count < 0:
-            raise DuplicateBlocked("mobile ticket count could not be verified")
-        return "" if count == 0 else str(result.get("text", ""))
+        empty = result.get("empty") is True
+        if count > 0 and empty:
+            raise TicketCheckUnavailable("mobile ticket page presented conflicting ticket state")
+        if count == 0 or empty:
+            return ""
+        if count > 0:
+            return str(result.get("text", ""))
+        raise TicketCheckUnavailable("mobile ticket list structure could not be verified")
 
     def ensure_no_existing_ticket(self, match: dict[str, Any], *, separate_tab: bool = False) -> None:
         if separate_tab:

@@ -2,7 +2,13 @@ from __future__ import annotations
 
 import unittest
 
-from prickly_imax_helper.checkout import duplicate_status, mobile_ticket_proof, payment_proof
+from prickly_imax_helper.checkout import (
+    CheckoutFlow,
+    TicketCheckUnavailable,
+    duplicate_status,
+    mobile_ticket_proof,
+    payment_proof,
+)
 from prickly_imax_helper.presets import odyssey
 
 
@@ -46,6 +52,46 @@ class DuplicateTests(unittest.TestCase):
 
     def test_same_movie_without_provable_show_is_uncertain(self):
         self.assertEqual(duplicate_status("오디세이 예매 내역", self.MATCH, "오디세이"), "uncertain")
+
+
+class MobileTicketListTests(unittest.TestCase):
+    class Page:
+        def __init__(self, result):
+            self.result = result
+
+        def goto(self, *_args, **_kwargs):
+            return None
+
+        def wait_for_function(self, *_args, **_kwargs):
+            return None
+
+        def evaluate(self, *_args, **_kwargs):
+            return self.result
+
+    def setUp(self):
+        self.flow = CheckoutFlow(object(), odyssey())
+
+    def test_current_cgv_empty_state_is_authoritative(self):
+        page = self.Page({"count": -1, "empty": True, "text": "예매하신 모바일 티켓이 없습니다."})
+        self.assertEqual(self.flow._ticket_text(page), "")
+
+    def test_legacy_zero_count_is_still_authoritative(self):
+        page = self.Page({"count": 0, "empty": False, "text": "시네마 0"})
+        self.assertEqual(self.flow._ticket_text(page), "")
+
+    def test_positive_count_returns_ticket_text_for_duplicate_analysis(self):
+        page = self.Page({"count": 1, "empty": False, "text": "시네마 1 오디세이 08.13 20:30"})
+        self.assertIn("오디세이", self.flow._ticket_text(page))
+
+    def test_ambiguous_page_fails_closed_without_claiming_a_duplicate(self):
+        page = self.Page({"count": -1, "empty": False, "text": "모바일 티켓"})
+        with self.assertRaises(TicketCheckUnavailable):
+            self.flow._ticket_text(page)
+
+    def test_conflicting_positive_and_empty_state_fails_closed(self):
+        page = self.Page({"count": 1, "empty": True, "text": "시네마 1 예매하신 모바일 티켓이 없습니다."})
+        with self.assertRaises(TicketCheckUnavailable):
+            self.flow._ticket_text(page)
 
 
 class MobileTicketProofTests(unittest.TestCase):

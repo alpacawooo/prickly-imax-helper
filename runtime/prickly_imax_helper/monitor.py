@@ -18,6 +18,7 @@ from .state import TERMINAL, Status, read_state, transition
 OPEN_DATE_REFRESH_SECONDS = 30.0
 UNCHANGED_SEAT_PROBE_SECONDS = 60.0
 MAX_RATE_LIMIT_COOLDOWN_SECONDS = 3600.0
+CHECKOUT_GUARD_RETRY_SECONDS = 300.0
 
 
 class AlreadyRunning(RuntimeError):
@@ -175,6 +176,7 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
                         key = f"{show['ymd']}|{show.get('scnsNo')}|{show.get('scnSseq')}"
                         if show in changed or now - last_seat_probe.get(key, 0.0) >= UNCHANGED_SEAT_PROBE_SECONDS:
                             targets.append(show)
+                    checkout_guard_unavailable = False
                     for show in targets:
                         key = f"{show['ymd']}|{show.get('scnsNo')}|{show.get('scnSseq')}"
                         last_seat_probe[key] = time.time()
@@ -184,11 +186,19 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
                             write_event(paths.logs, "seat_match", match=match)
                             if allow_checkout:
                                 result = _checkout(paths, config, session, match)
-                                if result != Status.ARMED.value and result != Status.RECOVERING.value:
+                                if result == Status.RECOVERING.value:
+                                    checkout_guard_unavailable = True
+                                elif result != Status.ARMED.value:
                                     return 0
                             else:
                                 write_event(paths.logs, "dry_run_match_not_selected", match=match)
                             break
+                    if checkout_guard_unavailable:
+                        write_event(paths.logs, "checkout_guard_retry_deferred", seconds=CHECKOUT_GUARD_RETRY_SECONDS)
+                        if max_cycles is not None:
+                            return 1
+                        time.sleep(CHECKOUT_GUARD_RETRY_SECONDS)
+                        continue
                     consecutive_errors = 0
                     rate_limit_streak = 0
                     _heartbeat(
