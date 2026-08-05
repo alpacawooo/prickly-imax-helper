@@ -15,7 +15,7 @@ from .scheduler import FairScanState, changed_seat_targets, eligible_shows, matc
 from .state import Status, read_state, transition
 
 
-OPEN_DATE_REFRESH_SECONDS = 300.0
+OPEN_DATE_REFRESH_SECONDS = 30.0
 UNCHANGED_SEAT_PROBE_SECONDS = 60.0
 
 
@@ -42,7 +42,7 @@ def _checkout(paths: RuntimePaths, config: dict[str, Any], session: CgvSession, 
     _heartbeat(paths, Status.STAGING, match=match)
     flow = CheckoutFlow(session.page, config)
     try:
-        flow.ensure_no_existing_ticket(match)
+        flow.ensure_no_existing_ticket(match, separate_tab=True)
         flow.open_movie_and_theater()
         flow.open_match(match)
         flow.select_party_and_seats(match)
