@@ -26,22 +26,40 @@ SUPPORTED_NOTIFICATION_PROVIDERS = {"gmail", "naver", "icloud", "other"}
 def valid_email_address(value: object) -> bool:
     return isinstance(value, str) and re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value) is not None
 
-LOCKED_ODYSSEY_FIELDS = (
-    "movie",
-    "theater",
-    "format",
-    "party_size",
-    "dates",
-    "time_rules",
-    "rows",
-    "edge_exclusion",
-    "preference",
-    "prevent_duplicate_booking",
-    "allow_cancel_existing",
-    "allow_change_existing",
-    "payment",
-    "authorization",
-)
+SUPPORTED_SEAT_PREFERENCES = {"closest_to_center", "row_order_then_left"}
+
+
+def valid_clock(value: object, *, optional: bool = False) -> bool:
+    if optional and value in {None, ""}:
+        return True
+    if not isinstance(value, str) or re.fullmatch(r"(?:[01]\d|2\d):[0-5]\d", value) is None:
+        return False
+    return True
+
+
+def _validate_time_rules(value: object) -> list[str]:
+    if not isinstance(value, dict):
+        return ["time_rules must be an object"]
+    errors: list[str] = []
+    for day_group in ("weekday", "saturday", "sunday"):
+        rule = value.get(day_group)
+        if not isinstance(rule, dict):
+            errors.append(f"time_rules.{day_group} must be an object")
+            continue
+        if rule.get("any_time") is True:
+            continue
+        start = rule.get("at_or_after")
+        before = rule.get("before")
+        if not valid_clock(start, optional=True):
+            errors.append(f"time_rules.{day_group}.at_or_after must be HH:MM or empty")
+        if not valid_clock(before, optional=True):
+            errors.append(f"time_rules.{day_group}.before must be HH:MM or empty")
+        if start and before:
+            start_minutes = int(start[:2]) * 60 + int(start[3:])
+            before_minutes = int(before[:2]) * 60 + int(before[3:])
+            if start_minutes >= before_minutes:
+                errors.append(f"time_rules.{day_group} start must be earlier than before")
+    return errors
 
 
 def validate_config(value: dict[str, Any]) -> list[str]:
@@ -50,9 +68,12 @@ def validate_config(value: dict[str, Any]) -> list[str]:
     for key in required:
         if key not in value:
             errors.append(f"missing {key}")
-    for key in LOCKED_ODYSSEY_FIELDS:
-        if value.get(key) != ODYSSEY[key]:
-            errors.append(f"private beta requires exact Odyssey preset field: {key}")
+    for key in ("movie", "theater", "format"):
+        field = value.get(key)
+        if not isinstance(field, str) or not field.strip() or len(field) > 100:
+            errors.append(f"{key} must be a non-empty string of at most 100 characters")
+    if isinstance(value.get("format"), str) and "imax" not in value["format"].casefold():
+        errors.append("format must contain IMAX while registered_imax_voucher is the only payment method")
     party = value.get("party_size")
     if not isinstance(party, int) or not 1 <= party <= 8:
         errors.append("party_size must be an integer from 1 to 8")
@@ -62,6 +83,23 @@ def validate_config(value: dict[str, Any]) -> list[str]:
     edge = value.get("edge_exclusion")
     if not isinstance(edge, (int, float)) or not 0 <= edge < 0.5:
         errors.append("edge_exclusion must be at least 0 and below 0.5")
+    if value.get("preference") not in SUPPORTED_SEAT_PREFERENCES:
+        errors.append("preference must be closest_to_center or row_order_then_left")
+    errors.extend(_validate_time_rules(value.get("time_rules")))
+    if value.get("dates") != "all_open":
+        errors.append("dates must remain all_open")
+    target = value.get("target")
+    is_legacy_odyssey = all(value.get(key) == ODYSSEY[key] for key in ("movie", "theater", "format"))
+    if target is None and not is_legacy_odyssey:
+        errors.append("target identifiers are required for a custom movie, theater, or format")
+    elif target is not None:
+        if not isinstance(target, dict):
+            errors.append("target must be an object")
+        else:
+            for key in ("company_code", "site_no", "movie_no"):
+                identifier = target.get(key)
+                if not isinstance(identifier, str) or re.fullmatch(r"[A-Za-z0-9_-]+", identifier) is None:
+                    errors.append(f"target.{key} must be a safe identifier")
     payment = value.get("payment")
     if not isinstance(payment, dict):
         errors.append("payment must be an object")

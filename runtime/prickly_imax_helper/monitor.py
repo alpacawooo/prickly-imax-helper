@@ -44,6 +44,14 @@ def _checkout(paths: RuntimePaths, config: dict[str, Any], session: CgvSession, 
     try:
         flow.ensure_no_existing_ticket(match, separate_tab=True)
         flow.open_movie_and_theater()
+        selected_target = session.booking_target_from_page()
+        expected_target = config.get("target") or {
+            "company_code": "A420",
+            "site_no": "0013",
+            "movie_no": "30001323",
+        }
+        if selected_target != expected_target:
+            raise CheckoutError("selected movie/theater identifiers do not match the monitored target")
         flow.open_match(match)
         flow.select_party_and_seats(match)
         flow.open_payment_and_apply_vouchers()
@@ -124,6 +132,9 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
             paths,
             minimum_interval_seconds=float(config["request_policy"]["minimum_interval_seconds"]),
             cooldown_seconds=float(config["request_policy"].get("rate_limit_cooldown_seconds", 300)),
+            company_code=str(config.get("target", {}).get("company_code", "A420")),
+            site_no=str(config.get("target", {}).get("site_no", "0013")),
+            movie_no=str(config.get("target", {}).get("movie_no", "30001323")),
         )
         with session.locked():
             completed_cycles = 0
@@ -148,7 +159,7 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
                         time.sleep(5)
                         continue
                     shows = eligible_shows(ymd, session.schedules(ymd), config)
-                    changed = changed_seat_targets(state, shows)
+                    changed = changed_seat_targets(state, shows, int(config["party_size"]))
                     targets = []
                     for show in shows:
                         key = f"{show['ymd']}|{show.get('scnsNo')}|{show.get('scnSseq')}"

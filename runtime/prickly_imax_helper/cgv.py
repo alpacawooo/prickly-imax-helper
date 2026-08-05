@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import urllib.parse
 from dataclasses import dataclass
 from typing import Any, Iterator
 
@@ -33,6 +34,9 @@ class CgvSession:
     paths: RuntimePaths
     minimum_interval_seconds: float = 1.0
     cooldown_seconds: float = 300.0
+    company_code: str = COMPANY_CODE
+    site_no: str = SITE_NO
+    movie_no: str = MOVIE_NO
 
     def __post_init__(self) -> None:
         self.budget = RequestBudget(self.paths.root, minimum_interval_seconds=self.minimum_interval_seconds)
@@ -121,13 +125,13 @@ class CgvSession:
 
     def open_dates(self) -> list[str]:
         data = self.api_get(
-            f"/api/v1/booking/searchSiteScnscYmdListByMov?coCd={COMPANY_CODE}&siteNo={SITE_NO}&movNo={MOVIE_NO}"
+            f"/api/v1/booking/searchSiteScnscYmdListByMov?coCd={self.company_code}&siteNo={self.site_no}&movNo={self.movie_no}"
         )
         return [str(item["scnYmd"]) for item in data]
 
     def schedules(self, ymd: str) -> list[dict[str, Any]]:
         return self.api_get(
-            f"/api/v1/booking/searchSchByMov?coCd={COMPANY_CODE}&siteNo={SITE_NO}&movNo={MOVIE_NO}"
+            f"/api/v1/booking/searchSchByMov?coCd={self.company_code}&siteNo={self.site_no}&movNo={self.movie_no}"
             f"&scnYmd={ymd}&rtctlScopCd=01"
         )
 
@@ -140,3 +144,23 @@ class CgvSession:
         labels = [f"{seat['seatRowNm']}{seat['seatNo']}" for seat in seats]
         available = [f"{seat['seatRowNm']}{seat['seatNo']}" for seat in seats if seat.get("seatSaleYn") == "Y"]
         return {"all": labels, "available": available}
+
+    def booking_target_from_page(self) -> dict[str, str]:
+        if self.page is None:
+            raise CgvError("browser is not connected")
+        urls = self.page.evaluate(
+            """() => performance.getEntriesByType('resource').map(entry => entry.name).reverse()"""
+        )
+        for raw in urls:
+            parsed = urllib.parse.urlparse(str(raw))
+            if not parsed.path.endswith("/api/v1/booking/searchSchByMov"):
+                continue
+            query = urllib.parse.parse_qs(parsed.query)
+            target = {
+                "company_code": query.get("coCd", [""])[0],
+                "site_no": query.get("siteNo", [""])[0],
+                "movie_no": query.get("movNo", [""])[0],
+            }
+            if all(target.values()):
+                return target
+        raise CgvError("could not resolve CGV target identifiers from the selected booking page")

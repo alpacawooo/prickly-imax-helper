@@ -22,7 +22,7 @@ vouchers, notification address, and payment state on the user's PC.
 - Keep credentials and browser data local. Never commit runtime state.
 - Use one browser lock for monitoring and checkout.
 - Refresh the open-date list dynamically.
-- Select only an exact same-row consecutive pair satisfying the configured edge exclusion.
+- Select only an exact same-row consecutive block of the configured size satisfying the configured rows and edge exclusion.
 - Recheck existing tickets immediately before checkout.
 - Submit only when the configured payment method covers the full amount and the remaining balance is zero.
 - Verify completion from the resulting mobile ticket before reporting success.

@@ -10,28 +10,11 @@ from pathlib import Path
 
 
 WEEKDAYS = "월화수목금토일"
-LOCKED_PRESET = {
-    "movie": "오디세이",
-    "theater": "용산아이파크몰",
-    "format": "IMAX",
-    "party_size": 2,
+LOCKED_SAFETY = {
     "dates": "all_open",
-    "time_rules": {
-        "weekday": {"at_or_after": "19:00"},
-        "saturday": {"any_time": True},
-        "sunday": {"before": "22:00"},
-    },
-    "rows": list("DEFGHIJ"),
-    "edge_exclusion": 0.2,
-    "preference": "closest_to_center",
     "prevent_duplicate_booking": True,
     "allow_cancel_existing": False,
     "allow_change_existing": False,
-    "payment": {
-        "method": "registered_imax_voucher",
-        "voucher_count": 2,
-        "maximum_remaining_balance": 0,
-    },
     "authorization": {
         "automatic_query": True,
         "automatic_seat_selection": True,
@@ -53,9 +36,14 @@ def validate(config: dict) -> dict:
     for key in ("movie", "theater", "format", "party_size", "rows", "edge_exclusion", "time_rules", "payment"):
         if key not in config:
             errors.append(f"missing {key}")
-    for key, expected in LOCKED_PRESET.items():
+    for key, expected in LOCKED_SAFETY.items():
         if config.get(key) != expected:
-            errors.append(f"private beta requires exact Odyssey preset field: {key}")
+            errors.append(f"private beta requires fixed safety field: {key}")
+    for key in ("movie", "theater", "format"):
+        if not isinstance(config.get(key), str) or not config[key].strip():
+            errors.append(f"{key} must be a non-empty string")
+    if isinstance(config.get("format"), str) and "imax" not in config["format"].casefold():
+        errors.append("format must contain IMAX while registered_imax_voucher is the only payment method")
     party = config.get("party_size")
     if not isinstance(party, int) or party < 1 or party > 8:
         errors.append("party_size must be an integer from 1 to 8")
@@ -65,11 +53,15 @@ def validate(config: dict) -> dict:
     edge = config.get("edge_exclusion")
     if not isinstance(edge, (int, float)) or not 0 <= edge < 0.5:
         errors.append("edge_exclusion must be at least 0 and below 0.5")
+    if config.get("preference") not in {"closest_to_center", "row_order_then_left"}:
+        errors.append("unsupported preference")
     payment = config.get("payment", {})
     if payment.get("maximum_remaining_balance") != 0:
         errors.append("public beta requires maximum_remaining_balance to be 0")
     if payment.get("voucher_count") != party:
         errors.append("voucher_count must equal party_size")
+    if payment.get("method") != "registered_imax_voucher":
+        errors.append("public beta supports registered_imax_voucher only")
     if config.get("allow_cancel_existing", False):
         errors.append("allow_cancel_existing must be false")
     if config.get("allow_change_existing", False):
@@ -83,13 +75,20 @@ def eligible_start(day: date, start: str, config: dict) -> bool:
     hour, minute = map(int, start.split(":"))
     total = hour * 60 + minute
     rules = config["time_rules"]
-    if day.weekday() == 5:
-        return bool(rules["saturday"]["any_time"])
-    if day.weekday() == 6:
-        limit_h, limit_m = map(int, rules["sunday"]["before"].split(":"))
-        return total < limit_h * 60 + limit_m
-    start_h, start_m = map(int, rules["weekday"]["at_or_after"].split(":"))
-    return total >= start_h * 60 + start_m
+    rule = rules["saturday"] if day.weekday() == 5 else rules["sunday"] if day.weekday() == 6 else rules["weekday"]
+    if rule.get("any_time") is True:
+        return True
+    lower = rule.get("at_or_after")
+    upper = rule.get("before")
+    if lower:
+        start_h, start_m = map(int, lower.split(":"))
+        if total < start_h * 60 + start_m:
+            return False
+    if upper:
+        limit_h, limit_m = map(int, upper.split(":"))
+        if total >= limit_h * 60 + limit_m:
+            return False
+    return True
 
 
 def rank_best_block(seat_map: dict, config: dict) -> dict | None:
@@ -114,10 +113,14 @@ def rank_best_block(seat_map: dict, config: dict) -> dict | None:
                 continue
             midpoint = sum(positions[number] for number in block) / party
             distance = abs(midpoint - center) / len(numbers)
-            ranked.append((distance, row_index, block[0], labels))
+            if config.get("preference") == "row_order_then_left":
+                key = (float(row_index), float(block[0]), distance)
+            else:
+                key = (distance, float(row_index), float(block[0]))
+            ranked.append((key, distance, labels))
     if not ranked:
         return None
-    distance, _, _, labels = min(ranked)
+    _, distance, labels = min(ranked)
     return {"seats": labels, "pair": "-".join(labels), "center_distance": round(distance, 4)}
 
 
