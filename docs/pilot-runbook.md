@@ -19,12 +19,12 @@ Windows의 새 Outlook만 사용하는 참가자는 0.1.0 파일럿 대상에서
 
 ## 초대 전 운영자 확인
 
-- [ ] 승인 메타데이터에 승인일, 허가 범위, `public_ip`, 초당 최대 1회, 공개 참조값 또는 비공개 원문 SHA-256 지문이 있다.
-- [ ] GitHub tag와 release가 정확히 `0.1.0`이다.
-- [ ] macOS와 Windows 아카이브 및 각 `.sha256` 파일 네 개가 release에 첨부돼 있다.
-- [ ] GitHub Actions의 macOS와 Windows 작업이 모두 통과했다.
-- [ ] Notion 페이지의 릴리스 링크가 실제 비공개 release를 가리킨다.
-- [ ] 10분 soak가 429·중복 감시·로그인 손실·큰 메모리 증가 없이 통과했다.
+- [x] 승인 메타데이터에 승인일, 허가 범위, `public_ip`, 초당 최대 1회, 공개 참조값 또는 비공개 원문 SHA-256 지문이 있다.
+- [x] GitHub tag와 release가 정확히 `0.1.0`이다.
+- [x] macOS와 Windows 아카이브 및 각 `.sha256` 파일 네 개가 release에 첨부돼 있다.
+- [x] GitHub Actions의 macOS와 Windows 작업이 모두 통과했다.
+- [x] Notion 페이지의 릴리스 링크가 실제 비공개 release를 가리킨다.
+- [x] 10분 soak가 429·중복 감시·로그인 손실·큰 메모리 증가 없이 통과했다.
 - [ ] 참가자별 GitHub 비공개 저장소 초대를 보냈다.
 
 ## 참가자별 완료 증거
