@@ -137,7 +137,7 @@ class CgvSession:
 
     def seats(self, ymd: str, screen_no: str, sequence: str) -> dict[str, list[str]]:
         data = self.api_get(
-            f"/api/v1/booking/searchIfSeatData?coCd={COMPANY_CODE}&siteNo={SITE_NO}&scnYmd={ymd}"
+            f"/api/v1/booking/searchIfSeatData?coCd={self.company_code}&siteNo={self.site_no}&scnYmd={ymd}"
             f"&scnsNo={screen_no}&scnSseq={sequence}"
         )
         seats = [seat for item in (data or {}).get("items", []) for seat in item.get("seats", [])]

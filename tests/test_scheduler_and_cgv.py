@@ -140,6 +140,41 @@ class CgvApiTests(unittest.TestCase):
             self.assertEqual(session.open_dates(), ["20260808"])
             self.assertIn("coCd=TEST&siteNo=0099&movNo=movie123", str(page.last_path))
 
+    def test_custom_target_identifiers_drive_seat_request(self):
+        with tempfile.TemporaryDirectory() as temp:
+            session = CgvSession(
+                RuntimePaths(Path(temp)),
+                company_code="TEST",
+                site_no="0099",
+                movie_no="movie123",
+            )
+            session.budget = FakeBudget()
+            page = FakePage(
+                {
+                    "status": 200,
+                    "retryAfter": None,
+                    "text": json.dumps(
+                        {
+                            "statusCode": 0,
+                            "data": {
+                                "items": [
+                                    {
+                                        "seats": [
+                                            {"seatRowNm": "H", "seatNo": "15", "seatSaleYn": "Y"},
+                                            {"seatRowNm": "H", "seatNo": "16", "seatSaleYn": "N"},
+                                        ]
+                                    }
+                                ]
+                            },
+                        }
+                    ),
+                }
+            )
+            session.page = page
+            self.assertEqual(session.seats("20260808", "018", "1"), {"all": ["H15", "H16"], "available": ["H15"]})
+            self.assertIn("coCd=TEST&siteNo=0099", str(page.last_path))
+            self.assertNotIn("siteNo=0013", str(page.last_path))
+
 
 if __name__ == "__main__":
     unittest.main()
