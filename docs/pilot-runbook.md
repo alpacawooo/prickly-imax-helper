@@ -49,6 +49,22 @@ Windows의 새 Outlook만 사용하는 참가자는 0.1.0 파일럿 대상에서
 - [ ] 다시 시작 및 `armed` 확인
 - [ ] uninstall에서 프로그램만 삭제하고 설정·로그인 프로필 보존 확인
 
+## 개인정보 없는 증거 파일
+
+운영자는 저장소 밖의 개인 폴더에 빈 양식 세 개를 만든다. 이름·이메일·IP 주소·진단 원문은 기록하지 않는다.
+
+```bash
+python3 scripts/pilot_audit.py init --output "$HOME/prickly-pilot-evidence"
+```
+
+각 참가자의 `diagnose` JSON은 운영자가 내용을 보관하지 않고 로컬에서 SHA-256만 계산해 `redacted_diagnose_sha256`에 기록한다. 설치 아카이브의 SHA-256도 같은 방식으로 기록한다. 모든 체크가 끝나면 아래 명령이 세 참가자, macOS·Windows 포함, Windows 표준 사용자, 서로 다른 수신 서비스, 전 단계 완료 여부를 검사한다.
+
+```bash
+python3 scripts/pilot_audit.py verify --input "$HOME/prickly-pilot-evidence"
+```
+
+`"ok": true`가 아니면 베타 성공으로 표시하거나 릴리스를 게시하지 않는다. 이 폴더는 GitHub에 올리지 않는다.
+
 ## 실패 보고 양식
 
 비밀번호, 전체 화면 캡처, CGV 고객번호, 관람권 번호, 쿠키, 카드정보는 받지 않는다. 참가자는 아래 정보만 보낸다.

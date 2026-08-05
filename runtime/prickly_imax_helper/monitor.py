@@ -215,6 +215,7 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
                         return 0
                 except LoginRequired as exc:
                     _heartbeat(paths, Status.LOGIN_REQUIRED, str(exc))
+                    write_event(paths.logs, "login_required", error=str(exc))
                     if max_cycles is not None:
                         return 1
                     time.sleep(30)

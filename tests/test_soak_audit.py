@@ -20,6 +20,7 @@ class SoakAuditTests(unittest.TestCase):
             "started_at": "2026-08-04T00:00:00+00:00",
             "captured_at": "2026-08-05T00:00:01+00:00",
             "status": "armed",
+            "match": None,
             "heartbeat_age_seconds": 5,
             "processes": {
                 "monitor": {"count": 1, "rss_kib": 40_000},
@@ -45,6 +46,22 @@ class SoakAuditTests(unittest.TestCase):
         self.assertTrue(any("exactly one" in error for error in errors))
         self.assertTrue(any("rate_limited" in error for error in errors))
 
+    def test_checkout_guard_login_loss_stale_match_and_conflicting_browser_fail(self):
+        baseline = self.healthy()
+        current = self.healthy()
+        current["match"] = {"pair": "D28-D29"}
+        current["processes"]["conflicting_automation"] = {"count": 1, "rss_kib": 100_000}
+        errors = soak_audit.evaluate(
+            baseline,
+            current,
+            {"checkout_guard_retry_deferred": 1, "checkout_pre_submit_error": 1, "login_required": 1},
+        )
+        self.assertTrue(any("stale seat match" in error for error in errors))
+        self.assertTrue(any("Hermes" in error for error in errors))
+        self.assertTrue(any("checkout_guard_retry_deferred" in error for error in errors))
+        self.assertTrue(any("checkout_pre_submit_error" in error for error in errors))
+        self.assertTrue(any("login_required" in error for error in errors))
+
     def test_large_memory_growth_fails_but_small_noise_passes(self):
         baseline = self.healthy()
         current = self.healthy()
@@ -67,6 +84,7 @@ class SoakAuditTests(unittest.TestCase):
             (
                 f"100 40000 {home}/venv/bin/prickly-imax --home {home} run",
                 f"101 90000 {home}/venv/site-packages/playwright/driver/node run-driver",
+                "102 100000 /Applications/Google Chrome --user-data-dir=/Users/pilot/.hermes/browser-profiles/cgv",
             )
         )
         with patch.object(soak_audit.subprocess, "run", return_value=SimpleNamespace(stdout=output)):
@@ -74,6 +92,7 @@ class SoakAuditTests(unittest.TestCase):
                 processes = soak_audit.process_memory(home)
         self.assertEqual(processes["monitor"]["count"], 1)
         self.assertEqual(processes["driver"]["count"], 1)
+        self.assertEqual(processes["conflicting_automation"]["count"], 1)
 
 
 if __name__ == "__main__":
