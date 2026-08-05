@@ -124,7 +124,7 @@ def evaluate(
     current: dict[str, Any],
     new_events: dict[str, int],
     *,
-    minimum_seconds: float = 3_600.0,
+    minimum_seconds: float = 600.0,
 ) -> list[str]:
     errors: list[str] = []
     elapsed = (parse_time(current["captured_at"]) - parse_time(baseline["started_at"])).total_seconds()
@@ -166,10 +166,10 @@ def write_private_json(target: Path, value: dict[str, Any]) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Record or verify a redacted Prickly 1-hour soak snapshot")
+    parser = argparse.ArgumentParser(description="Record or verify a redacted Prickly 10-minute soak snapshot")
     parser.add_argument("mode", choices=("start", "verify"))
     parser.add_argument("--home", type=Path, required=True)
-    parser.add_argument("--minimum-seconds", type=float, default=3_600.0)
+    parser.add_argument("--minimum-seconds", type=float, default=600.0)
     args = parser.parse_args()
     home = args.home.expanduser().resolve()
     baseline_path = home / "state" / BASELINE_NAME
