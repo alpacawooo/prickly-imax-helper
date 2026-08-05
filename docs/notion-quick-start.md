@@ -106,6 +106,26 @@ Windows:
 & "$env:LOCALAPPDATA\PricklyIMAXHelper\bin\prickly-imax.cmd" stop
 ```
 
+## 조건 다시 설정
+
+감시 중에는 전용 Chrome 잠금을 보호하기 위해 설정 페이지를 동시에 열지 않습니다. 먼저 감시를 중지하고 `setup`을 실행한 뒤, 저장이 끝나면 다시 시작합니다.
+
+macOS:
+
+```bash
+~/.local/bin/prickly-imax stop
+~/.local/bin/prickly-imax setup
+~/.local/bin/prickly-imax start
+```
+
+Windows PowerShell:
+
+```powershell
+& "$env:LOCALAPPDATA\PricklyIMAXHelper\bin\prickly-imax.cmd" stop
+& "$env:LOCALAPPDATA\PricklyIMAXHelper\bin\prickly-imax.cmd" setup
+& "$env:LOCALAPPDATA\PricklyIMAXHelper\bin\prickly-imax.cmd" start
+```
+
 ## 삭제
 
 다운로드해 둔 릴리스 폴더에서 macOS는 `scripts/Uninstall.command`, Windows는 `scripts/Uninstall.ps1`을 실행합니다. 프로그램만 지울지 CGV 로그인 프로필까지 지울지 삭제 전에 다시 묻습니다.
