@@ -63,6 +63,13 @@ jobs:
           export PRICKLY_INSTALL_DRY_RUN=1
           zsh scripts/Install.command
           "$PRICKLY_IMAX_HOME/venv/bin/prickly-imax" --home "$PRICKLY_IMAX_HOME" doctor
+          zsh scripts/Update.command
+          "$PRICKLY_IMAX_HOME/venv/bin/prickly-imax" --home "$PRICKLY_IMAX_HOME" doctor
+          export PRICKLY_UNINSTALL_KEEP_DATA=1
+          zsh scripts/Uninstall.command
+          test ! -e "$PRICKLY_IMAX_HOME/app"
+          test ! -e "$PRICKLY_IMAX_HOME/venv"
+          test -d "$PRICKLY_IMAX_HOME"
       - name: Smoke-test Windows installer
         if: runner.os == 'Windows'
         shell: powershell
@@ -73,3 +80,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & "$env:PRICKLY_IMAX_HOME\bin\prickly-imax.cmd" --home $env:PRICKLY_IMAX_HOME doctor
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & scripts\Update.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$env:PRICKLY_IMAX_HOME\bin\prickly-imax.cmd" --home $env:PRICKLY_IMAX_HOME doctor
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:PRICKLY_UNINSTALL_KEEP_DATA = '1'
+          & scripts\Uninstall.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (Test-Path "$env:PRICKLY_IMAX_HOME\app") { throw 'app directory survived uninstall' }
+          if (Test-Path "$env:PRICKLY_IMAX_HOME\venv") { throw 'venv directory survived uninstall' }
+          if (-not (Test-Path "$env:PRICKLY_IMAX_HOME")) { throw 'preserved data root was removed' }

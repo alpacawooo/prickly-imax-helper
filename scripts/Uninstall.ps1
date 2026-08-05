@@ -16,7 +16,11 @@ if (-not $AppHome.StartsWith($ExpectedPrefix, [StringComparison]::OrdinalIgnoreC
 Write-Host "다음 항목을 제거합니다:"
 Write-Host "- 감시 예약 작업: $TaskName"
 Write-Host "- 설치된 실행 파일: $AppHome\app, $AppHome\venv, $AppHome\bin"
-$Answer = Read-Host "설정·로그·CGV 로그인 프로필까지 모두 삭제할까요? [y/N]"
+$Answer = if ($env:PRICKLY_UNINSTALL_KEEP_DATA -eq "1") {
+    "n"
+} else {
+    Read-Host "설정·로그·CGV 로그인 프로필까지 모두 삭제할까요? [y/N]"
+}
 
 Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
 Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue

@@ -14,11 +14,15 @@ if [[ ${APP_HOME} != "${USER_HOME}/"* ]]; then
 fi
 
 print "다음 항목을 제거합니다:"
-print "- 감시 서비스: ${PLIST_PATH}"
-print "- 설치된 실행 파일: ${APP_HOME}/app, ${APP_HOME}/venv"
-print "- 명령 링크: ${CLI_LINK}"
+print -r -- "- 감시 서비스: ${PLIST_PATH}"
+print -r -- "- 설치된 실행 파일: ${APP_HOME}/app, ${APP_HOME}/venv"
+print -r -- "- 명령 링크: ${CLI_LINK}"
 print ""
-read "answer?설정·로그·CGV 로그인 프로필까지 모두 삭제할까요? [y/N] "
+if [[ ${PRICKLY_UNINSTALL_KEEP_DATA:-0} == 1 ]]; then
+  answer=n
+else
+  read "answer?설정·로그·CGV 로그인 프로필까지 모두 삭제할까요? [y/N] "
+fi
 
 /bin/launchctl bootout "gui/$(id -u)/${LABEL}" >/dev/null 2>&1 || true
 [[ ! -f "${PLIST_PATH}" ]] || /bin/rm "${PLIST_PATH}"
