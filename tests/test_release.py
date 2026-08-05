@@ -75,6 +75,7 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn("Stop-ScheduledTask", installer)
         self.assertIn("-RunLevel Limited", installer)
         self.assertIn("$ExpectedPrefix", installer)
+        self.assertIn("%~dp0..\\venv\\Scripts\\python.exe", installer)
         self.assertIn("$ExpectedPrefix", uninstaller)
         self.assertNotIn("password", installer.lower())
 

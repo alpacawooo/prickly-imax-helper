@@ -93,7 +93,8 @@ from prickly_imax_helper.cli import main
 raise SystemExit(main())
 "@
 Set-Content -LiteralPath $LauncherPy -Value $LauncherSource -Encoding UTF8
-Set-Content -LiteralPath $LauncherCmd -Value "@echo off`r`n`"$PythonExe`" `"$LauncherPy`" %*`r`n" -Encoding ASCII
+$LauncherCmdSource = '@echo off' + "`r`n" + '"%~dp0..\venv\Scripts\python.exe" "%~dp0launcher.py" %*' + "`r`n"
+Set-Content -LiteralPath $LauncherCmd -Value $LauncherCmdSource -Encoding ASCII
 
 if ($DryRun) {
     Write-Host "Dry-run: 설정 페이지와 예약 작업 시작을 생략합니다."
