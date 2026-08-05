@@ -37,7 +37,7 @@ This checklist is the release gate. A checked implementation item is not equival
 - [x] Publish the workflow and confirm green hosted macOS and Windows install smoke tests: `https://github.com/alpacawooo/prickly-imax-helper/actions/runs/30974254293`.
 - [ ] Run a fresh 24-hour monitor soak with no 429, duplicate process, memory growth, login-profile loss, or checkout-guard failure. The first soak was invalidated on 2026-08-05 when a real seat match exposed a changed CGV mobile-ticket empty-state selector; it stopped before seat selection or payment.
 - [x] Create the private GitHub repository.
-- [ ] Publish tag `0.1.0` and attach the authorization-gated macOS/Windows archives and checksums.
+- [ ] Publish tag `0.1.0` as an authorized private prerelease and attach the authorization-gated macOS/Windows archives and checksums; do not call the beta successful until soak and three real pilots pass.
 - [x] Upload the authorization-gated macOS/Windows archives and checksums to a private GitHub draft release for owner review; download count remained zero at creation (2026-08-05).
 - [x] Replace the private-beta guide's generic GitHub wording with the exact private repository and current draft-release links (2026-08-05).
 - [x] Add a privacy-safe three-pilot evidence generator and validator that requires macOS and Windows, a Windows standard user, distinct recipient providers, all lifecycle steps, local-only credentials, archive/diagnose digests, and no email or absolute user path in evidence.
