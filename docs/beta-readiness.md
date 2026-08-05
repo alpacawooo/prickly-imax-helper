@@ -28,7 +28,7 @@ This checklist is the release gate. A checked implementation item is not equival
 
 ## Required before inviting pilot users
 
-- [x] Create the private Notion onboarding draft: `https://app.notion.com/p/3b24fb8e6f4d81168194f4f4a4b68bef` (explicitly marked not ready to share).
+- [x] Publish the invited-pilot Notion onboarding guide: `https://app.notion.com/p/3b24fb8e6f4d81168194f4f4a4b68bef` (explicitly marked for approved pilots only; general sharing remains prohibited).
 - [x] Generate authorization metadata from the locally retained CGV approval document without copying the confidential source (2026-08-05); only its SHA-256 fingerprint is embedded in the release candidate.
 - [x] Complete a logged-in, no-click `dry-run` with the new dedicated runtime profile on macOS (2026-08-05); the installed LaunchAgent then reached `armed` without Hermes running concurrently.
 - [x] Capture the current CGV mobile-ticket empty-state structure without submitting an order (2026-08-05); only the sanitized path, heading, tag/class, and empty-state text are retained in `tests/fixtures/cgv-mobile-ticket-empty-2026-08-05.json`.
@@ -37,9 +37,9 @@ This checklist is the release gate. A checked implementation item is not equival
 - [x] Publish the workflow and confirm green hosted macOS and Windows install smoke tests: `https://github.com/alpacawooo/prickly-imax-helper/actions/runs/30974254293`.
 - [ ] Run a fresh 24-hour monitor soak with no 429, duplicate process, memory growth, login-profile loss, or checkout-guard failure. The first soak was invalidated on 2026-08-05 when a real seat match exposed a changed CGV mobile-ticket empty-state selector; it stopped before seat selection or payment.
 - [x] Create the private GitHub repository.
-- [ ] Publish tag `0.1.0` as an authorized private prerelease and attach the authorization-gated macOS/Windows archives and checksums; do not call the beta successful until soak and three real pilots pass.
-- [x] Upload the authorization-gated macOS/Windows archives and checksums to a private GitHub draft release for owner review; download count remained zero at creation (2026-08-05).
-- [x] Replace the private-beta guide's generic GitHub wording with the exact private repository and current draft-release links (2026-08-05).
+- [x] Publish tag `0.1.0` as an authorized private prerelease and attach the authorization-gated macOS/Windows archives and checksums: `https://github.com/alpacawooo/prickly-imax-helper/releases/tag/0.1.0` (2026-08-05). Do not call the beta successful until soak and three real pilots pass.
+- [x] Verify the private prerelease contains both authorization-gated platform archives and both checksum files; download count remained zero at publication verification (2026-08-05).
+- [x] Replace the private-beta guide's draft wording with the exact private repository and published prerelease links (2026-08-05).
 - [x] Add a privacy-safe three-pilot evidence generator and validator that requires macOS and Windows, a Windows standard user, distinct recipient providers, all lifecycle steps, local-only credentials, archive/diagnose digests, and no email or absolute user path in evidence.
 
 ## Required before calling the beta successful
