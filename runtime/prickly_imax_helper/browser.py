@@ -53,6 +53,30 @@ def _json_url(url: str, timeout: float = 1.0) -> Any:
         return json.load(response)
 
 
+def _ensure_browser_tab(port: int, url: str, *, wait_seconds: float = 2.0) -> None:
+    """Wait for Chrome's startup tab, then create it if Chrome dropped the URL."""
+    expected_host = urllib.parse.urlparse(url).hostname or ""
+    deadline = time.monotonic() + wait_seconds
+    while True:
+        try:
+            tabs = _json_url(f"http://127.0.0.1:{port}/json/list")
+        except (OSError, urllib.error.URLError):
+            tabs = []
+        if any(expected_host in str(tab.get("url", "")) for tab in tabs):
+            return
+        if time.monotonic() >= deadline:
+            break
+        time.sleep(0.1)
+    request = urllib.request.Request(
+        f"http://127.0.0.1:{port}/json/new?{urllib.parse.quote(url, safe='')}",
+        method="PUT",
+    )
+    try:
+        urllib.request.urlopen(request, timeout=2).close()
+    except urllib.error.URLError as exc:
+        raise BrowserError(f"Could not open the dedicated Chrome tab: {exc}") from exc
+
+
 def browser_info(paths: RuntimePaths) -> dict[str, Any]:
     info_path = paths.state_dir / "browser.json"
     try:
@@ -97,20 +121,7 @@ def launch_browser(paths: RuntimePaths, url: str = CGV_BOOKING_URL, *, headless:
     paths.prepare()
     current = browser_info(paths)
     if current:
-        try:
-            tabs = _json_url(f"http://127.0.0.1:{int(current['port'])}/json/list")
-        except (OSError, urllib.error.URLError):
-            tabs = []
-        if any("cgv.co.kr" in str(tab.get("url", "")) for tab in tabs):
-            return current
-        request = urllib.request.Request(
-            f"http://127.0.0.1:{int(current['port'])}/json/new?{urllib.parse.quote(url, safe='')}",
-            method="PUT",
-        )
-        try:
-            urllib.request.urlopen(request, timeout=2).close()
-        except urllib.error.URLError as exc:
-            raise BrowserError(f"Could not open the dedicated Chrome tab: {exc}") from exc
+        _ensure_browser_tab(int(current["port"]), url, wait_seconds=0)
         return current
     port = _free_port()
     arguments = [
@@ -142,6 +153,7 @@ def launch_browser(paths: RuntimePaths, url: str = CGV_BOOKING_URL, *, headless:
     else:
         process.terminate()
         raise BrowserError("Chrome remote debugging did not become ready")
+    _ensure_browser_tab(port, url)
     info = {"port": port, "pid": process.pid, "profile": str(paths.browser_profile)}
     target = paths.state_dir / "browser.json"
     temp = target.with_suffix(".tmp")
