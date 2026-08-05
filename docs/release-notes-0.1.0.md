@@ -6,10 +6,10 @@ Prickly IMAX Helper는 사용자의 PC에서만 실행되는 CGV IMAX 감시·�
 
 ## 다운로드
 
-운영체제에 맞는 아카이브와 같은 이름의 SHA-256 파일을 함께 받는다.
+운영체제에 맞는 전용 아카이브와 같은 이름의 SHA-256 검증 파일을 함께 받는다. GitHub가 자동으로 표시하는 `Source code (zip)`과 `Source code (tar.gz)`는 설치 파일이 아니다.
 
-- macOS: `prickly-imax-helper-0.1.0.tar.gz`, `prickly-imax-helper-0.1.0.tar.gz.sha256`
-- Windows 10/11: `prickly-imax-helper-0.1.0.zip`, `prickly-imax-helper-0.1.0.zip.sha256`
+- **macOS 전용:** `prickly-imax-helper-0.1.0.tar.gz`, `prickly-imax-helper-0.1.0.tar.gz.sha256`
+- **Windows 10/11 전용:** `prickly-imax-helper-0.1.0.zip`, `prickly-imax-helper-0.1.0.zip.sha256`
 
 Notion 안내의 버전 고정 명령은 체크섬이 일치할 때만 설치기를 실행한다. `main` 브랜치의 파일을 직접 실행하지 않는다.
 
