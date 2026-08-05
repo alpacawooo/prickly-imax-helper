@@ -32,6 +32,10 @@ chmod 700 "${APP_HOME}"
 if [[ ${DRY_RUN} != 1 ]]; then
   /bin/launchctl bootout "gui/$(id -u)/${LABEL}" >/dev/null 2>&1 || true
 fi
+RUNTIME_TARGET=${APP_DIR}/runtime
+if [[ -e ${RUNTIME_TARGET} ]]; then
+  /bin/rm -rf -- "${RUNTIME_TARGET}"
+fi
 /usr/bin/ditto "${REPO_DIR}/runtime" "${APP_DIR}/runtime"
 /bin/cp "${REPO_DIR}/pyproject.toml" "${APP_DIR}/pyproject.toml"
 /bin/cp "${REPO_DIR}/uv.lock" "${APP_DIR}/uv.lock"

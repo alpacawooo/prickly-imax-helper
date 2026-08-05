@@ -134,6 +134,8 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
                     ymd = state.next_date()
                     if ymd is None:
                         _heartbeat(paths, Status.ARMED, "no open dates", open_dates=0)
+                        if max_cycles is not None:
+                            return 0
                         time.sleep(5)
                         continue
                     shows = eligible_shows(ymd, session.schedules(ymd), config)

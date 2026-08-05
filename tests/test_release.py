@@ -33,6 +33,12 @@ class ReleaseTests(unittest.TestCase):
             script = (ROOT / "scripts" / name).read_text(encoding="utf-8")
             self.assertIn('[[ ${APP_HOME} != "${USER_HOME}/"* ]]', script)
 
+    def test_macos_update_replaces_only_the_versioned_runtime(self):
+        installer = (ROOT / "scripts/Install.command").read_text(encoding="utf-8")
+        self.assertIn("RUNTIME_TARGET=${APP_DIR}/runtime", installer)
+        self.assertIn('/bin/rm -rf -- "${RUNTIME_TARGET}"', installer)
+        self.assertNotIn('/bin/rm -rf -- "${APP_HOME}"', installer)
+
     def test_windows_installer_is_pinned_and_user_scoped(self):
         installer = (ROOT / "scripts/Install.ps1").read_text(encoding="utf-8")
         uninstaller = (ROOT / "scripts/Uninstall.ps1").read_text(encoding="utf-8")
