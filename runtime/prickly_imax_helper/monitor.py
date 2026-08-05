@@ -6,13 +6,13 @@ from typing import Any
 from .browser import launch_browser
 from .cgv import CgvSession, LoginRequired, RateLimited
 from .checkout import CheckoutError, CheckoutFlow, DuplicateBlocked, PaymentBlocked, SeatVanished, UnknownAfterSubmit
-from .config import load_config
+from .config import ConfigError, load_config
 from .eventlog import write_event
 from .locks import LockUnavailable, locked_file
 from .notify import send_email, show_notification
 from .paths import RuntimePaths
 from .scheduler import FairScanState, changed_seat_targets, eligible_shows, match_for
-from .state import Status, read_state, transition
+from .state import TERMINAL, Status, read_state, transition
 
 
 OPEN_DATE_REFRESH_SECONDS = 30.0
@@ -82,7 +82,16 @@ def _checkout(paths: RuntimePaths, config: dict[str, Any], session: CgvSession, 
 
 def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: bool = True) -> int:
     paths.prepare()
-    config = load_config(paths.config)
+    try:
+        config = load_config(paths.config)
+    except ConfigError as exc:
+        current = read_state(paths.heartbeat).get("status", Status.UNCONFIGURED.value)
+        if current == Status.SUBMITTING.value:
+            _heartbeat(paths, Status.UNKNOWN_AFTER_SUBMIT, "configuration became invalid across submission boundary; retry forbidden")
+        elif current not in {status.value for status in TERMINAL}:
+            _heartbeat(paths, Status.FATAL, "configuration is invalid; resident restart disabled")
+        write_event(paths.logs, "configuration_invalid", error=str(exc))
+        return 0
     lock_path = paths.state_dir / "monitor.lock"
     try:
         daemon_lock = locked_file(lock_path, blocking=False)

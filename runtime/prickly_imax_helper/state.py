@@ -34,7 +34,7 @@ TERMINAL = {
 }
 
 ALLOWED: dict[Status, set[Status]] = {
-    Status.UNCONFIGURED: {Status.LOGIN_REQUIRED, Status.STOPPED},
+    Status.UNCONFIGURED: {Status.LOGIN_REQUIRED, Status.STOPPED, Status.FATAL},
     Status.LOGIN_REQUIRED: {Status.ARMED, Status.STOPPED, Status.FATAL},
     Status.ARMED: {Status.LOGIN_REQUIRED, Status.STAGING, Status.RECOVERING, Status.RATE_LIMITED, Status.BLOCKED_DUPLICATE, Status.STOPPED, Status.FATAL},
     Status.STAGING: {Status.SUBMITTING, Status.ARMED, Status.BLOCKED_DUPLICATE, Status.BLOCKED_PAYMENT, Status.RECOVERING, Status.STOPPED, Status.FATAL},
@@ -42,6 +42,7 @@ ALLOWED: dict[Status, set[Status]] = {
     Status.RECOVERING: {Status.ARMED, Status.LOGIN_REQUIRED, Status.RATE_LIMITED, Status.STOPPED, Status.FATAL},
     Status.RATE_LIMITED: {Status.ARMED, Status.LOGIN_REQUIRED, Status.STOPPED, Status.FATAL},
     Status.STOPPED: {Status.LOGIN_REQUIRED},
+    Status.FATAL: {Status.LOGIN_REQUIRED},
 }
 
 

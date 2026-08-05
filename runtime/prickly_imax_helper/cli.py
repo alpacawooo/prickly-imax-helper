@@ -117,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
         if current in {Status.COMPLETED.value, Status.UNKNOWN_AFTER_SUBMIT.value, Status.BLOCKED_DUPLICATE.value, Status.BLOCKED_PAYMENT.value}:
             print(json.dumps({"ok": False, "error": f"terminal state {current} requires review before a new configuration"}, ensure_ascii=False))
             return 2
-        if current not in {Status.UNCONFIGURED.value, Status.STOPPED.value}:
+        if current not in {Status.UNCONFIGURED.value, Status.STOPPED.value, Status.FATAL.value}:
             print(json.dumps({"ok": True, "status": current, "detail": "monitor is already active or starting"}, ensure_ascii=False))
             return 0
         if current != Status.LOGIN_REQUIRED.value:

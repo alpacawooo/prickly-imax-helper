@@ -112,6 +112,13 @@ class StateTests(unittest.TestCase):
             with self.assertRaises(InvalidTransition):
                 transition(Path(temp) / "checkout.json", Status.COMPLETED)
 
+    def test_fatal_configuration_state_can_return_to_login_required(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "heartbeat.json"
+            transition(path, Status.FATAL)
+            transition(path, Status.LOGIN_REQUIRED)
+            self.assertEqual(read_state(path)["status"], "login_required")
+
 
 class RedactionTests(unittest.TestCase):
     def test_secrets_email_and_long_numbers_are_redacted(self):

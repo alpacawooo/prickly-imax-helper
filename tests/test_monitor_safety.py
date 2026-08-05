@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import contextlib
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -18,6 +19,30 @@ from test_runtime_core import VALID_CONFIG
 class MonitorRestartSafetyTests(unittest.TestCase):
     def test_new_booking_dates_are_refreshed_within_thirty_seconds(self):
         self.assertLessEqual(OPEN_DATE_REFRESH_SECONDS, 30.0)
+
+    def test_invalid_config_fails_closed_without_launch_or_restart_error(self):
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            paths.config.write_text("{}\n", encoding="utf-8")
+            with patch("prickly_imax_helper.monitor.launch_browser") as launch:
+                self.assertEqual(run(paths), 0)
+            launch.assert_not_called()
+            self.assertEqual(read_state(paths.heartbeat)["status"], "fatal")
+
+    def test_invalid_config_across_submission_boundary_becomes_unknown(self):
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            paths.config.write_text("{}\n", encoding="utf-8")
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+            transition(paths.heartbeat, Status.ARMED)
+            transition(paths.heartbeat, Status.STAGING)
+            transition(paths.heartbeat, Status.SUBMITTING)
+            with patch("prickly_imax_helper.monitor.launch_browser") as launch:
+                self.assertEqual(run(paths), 0)
+            launch.assert_not_called()
+            self.assertEqual(read_state(paths.heartbeat)["status"], "unknown_after_submit")
 
     def test_restart_during_submission_becomes_unknown_without_browser_launch(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -109,6 +134,18 @@ class MonitorRestartSafetyTests(unittest.TestCase):
             with patch("prickly_imax_helper.monitor.launch_browser") as launch:
                 self.assertEqual(run(paths), 0)
             launch.assert_not_called()
+
+    def test_fixed_config_can_restart_from_fatal_state(self):
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            write_config(paths.config, copy.deepcopy(VALID_CONFIG))
+            transition(paths.heartbeat, Status.FATAL)
+            completed = subprocess.CompletedProcess([], 0, "", "")
+            with patch("prickly_imax_helper.cli.start_service", return_value=completed) as start:
+                self.assertEqual(cli_main(["--home", temp, "start"]), 0)
+            start.assert_called_once_with()
+            self.assertEqual(read_state(paths.heartbeat)["status"], "login_required")
 
 
 if __name__ == "__main__":
