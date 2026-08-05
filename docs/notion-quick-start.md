@@ -17,10 +17,12 @@ CGV 비밀번호, 관람권 번호, 카드번호, 이메일 비밀번호는 Pric
 
 ## 1. 설치 — macOS
 
-비공개 GitHub 초대를 수락하고 Releases에서 아래 파일 두 개를 다운로드합니다.
+비공개 GitHub 초대를 수락하고 Releases에서 **macOS 전용**으로 표시된 아래 파일 두 개를 모두 다운로드합니다.
 
 - `prickly-imax-helper-0.1.0.tar.gz`
 - `prickly-imax-helper-0.1.0.tar.gz.sha256`
+
+GitHub가 자동으로 표시하는 `Source code (zip)`과 `Source code (tar.gz)`는 설치 파일이 아니므로 다운로드하지 않습니다.
 
 터미널을 열어 이 한 줄을 붙여넣습니다.
 
@@ -32,10 +34,12 @@ cd "$HOME/Downloads" && shasum -a 256 -c prickly-imax-helper-0.1.0.tar.gz.sha256
 
 ## 1. 설치 — Windows 10/11
 
-Releases에서 아래 파일 두 개를 다운로드합니다.
+Releases에서 **Windows 전용**으로 표시된 아래 파일 두 개를 모두 다운로드합니다.
 
 - `prickly-imax-helper-0.1.0.zip`
 - `prickly-imax-helper-0.1.0.zip.sha256`
+
+GitHub가 자동으로 표시하는 `Source code (zip)`과 `Source code (tar.gz)`는 설치 파일이 아니므로 다운로드하지 않습니다.
 
 시작 메뉴에서 `Windows PowerShell`을 열고 아래 한 줄을 붙여넣습니다.
 
