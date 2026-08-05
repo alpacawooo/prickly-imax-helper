@@ -14,9 +14,9 @@ if [[ ${APP_HOME} != "${USER_HOME}/"* ]]; then
 fi
 
 print "다음 항목을 제거합니다:"
-print "- 감시 서비스: ${PLIST_PATH}"
-print "- 설치된 실행 파일: ${APP_HOME}/app, ${APP_HOME}/venv"
-print "- 명령 링크: ${CLI_LINK}"
+print -r -- "- 감시 서비스: ${PLIST_PATH}"
+print -r -- "- 설치된 실행 파일: ${APP_HOME}/app, ${APP_HOME}/venv"
+print -r -- "- 명령 링크: ${CLI_LINK}"
 print ""
 if [[ ${PRICKLY_UNINSTALL_KEEP_DATA:-0} == 1 ]]; then
   answer=n
