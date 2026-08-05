@@ -122,7 +122,9 @@ class MonitorRestartSafetyTests(unittest.TestCase):
             with patch("prickly_imax_helper.monitor.launch_browser"), patch("prickly_imax_helper.monitor.CgvSession", FakeSession), patch("prickly_imax_helper.monitor._checkout") as checkout:
                 self.assertEqual(run(paths, max_cycles=1, allow_checkout=False), 0)
             checkout.assert_not_called()
-            self.assertEqual(read_state(paths.heartbeat)["status"], "armed")
+            state = read_state(paths.heartbeat)
+            self.assertEqual(state["status"], "armed")
+            self.assertIsNone(state["match"])
 
     def test_dry_run_finishes_when_login_works_but_no_dates_are_open(self):
         class FakeSession:

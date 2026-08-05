@@ -77,7 +77,7 @@ def _checkout(paths: RuntimePaths, config: dict[str, Any], session: CgvSession, 
         _notify(paths, config, "Prickly IMAX 결제 중단", "관람권 수량 또는 0원 잔액을 증명하지 못해 결제를 실행하지 않았습니다.")
         return Status.BLOCKED_PAYMENT.value
     except SeatVanished as exc:
-        _heartbeat(paths, Status.ARMED, str(exc))
+        _heartbeat(paths, Status.ARMED, str(exc), match=None)
         write_event(paths.logs, "seat_vanished", match=match, error=str(exc))
         return Status.ARMED.value
     except CheckoutError as exc:
@@ -156,7 +156,7 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
                     session.require_login()
                     current = read_state(paths.heartbeat).get("status")
                     if current != Status.ARMED.value:
-                        _heartbeat(paths, Status.ARMED, "CGV login verified")
+                        _heartbeat(paths, Status.ARMED, "CGV login verified", match=None)
                     now = time.time()
                     if not state.open_dates or now - last_open_date_refresh >= OPEN_DATE_REFRESH_SECONDS:
                         state.replace_dates(session.open_dates())
@@ -164,7 +164,7 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
                         write_event(paths.logs, "open_dates_refreshed", count=len(state.open_dates))
                     ymd = state.next_date()
                     if ymd is None:
-                        _heartbeat(paths, Status.ARMED, "no open dates", open_dates=0)
+                        _heartbeat(paths, Status.ARMED, "no open dates", open_dates=0, match=None)
                         if max_cycles is not None:
                             return 0
                         time.sleep(5)
@@ -208,6 +208,7 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
                         open_dates=len(state.open_dates),
                         scanned_date=ymd,
                         eligible_shows=len(shows),
+                        match=None,
                     )
                     completed_cycles += 1
                     if max_cycles is not None and completed_cycles >= max_cycles:
