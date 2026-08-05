@@ -24,6 +24,7 @@ VALID_CONFIG = {
     },
     "rows": list("DEFGHIJ"),
     "edge_exclusion": 0.2,
+    "preference": "closest_to_center",
     "prevent_duplicate_booking": True,
     "allow_cancel_existing": False,
     "allow_change_existing": False,
@@ -37,12 +38,13 @@ VALID_CONFIG = {
         "automatic_seat_selection": True,
         "automatic_submission": True,
     },
-    "request_policy": {"minimum_interval_seconds": 1.0},
+    "request_policy": {"minimum_interval_seconds": 1.0, "rate_limit_cooldown_seconds": 300},
     "notification": {"email": "tester@example.com", "method": "apple_mail"},
     "consent": {
         "automatic_submission": True,
         "one_active_device_per_public_ip": True,
         "accepted_at": "2026-08-05T03:00:00+09:00",
+        "scope": "matching-seat-once-voucher-only-zero-balance",
     },
 }
 
@@ -70,6 +72,26 @@ class ConfigTests(unittest.TestCase):
         errors = validate_config(value)
         self.assertTrue(any("maximum_remaining_balance" in item for item in errors))
         self.assertTrue(any("voucher_count" in item for item in errors))
+
+    def test_rejects_any_weakening_of_the_fixed_odyssey_policy(self):
+        value = copy.deepcopy(VALID_CONFIG)
+        value["movie"] = "다른 영화"
+        value["party_size"] = 1
+        value["rows"] = ["H"]
+        value["time_rules"]["weekday"]["at_or_after"] = "18:00"
+        errors = validate_config(value)
+        for field in ("movie", "party_size", "rows", "time_rules"):
+            self.assertTrue(any(field in item for item in errors), errors)
+
+    def test_rejects_short_cooldown_or_unscoped_consent(self):
+        value = copy.deepcopy(VALID_CONFIG)
+        value["request_policy"]["rate_limit_cooldown_seconds"] = 30
+        value["consent"]["scope"] = "anything"
+        value["consent"]["accepted_at"] = "not-a-date"
+        errors = validate_config(value)
+        self.assertTrue(any("at least 300" in item for item in errors))
+        self.assertTrue(any("consent.scope" in item for item in errors))
+        self.assertTrue(any("ISO timestamp" in item for item in errors))
 
 
 class StateTests(unittest.TestCase):

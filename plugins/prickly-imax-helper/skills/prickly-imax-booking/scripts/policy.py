@@ -10,6 +10,34 @@ from pathlib import Path
 
 
 WEEKDAYS = "월화수목금토일"
+LOCKED_PRESET = {
+    "movie": "오디세이",
+    "theater": "용산아이파크몰",
+    "format": "IMAX",
+    "party_size": 2,
+    "dates": "all_open",
+    "time_rules": {
+        "weekday": {"at_or_after": "19:00"},
+        "saturday": {"any_time": True},
+        "sunday": {"before": "22:00"},
+    },
+    "rows": list("DEFGHIJ"),
+    "edge_exclusion": 0.2,
+    "preference": "closest_to_center",
+    "prevent_duplicate_booking": True,
+    "allow_cancel_existing": False,
+    "allow_change_existing": False,
+    "payment": {
+        "method": "registered_imax_voucher",
+        "voucher_count": 2,
+        "maximum_remaining_balance": 0,
+    },
+    "authorization": {
+        "automatic_query": True,
+        "automatic_seat_selection": True,
+        "automatic_submission": True,
+    },
+}
 
 
 class PolicyError(ValueError):
@@ -25,6 +53,9 @@ def validate(config: dict) -> dict:
     for key in ("movie", "theater", "format", "party_size", "rows", "edge_exclusion", "time_rules", "payment"):
         if key not in config:
             errors.append(f"missing {key}")
+    for key, expected in LOCKED_PRESET.items():
+        if config.get(key) != expected:
+            errors.append(f"private beta requires exact Odyssey preset field: {key}")
     party = config.get("party_size")
     if not isinstance(party, int) or party < 1 or party > 8:
         errors.append("party_size must be an integer from 1 to 8")

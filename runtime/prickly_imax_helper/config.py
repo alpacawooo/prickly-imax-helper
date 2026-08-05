@@ -3,8 +3,11 @@ from __future__ import annotations
 import json
 import os
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+from .presets import ODYSSEY
 
 
 class ConfigError(ValueError):
@@ -17,6 +20,23 @@ REQUIRED_AUTHORIZATION = {
     "automatic_submission",
 }
 
+LOCKED_ODYSSEY_FIELDS = (
+    "movie",
+    "theater",
+    "format",
+    "party_size",
+    "dates",
+    "time_rules",
+    "rows",
+    "edge_exclusion",
+    "preference",
+    "prevent_duplicate_booking",
+    "allow_cancel_existing",
+    "allow_change_existing",
+    "payment",
+    "authorization",
+)
+
 
 def validate_config(value: dict[str, Any]) -> list[str]:
     errors: list[str] = []
@@ -24,6 +44,9 @@ def validate_config(value: dict[str, Any]) -> list[str]:
     for key in required:
         if key not in value:
             errors.append(f"missing {key}")
+    for key in LOCKED_ODYSSEY_FIELDS:
+        if value.get(key) != ODYSSEY[key]:
+            errors.append(f"private beta requires exact Odyssey preset field: {key}")
     party = value.get("party_size")
     if not isinstance(party, int) or not 1 <= party <= 8:
         errors.append("party_size must be an integer from 1 to 8")
@@ -52,15 +75,30 @@ def validate_config(value: dict[str, Any]) -> list[str]:
     rate = value.get("request_policy", {}).get("minimum_interval_seconds")
     if not isinstance(rate, (int, float)) or rate < 1.0:
         errors.append("request_policy.minimum_interval_seconds must be at least 1.0")
+    cooldown = value.get("request_policy", {}).get("rate_limit_cooldown_seconds")
+    if not isinstance(cooldown, (int, float)) or cooldown < 300:
+        errors.append("request_policy.rate_limit_cooldown_seconds must be at least 300")
     authorization = value.get("authorization", {})
     missing_auth = sorted(key for key in REQUIRED_AUTHORIZATION if authorization.get(key) is not True)
     if missing_auth:
         errors.append("authorization must enable: " + ", ".join(missing_auth))
     consent = value.get("consent", {})
-    if consent.get("automatic_submission") is not True or not consent.get("accepted_at"):
+    accepted_at = consent.get("accepted_at")
+    if consent.get("automatic_submission") is not True or not accepted_at:
         errors.append("recorded automatic-submission consent is required")
+    elif not isinstance(accepted_at, str):
+        errors.append("consent.accepted_at must be an ISO timestamp with timezone")
+    else:
+        try:
+            accepted = datetime.fromisoformat(accepted_at)
+            if accepted.tzinfo is None:
+                raise ValueError
+        except ValueError:
+            errors.append("consent.accepted_at must be an ISO timestamp with timezone")
     if consent.get("one_active_device_per_public_ip") is not True:
         errors.append("consent.one_active_device_per_public_ip must be true")
+    if consent.get("scope") != "matching-seat-once-voucher-only-zero-balance":
+        errors.append("consent.scope does not match the private-beta submission boundary")
     notification = value.get("notification", {})
     method = notification.get("method")
     if method not in {"apple_mail", "outlook_desktop"}:

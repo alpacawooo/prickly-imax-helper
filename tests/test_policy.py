@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import copy
 import json
 import unittest
 from datetime import date
@@ -20,6 +21,16 @@ CONFIG = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 class PolicyTests(unittest.TestCase):
     def test_default_config_is_valid(self):
         self.assertEqual(policy.validate(CONFIG), {"ok": True, "errors": []})
+
+    def test_plugin_rejects_weaker_rows_times_or_party_size(self):
+        weaker = copy.deepcopy(CONFIG)
+        weaker["rows"] = ["H"]
+        weaker["party_size"] = 1
+        weaker["time_rules"]["weekday"]["at_or_after"] = "18:00"
+        result = policy.validate(weaker)
+        self.assertFalse(result["ok"])
+        for field in ("rows", "party_size", "time_rules"):
+            self.assertTrue(any(field in error for error in result["errors"]), result)
 
     def test_center_adjacent_pair_wins(self):
         seats = [f"H{i}" for i in range(1, 31)]
