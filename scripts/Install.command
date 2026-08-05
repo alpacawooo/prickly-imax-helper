@@ -9,9 +9,13 @@ APP_HOME=${APP_HOME:A}
 APP_VERSION=0.1.0
 APP_DIR=${APP_HOME}/app/${APP_VERSION}
 VENV_DIR=${APP_HOME}/venv
-PLIST_PATH=${HOME}/Library/LaunchAgents/ai.prickly.imax-helper.plist
 LABEL=ai.prickly.imax-helper
 DRY_RUN=${PRICKLY_INSTALL_DRY_RUN:-0}
+if [[ ${DRY_RUN} == 1 ]]; then
+  PLIST_PATH=${APP_HOME}/ai.prickly.imax-helper.plist
+else
+  PLIST_PATH=${HOME}/Library/LaunchAgents/ai.prickly.imax-helper.plist
+fi
 UV_VERSION=0.11.15
 MANAGED_PYTHON_VERSION=3.12.12
 
@@ -134,6 +138,10 @@ if [[ ${DRY_RUN} != 1 ]]; then
   /bin/launchctl kickstart -k "gui/$(id -u)/${LABEL}"
 fi
 
-mkdir -p "${HOME}/.local/bin"
-ln -sfn "${VENV_DIR}/bin/prickly-imax" "${HOME}/.local/bin/prickly-imax"
-print "Prickly IMAX Helper ${APP_VERSION} 설치가 완료됐습니다. 상태 확인: ${HOME}/.local/bin/prickly-imax status"
+if [[ ${DRY_RUN} == 1 ]]; then
+  print "Prickly IMAX Helper ${APP_VERSION} dry-run 설치가 완료됐습니다: ${VENV_DIR}/bin/prickly-imax"
+else
+  mkdir -p "${HOME}/.local/bin"
+  ln -sfn "${VENV_DIR}/bin/prickly-imax" "${HOME}/.local/bin/prickly-imax"
+  print "Prickly IMAX Helper ${APP_VERSION} 설치가 완료됐습니다. 상태 확인: ${HOME}/.local/bin/prickly-imax status"
+fi

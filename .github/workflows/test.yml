@@ -56,3 +56,20 @@ jobs:
         env:
           PYTHONPATH: runtime
         run: python -m unittest discover -s tests -v
+      - name: Smoke-test macOS installer
+        if: runner.os == 'macOS'
+        run: |
+          export PRICKLY_IMAX_HOME="$HOME/.prickly-ci"
+          export PRICKLY_INSTALL_DRY_RUN=1
+          zsh scripts/Install.command
+          "$PRICKLY_IMAX_HOME/venv/bin/prickly-imax" --home "$PRICKLY_IMAX_HOME" doctor
+      - name: Smoke-test Windows installer
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $env:PRICKLY_IMAX_HOME = Join-Path $env:USERPROFILE 'AppData\Local\PricklyCI'
+          $env:PRICKLY_INSTALL_DRY_RUN = '1'
+          & scripts\Install.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$env:PRICKLY_IMAX_HOME\bin\prickly-imax.cmd" --home $env:PRICKLY_IMAX_HOME doctor
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

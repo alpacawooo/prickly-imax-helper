@@ -42,12 +42,17 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn("persist-credentials: false", workflow)
         self.assertIn("Management.Automation.Language.Parser", workflow)
         self.assertIn("zsh -n scripts/Install.command", workflow)
+        self.assertIn("Smoke-test macOS installer", workflow)
+        self.assertIn("Smoke-test Windows installer", workflow)
+        self.assertIn("PRICKLY_INSTALL_DRY_RUN", workflow)
 
     def test_installer_avoids_unlocked_project_build_backend(self):
         installer = (ROOT / "scripts/Install.command").read_text(encoding="utf-8")
         self.assertIn("--no-install-project", installer)
         self.assertNotIn("--no-editable", installer)
         self.assertIn('"${VENV_DIR}/bin/prickly-imax"', installer)
+        self.assertIn("PLIST_PATH=${APP_HOME}/ai.prickly.imax-helper.plist", installer)
+        self.assertIn("dry-run 설치가 완료됐습니다", installer)
 
     def test_install_and_uninstall_restrict_app_home_to_user_home(self):
         for name in ("Install.command", "Uninstall.command"):
