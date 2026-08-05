@@ -133,6 +133,9 @@ def main() -> int:
         reference = authorization_reference.strip()
         if not 3 <= len(reference) <= 200 or any(ord(character) < 32 or ord(character) == 127 for character in reference):
             raise SystemExit("authorization_reference must be a single public-safe line of 3-200 characters")
+        placeholder_tokens = ("OPTIONAL", "REPLACE", "PLACEHOLDER", "CHANGEME", "TODO")
+        if any(token in reference.upper() for token in placeholder_tokens):
+            raise SystemExit("authorization_reference is still a placeholder")
     approved_at = authorization["approved_at"]
     if not isinstance(approved_at, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", approved_at):
         raise SystemExit("approved_at must be an ISO date (YYYY-MM-DD)")
