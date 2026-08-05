@@ -14,12 +14,50 @@ import zipfile
 from pathlib import Path
 
 
+FORBIDDEN_RUNTIME_NAMES = {
+    ".env",
+    "browser.json",
+    "checkout.json",
+    "config.json",
+    "heartbeat.json",
+    "request-budget.json",
+}
+FORBIDDEN_RUNTIME_DIRECTORIES = {"browser-profile", "logs", "state"}
+FORBIDDEN_SECRET_SUFFIXES = {".cookie", ".secret", ".token"}
+
+
 def hash_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def validate_stage(stage: Path) -> None:
+    """Reject local runtime state and developer-specific paths before archiving."""
+
+    problems: list[str] = []
+    for item in stage.rglob("*"):
+        relative = item.relative_to(stage)
+        if item.is_dir():
+            if item.name in FORBIDDEN_RUNTIME_DIRECTORIES:
+                problems.append(f"forbidden runtime directory: {relative}")
+            continue
+        if item.name in FORBIDDEN_RUNTIME_NAMES or item.suffix.lower() in FORBIDDEN_SECRET_SUFFIXES:
+            problems.append(f"forbidden runtime file: {relative}")
+            continue
+        if item.stat().st_size > 2 * 1024 * 1024:
+            continue
+        try:
+            text = item.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        mac_user_prefix = "/" + "Users" + "/"
+        if mac_user_prefix in text or re.search(r"[A-Za-z]:\\Users\\[^\\\r\n]+", text):
+            problems.append(f"developer-specific absolute path: {relative}")
+    if problems:
+        raise SystemExit("release stage privacy check failed: " + "; ".join(problems))
 
 
 def main() -> int:
@@ -94,6 +132,7 @@ def main() -> int:
             else:
                 shutil.copy2(source, destination)
         (stage / "AUTHORIZATION.json").write_text(json.dumps(authorization, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        validate_stage(stage)
         for command in (stage / "scripts" / "Install.command", stage / "scripts" / "Update.command", stage / "scripts" / "Uninstall.command"):
             os.chmod(command, 0o755)
         with tarfile.open(archive, "w:gz") as bundle:

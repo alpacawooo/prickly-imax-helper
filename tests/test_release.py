@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import subprocess
 import sys
@@ -12,9 +13,27 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+BUILD_SCRIPT = ROOT / "scripts/build_release.py"
+BUILD_SPEC = importlib.util.spec_from_file_location("prickly_build_release", BUILD_SCRIPT)
+build_release = importlib.util.module_from_spec(BUILD_SPEC)
+assert BUILD_SPEC.loader is not None
+BUILD_SPEC.loader.exec_module(build_release)
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_release_privacy_scan_rejects_state_secrets_and_absolute_user_paths(self):
+        with tempfile.TemporaryDirectory() as temp:
+            stage = Path(temp)
+            (stage / "safe.txt").write_text("portable content", encoding="utf-8")
+            build_release.validate_stage(stage)
+            (stage / "config.json").write_text("{}", encoding="utf-8")
+            with self.assertRaisesRegex(SystemExit, "forbidden runtime file"):
+                build_release.validate_stage(stage)
+            (stage / "config.json").unlink()
+            (stage / "unsafe.py").write_text("ROOT = '/Users/private/project'", encoding="utf-8")
+            with self.assertRaisesRegex(SystemExit, "developer-specific absolute path"):
+                build_release.validate_stage(stage)
+
     def test_ci_runs_on_macos_and_windows_with_read_only_contents(self):
         workflow = (ROOT / ".github/workflows/test.yml").read_text(encoding="utf-8")
         self.assertIn("macos-latest", workflow)
