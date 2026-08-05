@@ -17,34 +17,32 @@ CGV 비밀번호, 관람권 번호, 카드번호, 이메일 비밀번호는 Pric
 
 ## 1. 설치 — macOS
 
-비공개 GitHub 초대를 수락하고 Releases에서 **macOS 전용**으로 표시된 아래 파일 두 개를 모두 다운로드합니다.
+비공개 GitHub 초대를 수락한 뒤 **macOS 전용 설치 파일 하나만** 다운로드합니다.
 
-- `prickly-imax-helper-0.1.0.tar.gz`
-- `prickly-imax-helper-0.1.0.tar.gz.sha256`
+- [🍎 macOS 전용 설치 파일 받기](https://github.com/alpacawooo/prickly-imax-helper/releases/download/0.1.0/prickly-imax-helper-0.1.0.tar.gz) — `prickly-imax-helper-0.1.0.tar.gz`
 
-GitHub가 자동으로 표시하는 `Source code (zip)`과 `Source code (tar.gz)`는 설치 파일이 아니므로 다운로드하지 않습니다.
+별도의 `.sha256` 파일은 받지 않아도 됩니다. 아래 명령에 검증된 SHA-256이 고정되어 있습니다. GitHub가 자동으로 표시하는 `Source code (zip)`과 `Source code (tar.gz)`도 설치 파일이 아니므로 다운로드하지 않습니다.
 
 터미널을 열어 이 한 줄을 붙여넣습니다.
 
 ```bash
-cd "$HOME/Downloads" && shasum -a 256 -c prickly-imax-helper-0.1.0.tar.gz.sha256 && tar -xzf prickly-imax-helper-0.1.0.tar.gz && open prickly-imax-helper-0.1.0/scripts/Install.command
+cd "$HOME/Downloads"; f='prickly-imax-helper-0.1.0.tar.gz'; expected='9646a47708f11ef718ab4af5f22b60324285620d5383be40ce0621e32566c09e'; actual="$(shasum -a 256 "$f" | awk '{print $1}')"; if [ "$actual" = "$expected" ]; then tar -xzf "$f" && open prickly-imax-helper-0.1.0/scripts/Install.command; else echo '체크섬 불일치: 설치 중단'; fi
 ```
 
-`OK`가 나오지 않으면 설치하지 말고 받은 파일을 삭제합니다. macOS가 처음 실행을 막으면 Finder에서 `Install.command`를 Control-클릭한 뒤 `열기`를 선택합니다.
+설정 페이지가 열리면 검증과 압축 해제가 완료된 것입니다. `체크섬 불일치: 설치 중단`이 나오면 설치하지 말고 받은 파일을 삭제합니다. macOS가 처음 실행을 막으면 Finder에서 `Install.command`를 Control-클릭한 뒤 `열기`를 선택합니다.
 
 ## 1. 설치 — Windows 10/11
 
-Releases에서 **Windows 전용**으로 표시된 아래 파일 두 개를 모두 다운로드합니다.
+**Windows 전용 설치 파일 하나만** 다운로드합니다.
 
-- `prickly-imax-helper-0.1.0.zip`
-- `prickly-imax-helper-0.1.0.zip.sha256`
+- [🪟 Windows 전용 설치 파일 받기](https://github.com/alpacawooo/prickly-imax-helper/releases/download/0.1.0/prickly-imax-helper-0.1.0.zip) — `prickly-imax-helper-0.1.0.zip`
 
-GitHub가 자동으로 표시하는 `Source code (zip)`과 `Source code (tar.gz)`는 설치 파일이 아니므로 다운로드하지 않습니다.
+별도의 `.sha256` 파일은 받지 않아도 됩니다. 아래 명령에 검증된 SHA-256이 고정되어 있습니다. GitHub가 자동으로 표시하는 `Source code (zip)`과 `Source code (tar.gz)`도 설치 파일이 아니므로 다운로드하지 않습니다.
 
 시작 메뉴에서 `Windows PowerShell`을 열고 아래 한 줄을 붙여넣습니다.
 
 ```powershell
-$v='0.1.0'; cd "$HOME\Downloads"; $expected=((Get-Content "prickly-imax-helper-$v.zip.sha256").Split()[0]).ToLower(); $actual=(Get-FileHash "prickly-imax-helper-$v.zip" -Algorithm SHA256).Hash.ToLower(); if($actual -ne $expected){throw '체크섬 불일치: 설치 중단'}; Expand-Archive -Force "prickly-imax-helper-$v.zip" .; powershell -ExecutionPolicy RemoteSigned -File ".\prickly-imax-helper-$v\scripts\Install.ps1"
+$v='0.1.0'; $f="prickly-imax-helper-$v.zip"; $expected='edef469cdb41be31491cb1498dc9901b94a7ed0b733b25e3d3fbf5630b7cac4d'; cd "$HOME\Downloads"; $actual=(Get-FileHash $f -Algorithm SHA256).Hash.ToLower(); if($actual -ne $expected){throw '체크섬 불일치: 설치 중단'}; Expand-Archive -Force $f .; powershell -ExecutionPolicy RemoteSigned -File ".\prickly-imax-helper-$v\scripts\Install.ps1"
 ```
 
 체크섬이 다르면 설치가 즉시 중단됩니다. 관리자 PowerShell은 필요하지 않습니다. Windows가 실행 여부를 물으면 다운로드한 비공개 GitHub 릴리스가 맞는지 확인한 뒤 실행합니다.
