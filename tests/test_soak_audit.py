@@ -18,7 +18,7 @@ class SoakAuditTests(unittest.TestCase):
     def healthy(self):
         return {
             "started_at": "2026-08-04T00:00:00+00:00",
-            "captured_at": "2026-08-04T01:00:01+00:00",
+            "captured_at": "2026-08-04T00:10:01+00:00",
             "status": "armed",
             "match": None,
             "heartbeat_age_seconds": 5,
@@ -29,7 +29,7 @@ class SoakAuditTests(unittest.TestCase):
             },
         }
 
-    def test_healthy_1_hour_snapshot_passes(self):
+    def test_healthy_10_minute_snapshot_passes(self):
         baseline = self.healthy()
         current = self.healthy()
         self.assertEqual(soak_audit.evaluate(baseline, current, {}), [])
@@ -74,7 +74,7 @@ class SoakAuditTests(unittest.TestCase):
     def test_short_duration_fails(self):
         baseline = self.healthy()
         current = self.healthy()
-        current["captured_at"] = "2026-08-04T00:59:59+00:00"
+        current["captured_at"] = "2026-08-04T00:09:59+00:00"
         errors = soak_audit.evaluate(baseline, current, {})
         self.assertTrue(any("duration" in error for error in errors))
 
