@@ -33,9 +33,11 @@ $BinDir = Join-Path $AppHome "bin"
 $DryRun = $env:PRICKLY_INSTALL_DRY_RUN -eq "1"
 New-Item -ItemType Directory -Force -Path $AppHome, (Join-Path $AppHome "logs"), $AppDir, $BinDir | Out-Null
 
-$ExistingTask = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-if ($ExistingTask) {
-    Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+if (-not $DryRun) {
+    $ExistingTask = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    if ($ExistingTask) {
+        Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    }
 }
 
 $RuntimeTarget = Join-Path $AppDir "runtime"

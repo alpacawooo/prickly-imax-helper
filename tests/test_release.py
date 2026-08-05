@@ -63,6 +63,17 @@ class ReleaseTests(unittest.TestCase):
             script = (ROOT / "scripts" / name).read_text(encoding="utf-8")
             self.assertIn('[[ ${APP_HOME} != "${USER_HOME}/"* ]]', script)
 
+    def test_dry_run_lifecycle_cannot_stop_real_resident_service(self):
+        mac_installer = (ROOT / "scripts" / "Install.command").read_text(encoding="utf-8")
+        mac_uninstaller = (ROOT / "scripts" / "Uninstall.command").read_text(encoding="utf-8")
+        windows_installer = (ROOT / "scripts" / "Install.ps1").read_text(encoding="utf-8-sig")
+        windows_uninstaller = (ROOT / "scripts" / "Uninstall.ps1").read_text(encoding="utf-8-sig")
+        self.assertIn('if [[ ${DRY_RUN} != 1 ]]; then\n  /bin/launchctl bootout', mac_installer)
+        self.assertIn('if [[ ${DRY_RUN} != 1 ]]; then\n  /bin/launchctl bootout', mac_uninstaller)
+        self.assertIn('PLIST_PATH=${APP_HOME}/ai.prickly.imax-helper.plist', mac_uninstaller)
+        self.assertIn('if (-not $DryRun) {\n    $ExistingTask = Get-ScheduledTask', windows_installer)
+        self.assertIn('if (-not $DryRun) {\n    Stop-ScheduledTask', windows_uninstaller)
+
     def test_macos_update_replaces_only_the_versioned_runtime(self):
         installer = (ROOT / "scripts/Install.command").read_text(encoding="utf-8")
         self.assertIn("RUNTIME_TARGET=${APP_DIR}/runtime", installer)

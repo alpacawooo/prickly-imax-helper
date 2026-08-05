@@ -8,6 +8,7 @@ if (-not $env:USERPROFILE -or -not $env:LOCALAPPDATA) {
 $UserRoot = [IO.Path]::GetFullPath($env:USERPROFILE).TrimEnd('\')
 $DefaultHome = Join-Path $env:LOCALAPPDATA "PricklyIMAXHelper"
 $AppHome = if ($env:PRICKLY_IMAX_HOME) { [IO.Path]::GetFullPath($env:PRICKLY_IMAX_HOME) } else { $DefaultHome }
+$DryRun = $env:PRICKLY_INSTALL_DRY_RUN -eq "1"
 $ExpectedPrefix = $UserRoot + [IO.Path]::DirectorySeparatorChar
 if (-not $AppHome.StartsWith($ExpectedPrefix, [StringComparison]::OrdinalIgnoreCase)) {
     throw "삭제 경로는 현재 사용자 홈의 하위 폴더여야 합니다: $AppHome"
@@ -22,8 +23,10 @@ $Answer = if ($env:PRICKLY_UNINSTALL_KEEP_DATA -eq "1") {
     Read-Host "설정·로그·CGV 로그인 프로필까지 모두 삭제할까요? [y/N]"
 }
 
-Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
+if (-not $DryRun) {
+    Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
+}
 if ($Answer -match '^(?i:y|yes)$') {
     if (-not $AppHome.Equals($DefaultHome, [StringComparison]::OrdinalIgnoreCase)) {
         throw "안전을 위해 기본 설치 경로가 아닌 전체 삭제는 자동 실행하지 않습니다: $AppHome"

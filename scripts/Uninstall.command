@@ -4,9 +4,15 @@ set -euo pipefail
 USER_HOME=${HOME:A}
 APP_HOME=${PRICKLY_IMAX_HOME:-${USER_HOME}/.prickly-imax-helper}
 APP_HOME=${APP_HOME:A}
-PLIST_PATH=${HOME}/Library/LaunchAgents/ai.prickly.imax-helper.plist
-CLI_LINK=${HOME}/.local/bin/prickly-imax
 LABEL=ai.prickly.imax-helper
+DRY_RUN=${PRICKLY_INSTALL_DRY_RUN:-0}
+if [[ ${DRY_RUN} == 1 ]]; then
+  PLIST_PATH=${APP_HOME}/ai.prickly.imax-helper.plist
+  CLI_LINK=${APP_HOME}/prickly-imax.link
+else
+  PLIST_PATH=${HOME}/Library/LaunchAgents/ai.prickly.imax-helper.plist
+  CLI_LINK=${HOME}/.local/bin/prickly-imax
+fi
 
 if [[ ${APP_HOME} != "${USER_HOME}/"* ]]; then
   print -u2 "삭제 경로는 현재 사용자 홈의 하위 폴더여야 합니다: ${APP_HOME}"
@@ -24,7 +30,9 @@ else
   read "answer?설정·로그·CGV 로그인 프로필까지 모두 삭제할까요? [y/N] "
 fi
 
-/bin/launchctl bootout "gui/$(id -u)/${LABEL}" >/dev/null 2>&1 || true
+if [[ ${DRY_RUN} != 1 ]]; then
+  /bin/launchctl bootout "gui/$(id -u)/${LABEL}" >/dev/null 2>&1 || true
+fi
 [[ ! -f "${PLIST_PATH}" ]] || /bin/rm "${PLIST_PATH}"
 [[ ! -L "${CLI_LINK}" ]] || /bin/rm "${CLI_LINK}"
 
