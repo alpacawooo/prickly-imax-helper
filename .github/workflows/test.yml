@@ -30,6 +30,28 @@ jobs:
         run: ruff check runtime tests scripts plugins/prickly-imax-helper
       - name: Compile
         run: python -m compileall -q runtime tests scripts plugins/prickly-imax-helper
+      - name: Parse macOS service scripts
+        if: runner.os == 'macOS'
+        run: zsh -n scripts/Install.command scripts/Update.command scripts/Uninstall.command
+      - name: Parse Windows service scripts
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $failed = $false
+          foreach ($script in Get-ChildItem scripts\*.ps1) {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              $script.FullName,
+              [ref]$tokens,
+              [ref]$parseErrors
+            ) | Out-Null
+            if ($parseErrors.Count) {
+              $parseErrors | ForEach-Object { Write-Error "$($script.Name): $_" }
+              $failed = $true
+            }
+          }
+          if ($failed) { exit 1 }
       - name: Test
         env:
           PYTHONPATH: runtime

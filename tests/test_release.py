@@ -21,6 +21,8 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn("windows-latest", workflow)
         self.assertIn("contents: read", workflow)
         self.assertIn("persist-credentials: false", workflow)
+        self.assertIn("Management.Automation.Language.Parser", workflow)
+        self.assertIn("zsh -n scripts/Install.command", workflow)
 
     def test_installer_avoids_unlocked_project_build_backend(self):
         installer = (ROOT / "scripts/Install.command").read_text(encoding="utf-8")
