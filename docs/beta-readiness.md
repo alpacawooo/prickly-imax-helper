@@ -29,9 +29,9 @@ This checklist is the release gate. A checked implementation item is not equival
 - [ ] Generate authorization metadata from the retained CGV approval document and its SHA-256 fingerprint.
 - [x] Complete a logged-in, no-click `dry-run` with the new dedicated runtime profile on macOS (2026-08-05); the installed LaunchAgent then reached `armed` without Hermes running concurrently.
 - [ ] Capture current CGV checkout DOM fixtures without submitting an order and confirm selectors against them.
-- [ ] Confirm the Apple Mail test message from the installed LaunchAgent environment, not only an interactive shell.
+- [x] Confirm the Apple Mail test message from the installed LaunchAgent environment, not only an interactive shell (2026-08-05; one-shot GUI launchd probe exited successfully and its unique subject token was found in Apple Mail without exposing the configured recipient).
 - [ ] Complete a clean Windows 10/11 install and confirm the Scheduled Task, dedicated Chrome profile, toast, and classic Outlook test message under a standard non-admin user.
-- [x] Publish the workflow and confirm green hosted macOS and Windows install smoke tests: `https://github.com/alpacawooo/prickly-imax-helper/actions/runs/30970439612`.
+- [x] Publish the workflow and confirm green hosted macOS and Windows install smoke tests: `https://github.com/alpacawooo/prickly-imax-helper/actions/runs/30974254293`.
 - [ ] Run a 24-hour monitor soak with no 429, duplicate process, memory growth, or login-profile loss.
 - [x] Create the private GitHub repository.
 - [ ] Publish tag `0.1.0` and attach the authorization-gated macOS/Windows archives and checksums.
