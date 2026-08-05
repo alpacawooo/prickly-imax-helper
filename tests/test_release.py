@@ -318,6 +318,44 @@ class ReleaseTests(unittest.TestCase):
             self.assertIn("non-public or unknown fields", process.stderr)
             self.assertFalse((root / "dist" / "prickly-imax-helper-0.1.0.tar.gz").exists())
 
+    def test_release_rejects_placeholder_authorization_reference(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            authorization = root / "authorization.json"
+            authorization.write_text(
+                json.dumps(
+                    {
+                        "approved_at": "2026-08-05",
+                        "scope": [
+                            "automated_availability_query",
+                            "automated_seat_selection",
+                            "voucher_submission",
+                            "private_beta_distribution",
+                        ],
+                        "request_limit_scope": "public_ip",
+                        "max_requests_per_ip_per_second": 1.0,
+                        "authorization_reference": "OPTIONAL_PUBLIC_APPROVAL_OR_CONTRACT_REFERENCE",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            process = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/build_release.py"),
+                    "--version",
+                    "0.1.0",
+                    "--authorization",
+                    str(authorization),
+                    "--output",
+                    str(root / "dist"),
+                ],
+                text=True,
+                capture_output=True,
+            )
+            self.assertNotEqual(process.returncode, 0)
+            self.assertIn("still a placeholder", process.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
