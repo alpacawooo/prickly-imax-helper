@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -55,7 +56,8 @@ class ConfigTests(unittest.TestCase):
             target = Path(temp) / "private" / "config.json"
             write_config(target, VALID_CONFIG)
             self.assertEqual(load_config(target), VALID_CONFIG)
-            self.assertEqual(target.stat().st_mode & 0o777, 0o600)
+            if os.name != "nt":
+                self.assertEqual(target.stat().st_mode & 0o777, 0o600)
 
     def test_rejects_missing_consent_and_faster_rate(self):
         value = copy.deepcopy(VALID_CONFIG)
