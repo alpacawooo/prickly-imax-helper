@@ -1,6 +1,6 @@
 {
   "name": "prickly-imax-helper",
-  "version": "0.1.0+codex.20260805011014",
+  "version": "0.1.0+codex.20260805070739",
   "description": "Set up and operate a local CGV IMAX availability monitor and authorized booking assistant.",
   "author": {
     "name": "Prickly AI"
@@ -17,7 +17,7 @@
   "interface": {
     "displayName": "Prickly IMAX Helper",
     "shortDescription": "CGV IMAX \ucde8\uc18c\ud45c \uac10\uc2dc\uc640 \ub85c\uceec \uc608\ub9e4 \ub3c4\uc6b0\ubbf8",
-    "longDescription": "\uc0ac\uc6a9\uc790 Mac\uc758 \uc804\uc6a9 Chrome \uc138\uc158\uc5d0\uc11c CGV IMAX \uc88c\uc11d\uc744 \uac10\uc2dc\ud558\uace0, \uba85\uc2dc\ub41c \uc88c\uc11d \uc815\ucc45\uacfc \uacb0\uc81c \uc870\uac74\uc744 \uac80\uc99d\ud574 \ud5c8\uac00\ub41c \uc608\ub9e4 \ud750\ub984\uc744 \uc2e4\ud589\ud569\ub2c8\ub2e4.",
+    "longDescription": "\uc0ac\uc6a9\uc790 macOS \ub610\ub294 Windows PC\uc758 \uc804\uc6a9 Chrome \uc138\uc158\uc5d0\uc11c CGV IMAX \uc88c\uc11d\uc744 \uac10\uc2dc\ud558\uace0, \uba85\uc2dc\ub41c \uc88c\uc11d \uc815\ucc45\uacfc \uacb0\uc81c \uc870\uac74\uc744 \uac80\uc99d\ud574 \ud5c8\uac00\ub41c \uc608\ub9e4 \ud750\ub984\uc744 \uc2e4\ud589\ud569\ub2c8\ub2e4.",
     "developerName": "Prickly AI",
     "category": "Productivity",
     "capabilities": [

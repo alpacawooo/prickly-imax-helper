@@ -34,7 +34,7 @@ CGV login and browser data remain under the user's local profile. Runtime state 
 ## Safety contract
 
 - All explicit CGV availability requests share a cross-process one-request-per-second budget.
-- HTTP 429 stops traffic and applies a shared cooldown.
+- HTTP 429 stops traffic for at least five minutes; repeated limits double the shared cooldown up to one hour, while a longer server `Retry-After` always wins.
 - Only an exact same-row consecutive block of the configured size satisfying the configured rows and edge exclusion can proceed.
 - Odyssey at Yongsan IMAX, weekday 19:00+, all Saturday, Sunday before 22:00, two seats, D-J rows, 20% edge exclusion, and center priority are editable defaults rather than locked values.
 - The runtime submits once only after duplicate, seat, voucher count, and zero-balance checks.
@@ -48,3 +48,11 @@ PYTHONPATH=runtime python3 -m prickly_imax_helper.cli --home /tmp/prickly-test d
 ```
 
 Release generation is blocked unless authorization metadata contains an approval date, approved scope, a `public_ip` request limit no greater than one request per second, and either a public-safe authorization reference or the SHA-256 fingerprint of the privately retained source document. The private source document is never copied into a release.
+
+To change conditions after installation, stop the resident monitor before reopening setup. This avoids competing for the dedicated browser lock:
+
+```bash
+~/.local/bin/prickly-imax stop
+~/.local/bin/prickly-imax setup
+~/.local/bin/prickly-imax start
+```

@@ -13,7 +13,9 @@ This checklist is the release gate. A checked implementation item is not equival
 - [x] Dedicated system Chrome launches with an isolated profile and accepts a Playwright CDP connection.
 - [x] Explicit availability requests share a cross-process minimum one-second interval.
 - [x] HTTP 429 applies a shared cooldown; HTTP 401/403 becomes `login_required`.
+- [x] Repeated HTTP 429 responses exponentially extend the shared cooldown from five minutes up to one hour while honoring longer server `Retry-After` values.
 - [x] Open dates refresh dynamically and schedule checks rotate across dates.
+- [x] Custom movie/theater identifiers drive open-date, schedule, and seat-map requests without falling back to the Odyssey/Yongsan preset.
 - [x] Seat ranking enforces same-row adjacency, allowed rows, edge exclusion, and center priority.
 - [x] Duplicate checks run before staging and again immediately before submission.
 - [x] Exact selected voucher count, requested seats, zero remaining balance, and one final button are required.

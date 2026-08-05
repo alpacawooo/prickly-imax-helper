@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .config import ConfigError, load_config
 from .browser import chrome_executable
+from .locks import LockUnavailable, locked_file
 from .notify import notification_method, powershell_executable
 from .paths import RuntimePaths
 from .redaction import redact
@@ -50,16 +51,29 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"ok": required_ok, "checks": checks}, ensure_ascii=False, indent=2))
         return 0 if required_ok else 1
     if args.command == "setup":
+        try:
+            with locked_file(paths.state_dir / "monitor.lock", blocking=False):
+                pass
+        except LockUnavailable:
+            print("감시가 실행 중입니다. 먼저 `prickly-imax stop`을 실행하고 상태가 stopped가 된 뒤 설정을 다시 여세요.")
+            return 2
         serve_setup(paths)
         return 0
     if args.command == "run":
-        from .monitor import run
+        from .monitor import AlreadyRunning, run
 
-        return run(paths)
+        try:
+            return run(paths)
+        except AlreadyRunning:
+            return 0
     if args.command == "dry-run":
-        from .monitor import run
+        from .monitor import AlreadyRunning, run
 
-        return run(paths, max_cycles=1, allow_checkout=False)
+        try:
+            return run(paths, max_cycles=1, allow_checkout=False)
+        except AlreadyRunning:
+            print("감시가 실행 중이라 무클릭 검사를 시작하지 않았습니다. 중복 프로세스는 생성되지 않았습니다.")
+            return 2
     if args.command == "status":
         print(json.dumps(redact(read_state(paths.heartbeat)), ensure_ascii=False, indent=2))
         return 0

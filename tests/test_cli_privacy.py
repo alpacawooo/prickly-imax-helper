@@ -9,11 +9,38 @@ from pathlib import Path
 from unittest.mock import patch
 
 from prickly_imax_helper.cli import main
+from prickly_imax_helper.locks import LockUnavailable
+from prickly_imax_helper.monitor import AlreadyRunning
 from prickly_imax_helper.paths import RuntimePaths
 from prickly_imax_helper.state import Status, transition
 
 
 class CliPrivacyTests(unittest.TestCase):
+    def test_setup_fails_fast_when_monitor_is_running(self):
+        with tempfile.TemporaryDirectory() as temp, patch(
+            "prickly_imax_helper.cli.locked_file", side_effect=LockUnavailable("busy")
+        ), patch("prickly_imax_helper.cli.serve_setup") as setup:
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                self.assertEqual(main(["--home", temp, "setup"]), 2)
+            setup.assert_not_called()
+            self.assertIn("먼저", output.getvalue())
+
+    def test_run_exits_cleanly_when_monitor_is_already_running(self):
+        with tempfile.TemporaryDirectory() as temp, patch(
+            "prickly_imax_helper.monitor.run", side_effect=AlreadyRunning()
+        ):
+            self.assertEqual(main(["--home", temp, "run"]), 0)
+
+    def test_dry_run_reports_existing_monitor_without_creating_another(self):
+        with tempfile.TemporaryDirectory() as temp, patch(
+            "prickly_imax_helper.monitor.run", side_effect=AlreadyRunning()
+        ):
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                self.assertEqual(main(["--home", temp, "dry-run"]), 2)
+            self.assertIn("중복 프로세스", output.getvalue())
+
     def test_stop_is_idempotent_for_every_terminal_state(self):
         for terminal in (
             Status.COMPLETED,

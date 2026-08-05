@@ -17,10 +17,19 @@ from .state import TERMINAL, Status, read_state, transition
 
 OPEN_DATE_REFRESH_SECONDS = 30.0
 UNCHANGED_SEAT_PROBE_SECONDS = 60.0
+MAX_RATE_LIMIT_COOLDOWN_SECONDS = 3600.0
 
 
 class AlreadyRunning(RuntimeError):
     pass
+
+
+def rate_limit_backoff_seconds(streak: int, base_seconds: float) -> float:
+    if streak < 1:
+        raise ValueError("rate-limit streak must be positive")
+    if base_seconds < 300:
+        raise ValueError("rate-limit cooldown must be at least five minutes")
+    return min(MAX_RATE_LIMIT_COOLDOWN_SECONDS, base_seconds * (2 ** (streak - 1)))
 
 
 def _notify(paths: RuntimePaths, config: dict[str, Any], subject: str, body: str) -> None:
@@ -128,6 +137,7 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
         last_open_date_refresh = 0.0
         last_seat_probe: dict[str, float] = {}
         consecutive_errors = 0
+        rate_limit_streak = 0
         session = CgvSession(
             paths,
             minimum_interval_seconds=float(config["request_policy"]["minimum_interval_seconds"]),
@@ -180,6 +190,7 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
                                 write_event(paths.logs, "dry_run_match_not_selected", match=match)
                             break
                     consecutive_errors = 0
+                    rate_limit_streak = 0
                     _heartbeat(
                         paths,
                         Status.ARMED,
@@ -197,12 +208,16 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
                         return 1
                     time.sleep(30)
                 except RateLimited as exc:
-                    _heartbeat(paths, Status.RATE_LIMITED, str(exc))
-                    write_event(paths.logs, "rate_limited", error=str(exc))
+                    rate_limit_streak += 1
+                    base_cooldown = float(config["request_policy"].get("rate_limit_cooldown_seconds", 300))
+                    cooldown = max(exc.cooldown_seconds, rate_limit_backoff_seconds(rate_limit_streak, base_cooldown))
+                    session.budget.defer(cooldown)
+                    _heartbeat(paths, Status.RATE_LIMITED, str(exc), cooldown_seconds=cooldown, streak=rate_limit_streak)
+                    write_event(paths.logs, "rate_limited", error=str(exc), cooldown_seconds=cooldown, streak=rate_limit_streak)
                     _notify(paths, config, "Prickly IMAX 조회 제한", "CGV 요청 제한을 감지해 모든 자동 조회를 일시 중지했습니다.")
                     if max_cycles is not None:
                         return 3
-                    time.sleep(float(config["request_policy"].get("rate_limit_cooldown_seconds", 300)))
+                    time.sleep(cooldown)
                 except Exception as exc:
                     consecutive_errors += 1
                     current = read_state(paths.heartbeat).get("status")

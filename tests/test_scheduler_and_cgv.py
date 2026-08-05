@@ -91,6 +91,15 @@ class CgvApiTests(unittest.TestCase):
             self.assertEqual(session.budget.acquired, 1)
             self.assertEqual(session.budget.deferred, [900.0])
 
+    def test_429_exposes_server_cooldown_to_monitor(self):
+        with tempfile.TemporaryDirectory() as temp:
+            session = CgvSession(RuntimePaths(Path(temp)))
+            session.budget = FakeBudget()
+            session.page = FakePage({"status": 429, "retryAfter": "900", "text": "rate limited"})
+            with self.assertRaises(RateLimited) as raised:
+                session.api_get("/test")
+            self.assertEqual(raised.exception.cooldown_seconds, 900.0)
+
     def test_success_requires_cgv_status_code_zero(self):
         with tempfile.TemporaryDirectory() as temp:
             session = CgvSession(RuntimePaths(Path(temp)))
@@ -139,6 +148,41 @@ class CgvApiTests(unittest.TestCase):
             session.page = page
             self.assertEqual(session.open_dates(), ["20260808"])
             self.assertIn("coCd=TEST&siteNo=0099&movNo=movie123", str(page.last_path))
+
+    def test_custom_target_identifiers_drive_seat_request(self):
+        with tempfile.TemporaryDirectory() as temp:
+            session = CgvSession(
+                RuntimePaths(Path(temp)),
+                company_code="TEST",
+                site_no="0099",
+                movie_no="movie123",
+            )
+            session.budget = FakeBudget()
+            page = FakePage(
+                {
+                    "status": 200,
+                    "retryAfter": None,
+                    "text": json.dumps(
+                        {
+                            "statusCode": 0,
+                            "data": {
+                                "items": [
+                                    {
+                                        "seats": [
+                                            {"seatRowNm": "H", "seatNo": "15", "seatSaleYn": "Y"},
+                                            {"seatRowNm": "H", "seatNo": "16", "seatSaleYn": "N"},
+                                        ]
+                                    }
+                                ]
+                            },
+                        }
+                    ),
+                }
+            )
+            session.page = page
+            self.assertEqual(session.seats("20260808", "018", "1"), {"all": ["H15", "H16"], "available": ["H15"]})
+            self.assertIn("coCd=TEST&siteNo=0099", str(page.last_path))
+            self.assertNotIn("siteNo=0013", str(page.last_path))
 
 
 if __name__ == "__main__":
