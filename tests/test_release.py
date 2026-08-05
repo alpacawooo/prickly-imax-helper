@@ -45,6 +45,10 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn("Smoke-test macOS installer", workflow)
         self.assertIn("Smoke-test Windows installer", workflow)
         self.assertIn("PRICKLY_INSTALL_DRY_RUN", workflow)
+        self.assertIn("scripts/Update.command", workflow)
+        self.assertIn("scripts\\Update.ps1", workflow)
+        self.assertIn("scripts/Uninstall.command", workflow)
+        self.assertIn("scripts\\Uninstall.ps1", workflow)
 
     def test_installer_avoids_unlocked_project_build_backend(self):
         installer = (ROOT / "scripts/Install.command").read_text(encoding="utf-8")
