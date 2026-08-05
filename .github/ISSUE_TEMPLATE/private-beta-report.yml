@@ -1,16 +1,16 @@
-name: Private beta report
-description: Report an installation or runtime problem without private CGV or payment data.
-title: "[beta] "
+name: 비공개 베타 오류 신고
+description: CGV·결제 개인정보 없이 설치 또는 실행 문제를 신고합니다.
+title: "[베타] "
 labels: ["private-beta"]
 body:
   - type: markdown
     attributes:
       value: |
-        Do not attach screenshots containing CGV account details, voucher numbers, cookies, card data, or email addresses. Paste only the redacted `prickly-imax diagnose` output.
+        CGV 계정 정보, 관람권 번호, 쿠키, 카드정보, 이메일 주소가 포함된 화면은 첨부하지 마세요. 개인정보가 제거된 `prickly-imax diagnose` 결과만 붙여넣으세요.
   - type: dropdown
     id: platform
     attributes:
-      label: Platform
+      label: 운영체제
       options:
         - macOS
         - Windows 10
@@ -20,48 +20,48 @@ body:
   - type: dropdown
     id: stage
     attributes:
-      label: Failed stage
+      label: 실패 단계
       options:
-        - Download or checksum
-        - Install
-        - Dedicated Chrome or login
-        - Test email
-        - Dry-run
-        - Monitor status
-        - Stop
-        - Update
-        - Uninstall
+        - 다운로드 또는 체크섬
+        - 설치
+        - 전용 Chrome 또는 로그인
+        - 테스트메일
+        - 무클릭 dry-run
+        - 감시 상태
+        - 중지
+        - 업데이트
+        - 삭제
     validations:
       required: true
   - type: textarea
     id: error
     attributes:
-      label: Short visible error
-      description: Remove personal data before pasting.
+      label: 화면에 표시된 짧은 오류 문구
+      description: 붙여넣기 전에 개인정보를 제거하세요.
     validations:
       required: true
   - type: dropdown
     id: shared_ip
     attributes:
-      label: Was another Helper running on the same public IP?
+      label: 같은 공인 IP에서 다른 Helper가 실행 중이었나요?
       options:
-        - "No"
-        - "Yes"
-        - Unknown
+        - "아니요"
+        - "예"
+        - 모름
     validations:
       required: true
   - type: textarea
     id: diagnose
     attributes:
-      label: Redacted diagnose JSON
-      description: Paste only the output from `prickly-imax diagnose`.
+      label: 개인정보가 제거된 diagnose JSON
+      description: "`prickly-imax diagnose` 출력만 붙여넣으세요."
       render: json
     validations:
       required: true
   - type: checkboxes
     id: privacy
     attributes:
-      label: Privacy confirmation
+      label: 개인정보 제거 확인
       options:
-        - label: I removed passwords, email addresses, customer IDs, voucher numbers, cookies, and payment data.
+        - label: 비밀번호, 이메일 주소, 고객번호, 관람권 번호, 쿠키, 결제정보를 모두 제거했습니다.
           required: true
