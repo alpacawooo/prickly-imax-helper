@@ -12,7 +12,14 @@ from typing import Any
 
 
 BASELINE_NAME = "soak-baseline.json"
-FAILURE_EVENTS = {"rate_limited", "monitor_error", "configuration_invalid"}
+FAILURE_EVENTS = {
+    "checkout_guard_retry_deferred",
+    "checkout_pre_submit_error",
+    "configuration_invalid",
+    "login_required",
+    "monitor_error",
+    "rate_limited",
+}
 HEALTHY_STATUS = "armed"
 
 
@@ -74,6 +81,12 @@ def process_memory(home: Path) -> dict[str, Any]:
         if len(fields) != 3:
             continue
         pid_text, rss_text, command = fields
+        normalized_command = command.replace("\\", "/")
+        if "/.hermes/browser-profiles/cgv" in normalized_command:
+            entry = roles.setdefault("conflicting_automation", {"count": 0, "rss_kib": 0})
+            entry["count"] += 1
+            entry["rss_kib"] += int(rss_text)
+            continue
         if home_text not in command or int(pid_text) == os.getpid():
             continue
         if "playwright" in command and "run-driver" in command:
@@ -99,6 +112,7 @@ def capture(home: Path, *, started_at: datetime | None = None) -> dict[str, Any]
         "started_at": (started_at or captured_at).isoformat(),
         "captured_at": captured_at.isoformat(),
         "status": str(heartbeat.get("status", "missing")),
+        "match": heartbeat.get("match"),
         "heartbeat_age_seconds": max((captured_at - heartbeat_at).total_seconds(), 0.0),
         "processes": process_memory(home),
         "event_offsets": event_offsets(home / "logs"),
@@ -123,6 +137,14 @@ def evaluate(
     monitor_count = int(current.get("processes", {}).get("monitor", {}).get("count", 0))
     if monitor_count != 1:
         errors.append(f"expected exactly one monitor process, found {monitor_count}")
+    driver_count = int(current.get("processes", {}).get("driver", {}).get("count", 0))
+    if driver_count != 1:
+        errors.append(f"expected exactly one Playwright driver process, found {driver_count}")
+    conflict_count = int(current.get("processes", {}).get("conflicting_automation", {}).get("count", 0))
+    if conflict_count:
+        errors.append(f"found {conflict_count} conflicting Hermes CGV browser process(es)")
+    if current.get("status") == HEALTHY_STATUS and current.get("match") is not None:
+        errors.append("armed status retained a stale seat match")
     for event in sorted(FAILURE_EVENTS):
         if int(new_events.get(event, 0)):
             errors.append(f"observed {new_events[event]} {event} event(s)")
@@ -157,6 +179,10 @@ def main() -> int:
             raise SystemExit(f"cannot start soak while status is {baseline['status']}")
         if baseline.get("processes", {}).get("monitor", {}).get("count") != 1:
             raise SystemExit("cannot start soak without exactly one monitor process")
+        if baseline.get("processes", {}).get("driver", {}).get("count") != 1:
+            raise SystemExit("cannot start soak without exactly one Playwright driver process")
+        if baseline.get("processes", {}).get("conflicting_automation", {}).get("count", 0):
+            raise SystemExit("cannot start soak while a Hermes CGV browser process is running")
         write_private_json(baseline_path, baseline)
         print(json.dumps({"ok": True, "mode": "start", "baseline": str(baseline_path)}, indent=2))
         return 0

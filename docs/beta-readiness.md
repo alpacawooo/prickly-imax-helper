@@ -39,7 +39,8 @@ This checklist is the release gate. A checked implementation item is not equival
 - [x] Create the private GitHub repository.
 - [ ] Publish tag `0.1.0` and attach the authorization-gated macOS/Windows archives and checksums.
 - [x] Upload the authorization-gated macOS/Windows archives and checksums to a private GitHub draft release for owner review; download count remained zero at creation (2026-08-05).
-- [ ] Replace the private-beta guide's generic GitHub wording with the exact repository/release link.
+- [x] Replace the private-beta guide's generic GitHub wording with the exact private repository and current draft-release links (2026-08-05).
+- [x] Add a privacy-safe three-pilot evidence generator and validator that requires macOS and Windows, a Windows standard user, distinct recipient providers, all lifecycle steps, local-only credentials, archive/diagnose digests, and no email or absolute user path in evidence.
 
 ## Required before calling the beta successful
 
@@ -58,6 +59,8 @@ PYTHONPATH=runtime python -m unittest discover -s tests -v  # Windows runner
 python3 scripts/build_release.py --version 0.1.0 --authorization <private-metadata.json> --output dist
 python3 scripts/soak_audit.py start --home ~/.prickly-imax-helper
 python3 scripts/soak_audit.py verify --home ~/.prickly-imax-helper
+python3 scripts/pilot_audit.py init --output ~/prickly-pilot-evidence
+python3 scripts/pilot_audit.py verify --input ~/prickly-pilot-evidence
 ```
 
 The release metadata may include a public-safe `authorization_reference`, such as an approval letter, contract, or support-ticket number. It must never contain credentials or private approval text. When no public reference exists, the SHA-256 fingerprint of the privately retained source document is sufficient; the source document itself is never copied into a release.
