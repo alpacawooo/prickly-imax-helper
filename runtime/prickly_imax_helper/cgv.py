@@ -67,11 +67,46 @@ class CgvSession:
             raise CgvError("Playwright is not installed") from exc
         self._playwright = sync_playwright().start()
         self.browser = self._playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{int(info['port'])}")
-        context = self.browser.contexts[0]
-        pages = [page for page in context.pages if "cgv.co.kr" in page.url]
+        self._select_or_open_page()
+
+    def _page_is_usable(self) -> bool:
+        if self.page is None:
+            return False
+        is_closed = getattr(self.page, "is_closed", None)
+        if not callable(is_closed):
+            return True
+        try:
+            return not bool(is_closed())
+        except Exception:
+            return False
+
+    def _select_or_open_page(self) -> None:
+        if self.browser is None or not self.browser.is_connected():
+            raise CgvError("dedicated Chrome connection is closed")
+        contexts = self.browser.contexts
+        if not contexts:
+            raise CgvError("dedicated Chrome has no browser context")
+        if self._page_is_usable():
+            return
+        context = contexts[0]
+        pages = [page for page in context.pages if not page.is_closed() and "cgv.co.kr" in page.url]
         self.page = pages[-1] if pages else context.new_page()
         if not pages:
             self.page.goto(CGV_BOOKING_URL, wait_until="domcontentloaded")
+
+    def ensure_page(self) -> None:
+        """Recover a closed CGV tab or stale CDP connection without touching checkout state."""
+        if self._page_is_usable():
+            return
+        try:
+            self._select_or_open_page()
+            return
+        except Exception:
+            self.disconnect()
+        try:
+            self.connect()
+        except Exception as exc:
+            raise CgvError(f"could not recover the dedicated Chrome page: {exc}") from exc
 
     def disconnect(self) -> None:
         # Do not call browser.close(): this is a persistent user Chrome reached
@@ -83,8 +118,7 @@ class CgvSession:
         self._playwright = None
 
     def is_logged_in(self) -> bool:
-        if self.page is None:
-            raise CgvError("browser is not connected")
+        self.ensure_page()
         return bool(
             self.page.evaluate(
                 """() => document.cookie.split(';').some(c => c.trim().startsWith('accessToken=')) ||
@@ -97,8 +131,7 @@ class CgvSession:
             raise LoginRequired("CGV login is required in the dedicated Chrome profile")
 
     def api_get(self, path: str) -> Any:
-        if self.page is None:
-            raise CgvError("browser is not connected")
+        self.ensure_page()
         self.budget.acquire()
         result = self.page.evaluate(
             """async path => {
@@ -148,8 +181,7 @@ class CgvSession:
         return {"all": labels, "available": available}
 
     def booking_target_from_page(self) -> dict[str, str]:
-        if self.page is None:
-            raise CgvError("browser is not connected")
+        self.ensure_page()
         urls = self.page.evaluate(
             """() => performance.getEntriesByType('resource').map(entry => entry.name).reverse()"""
         )

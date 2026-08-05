@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock
 
 from prickly_imax_helper.cgv import CgvSession, LoginRequired, RateLimited
 from prickly_imax_helper.paths import RuntimePaths
@@ -81,6 +82,48 @@ class FakePage:
 
 
 class CgvApiTests(unittest.TestCase):
+    def test_closed_tab_is_replaced_with_existing_cgv_tab(self):
+        with tempfile.TemporaryDirectory() as temp:
+            session = CgvSession(RuntimePaths(Path(temp)))
+            closed = Mock()
+            closed.is_closed.return_value = True
+            live = Mock()
+            live.is_closed.return_value = False
+            live.url = "https://cgv.co.kr/cnm/movieBook"
+            context = Mock()
+            context.pages = [closed, live]
+            browser = Mock()
+            browser.is_connected.return_value = True
+            browser.contexts = [context]
+            session.page = closed
+            session.browser = browser
+
+            session.ensure_page()
+
+            self.assertIs(session.page, live)
+            context.new_page.assert_not_called()
+
+    def test_closed_tab_opens_booking_page_when_no_cgv_tab_remains(self):
+        with tempfile.TemporaryDirectory() as temp:
+            session = CgvSession(RuntimePaths(Path(temp)))
+            closed = Mock()
+            closed.is_closed.return_value = True
+            replacement = Mock()
+            replacement.is_closed.return_value = False
+            context = Mock()
+            context.pages = [closed]
+            context.new_page.return_value = replacement
+            browser = Mock()
+            browser.is_connected.return_value = True
+            browser.contexts = [context]
+            session.page = closed
+            session.browser = browser
+
+            session.ensure_page()
+
+            self.assertIs(session.page, replacement)
+            replacement.goto.assert_called_once_with("https://cgv.co.kr/cnm/movieBook", wait_until="domcontentloaded")
+
     def test_429_applies_shared_cooldown(self):
         with tempfile.TemporaryDirectory() as temp:
             session = CgvSession(RuntimePaths(Path(temp)))
