@@ -112,6 +112,32 @@ class CheckoutBrowserTests(unittest.TestCase):
 
         self.assertEqual(state, {"picker": True, "target_ready": False})
 
+    def test_selects_search_suggestion_then_actual_theater_row_and_confirms(self):
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8>
+            <input placeholder="지역을 입력해주세요">
+            <ul id="theaters"><li><button id="actual" type="button">용산아이파크몰</button></li></ul>
+            <button id="suggestion" type="button">용산아이파크몰</button>
+            <script>
+              suggestion.onclick = () => suggestion.remove();
+              actual.onclick = () => document.body.insertAdjacentHTML(
+                'beforeend', '<button id="confirm" type="button">극장선택</button>');
+              document.addEventListener('click', event => {
+                if (event.target.id !== 'confirm') return;
+                document.querySelector('input').remove();
+                document.body.insertAdjacentHTML('beforeend',
+                  '<button>용산아이파크몰</button><button>21:00-23:45 8 / 624석</button><h3>IMAX관</h3>');
+              });
+            </script>"""
+        )
+
+        self.flow._select_theater_from_picker("용산아이파크몰", "IMAX")
+
+        self.assertEqual(
+            self.flow._booking_page_state("용산아이파크몰", "IMAX"),
+            {"picker": False, "target_ready": True},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

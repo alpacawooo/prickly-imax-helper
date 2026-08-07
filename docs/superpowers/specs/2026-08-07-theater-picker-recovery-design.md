@@ -6,7 +6,9 @@ The monitor detected qualifying seat pairs, but every recent checkout attempt st
 
 ## Root Cause
 
-The live no-seat reproduction showed that CGV changes the route to `/cnm/movieBook/movie` before rendering the theater controls. At the first check there was no region input, configured-theater element, or theater launcher. About 500 ms later the region-search input and the rest of the booking UI appeared. `CheckoutFlow.open_movie_and_theater()` checked once immediately after the route change and therefore treated a normal delayed render as a missing launcher. The configurable-target change also removed the previous "selected theater and schedules are ready" short-circuit, so an already-ready screen had no direct success path.
+The live no-seat reproduction showed two independent pre-seat failures. First, CGV changes the route to `/cnm/movieBook/movie` before rendering the theater controls. At the first check there was no region input, configured-theater element, or theater launcher. About 500 ms later the region-search input and the rest of the booking UI appeared. `CheckoutFlow.open_movie_and_theater()` checked once immediately after the route change and therefore treated a normal delayed render as a missing launcher. The configurable-target change also removed the previous "selected theater and schedules are ready" short-circuit, so an already-ready screen had no direct success path.
+
+Second, the current picker requires three distinct actions after typing a theater: click the search suggestion, wait for the duplicate exact labels to collapse to the single actual theater row, click that row, then click the enabled `극장선택` confirmation button. The previous code clicked only the last of two exact labels and immediately waited for confirmation. That first click merely applied the search filter, so confirmation could never appear.
 
 ## Design
 
@@ -17,7 +19,8 @@ After selecting the configured movie, the runtime will inspect the visible booki
 3. If the region-search input becomes visible, use it.
 4. Only after the bounded wait expires, try to open the theater picker using a small ordered set of semantic signals, including the legacy accessible label and visible theater-selection controls.
 5. Require the region-search input to appear before typing the configured theater.
-6. Require the exact configured theater row and enabled confirmation button before continuing.
+6. If a search suggestion and actual row share the same exact label, click the suggestion and require the results to settle to one exact actual row.
+7. Click the actual row, require the enabled `극장선택` confirmation button, click it once, and prove the configured theater, format, and showtimes are ready before continuing.
 
 No fallback may silently select a different theater, movie, format, date, showtime, or seat.
 
@@ -39,8 +42,9 @@ Add deterministic browser-flow tests for:
 - no ready state and no launcher: fail closed with the existing error;
 - a different theater displayed: never treat it as the configured theater.
 - a region-search input rendered after a short delay: wait and continue instead of raising a missing-launcher error.
+- duplicate search-suggestion and theater-row labels: require suggestion, actual row, and confirmation in that order.
 
-Run the full unit suite, lint, compile checks, and platform script parsing. Install the patched runtime locally only after all checks pass. Confirm one monitor and one Playwright driver, `armed`, and `match: null`; do not generate a manual CGV request or test booking.
+Run the full unit suite, lint, compile checks, and platform script parsing. Install the patched runtime locally only after all checks pass. Confirm one monitor and one Playwright driver, `armed`, and `match: null`. A controlled live no-seat test may stop after proving the theater and IMAX showtime list; it must never click a showtime, seat, voucher, or submission control.
 
 ## Release Handling
 

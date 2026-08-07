@@ -241,6 +241,36 @@ class CheckoutFlow:
             )
         )
 
+    def _select_theater_from_picker(self, theater: str, format_name: str) -> None:
+        search = self.page.locator('input[placeholder="지역을 입력해주세요"]:visible')
+        search.fill(theater)
+        exact = self.page.get_by_role("button", name=theater, exact=True)
+        self._wait(
+            "theater => [...document.querySelectorAll('button')].some(b => "
+            "b.offsetParent && !b.disabled && b.textContent.trim() === theater)",
+            20_000,
+            theater,
+        )
+        if exact.count() > 1:
+            exact.nth(exact.count() - 1).click()
+            self._wait(
+                "theater => [...document.querySelectorAll('button')].filter(b => "
+                "b.offsetParent && !b.disabled && b.textContent.trim() === theater).length === 1",
+                10_000,
+                theater,
+            )
+        if exact.count() != 1:
+            raise CheckoutError(f"actual theater row not found: {theater}")
+        exact.first.click()
+        self._wait(
+            "() => [...document.querySelectorAll('button')].some(b => "
+            "b.offsetParent && !b.disabled && b.textContent.trim() === '극장선택')"
+        )
+        self.page.get_by_role("button", name="극장선택", exact=True).click()
+        ready = self._wait_for_booking_page_state(theater, format_name, timeout_ms=20_000)
+        if not ready["target_ready"]:
+            raise CheckoutError(f"configured theater did not become ready: {theater}")
+
     def open_movie_and_theater(self) -> None:
         movie = str(self.config["movie"])
         theater = str(self.config["theater"])
@@ -262,27 +292,7 @@ class CheckoutFlow:
             if not self._open_theater_picker():
                 raise CheckoutError("theater picker launcher not found")
         self._wait("() => !![...document.querySelectorAll('input')].find(x => x.offsetParent && x.placeholder === '지역을 입력해주세요')")
-        self.page.locator('input[placeholder="지역을 입력해주세요"]:visible').fill(theater)
-        self._wait(
-            "theater => [...document.querySelectorAll('button')].some(b => b.offsetParent && b.textContent.trim() === theater)",
-            20_000,
-            theater,
-        )
-        selected = self.page.evaluate(
-            r"""theater => { const values = [...document.querySelectorAll('button')].filter(b =>
-            b.offsetParent && !b.disabled && b.textContent.trim() === theater);
-            if (!values.length) return false; values[values.length - 1].click(); return true; }""",
-            theater,
-        )
-        if not selected:
-            raise CheckoutError(f"actual theater row not found: {theater}")
-        self._wait("() => [...document.querySelectorAll('button')].some(b => b.offsetParent && !b.disabled && b.textContent.trim() === '극장선택')")
-        self.page.get_by_role("button", name="극장선택", exact=True).click()
-        self._wait(
-            "formatName => document.body.innerText.toLocaleLowerCase().includes(formatName.toLocaleLowerCase())",
-            20_000,
-            format_name,
-        )
+        self._select_theater_from_picker(theater, format_name)
 
     def open_match(self, match: dict[str, Any]) -> None:
         year, month, day = map(int, match["date"].split("-"))

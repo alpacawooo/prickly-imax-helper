@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Prevent qualifying seats from being lost when CGV already has the configured theater selected or exposes a non-legacy theater-picker control.
+**Goal:** Prevent qualifying seats from being lost when CGV renders theater controls late, already has the configured theater selected, or requires separate search-suggestion, theater-row, and confirmation actions.
 
 **Architecture:** Keep `CheckoutFlow` fail-closed and extract two small browser-state operations: one proves the configured theater/format/showtimes are already ready, and one opens the theater picker through ordered semantic selectors. `open_movie_and_theater()` uses those operations without changing seat selection, duplicate checks, voucher checks, or submission.
 
@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Do not make a manual CGV request or click a real seat during testing.
+- A controlled live test may navigate only through configured movie and theater preparation; do not click a showtime, real seat, voucher, or submission control.
 - Never accept a different theater, movie, or format as ready.
 - Keep exact same-row seats, duplicate prevention, exact IMAX voucher count, zero balance, and one-submit rules unchanged.
 - Continue to fail before seat selection when the configured booking state cannot be proven.
@@ -113,3 +113,29 @@ Publish the branch, open a PR describing the ten identical failures and the regr
 - [ ] **Step 5: Report honestly**
 
 Claim the deterministic regression fixed only after focused and full tests pass. Do not claim a real booking succeeded until the resident monitor completes one under the unchanged safety guards.
+
+### Task 4: Reproduce and fix the staged theater-result flow
+
+**Files:**
+- Modify: `tests/test_checkout_browser.py`
+- Modify: `runtime/prickly_imax_helper/checkout.py`
+
+- [x] **Step 1: Reproduce the live sequence without selecting a showtime or seat**
+
+The live picker showed two exact `용산아이파크몰` buttons. The first click reduced them to one actual theater row. Clicking that row exposed an enabled `극장선택` button; it did not close the picker by itself.
+
+- [x] **Step 2: Write and verify a failing browser regression**
+
+The regression models suggestion removal, actual-row selection, confirmation, and the final configured theater/format/showtime proof. It failed before production changes because `_select_theater_from_picker` did not exist.
+
+- [x] **Step 3: Implement the minimum three-stage flow**
+
+Click the duplicate suggestion, wait for one exact actual row, click it, require and click the enabled confirmation button, then fail closed unless the configured booking state becomes ready.
+
+- [x] **Step 4: Run focused and full local verification**
+
+The focused regression and all 115 unit tests pass. Ruff, compile, macOS script parsing, and `git diff --check` pass.
+
+- [ ] **Step 5: Install and repeat the controlled live no-seat test**
+
+Require the picker to close and the configured theater, format, and showtimes to be proven. Do not click a showtime or proceed to seats.
