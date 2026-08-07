@@ -99,6 +99,19 @@ class CheckoutBrowserTests(unittest.TestCase):
         self.assertTrue(self.flow._open_theater_picker())
         self.assertTrue(self.page.evaluate("() => window.pickerOpened"))
 
+    def test_waits_for_delayed_theater_picker_render(self):
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8>
+            <script>
+            setTimeout(() => document.body.insertAdjacentHTML(
+              'beforeend', '<input placeholder="지역을 입력해주세요">'), 100);
+            </script>"""
+        )
+
+        state = self.flow._wait_for_booking_page_state("용산아이파크몰", "IMAX", timeout_ms=2_000)
+
+        self.assertEqual(state, {"picker": True, "target_ready": False})
+
 
 if __name__ == "__main__":
     unittest.main()

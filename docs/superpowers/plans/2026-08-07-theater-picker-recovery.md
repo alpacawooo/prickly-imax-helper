@@ -67,7 +67,7 @@ Try visible buttons in this order: the legacy `.voice-only` label `자주가는 
 
 - [ ] **Step 3: Wire the helpers into `open_movie_and_theater`**
 
-Return immediately when `target_ready` is proven. Otherwise reuse an already-open picker or call `_open_theater_picker()`. Preserve `CheckoutError("theater picker launcher not found")` when neither state is available.
+Poll for a picker or proven ready target for at most 10 seconds after the route changes. Return immediately when `target_ready` is proven. Otherwise reuse an already-open picker or call `_open_theater_picker()`. Preserve `CheckoutError("theater picker launcher not found")` when neither state is available after the bounded wait.
 
 - [ ] **Step 4: Run focused tests and verify GREEN**
 

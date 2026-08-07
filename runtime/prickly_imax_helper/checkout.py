@@ -205,6 +205,19 @@ class CheckoutFlow:
             {"theater": theater, "formatName": format_name},
         )
 
+    def _wait_for_booking_page_state(
+        self, theater: str, format_name: str, *, timeout_ms: int = 10_000
+    ) -> dict[str, bool]:
+        deadline = time.monotonic() + timeout_ms / 1000
+        while True:
+            state = self._booking_page_state(theater, format_name)
+            if state["picker"] or state["target_ready"]:
+                return state
+            remaining_ms = int((deadline - time.monotonic()) * 1000)
+            if remaining_ms <= 0:
+                return state
+            self.page.wait_for_timeout(min(100, remaining_ms))
+
     def _open_theater_picker(self) -> bool:
         return bool(
             self.page.evaluate(
@@ -242,7 +255,7 @@ class CheckoutFlow:
         if not clicked:
             raise CheckoutError(f"movie button not found: {movie}")
         self._wait("() => location.pathname === '/cnm/movieBook/movie'")
-        ready = self._booking_page_state(theater, format_name)
+        ready = self._wait_for_booking_page_state(theater, format_name)
         if ready["target_ready"]:
             return
         if not ready["picker"]:

@@ -6,17 +6,18 @@ The monitor detected qualifying seat pairs, but every recent checkout attempt st
 
 ## Root Cause
 
-`CheckoutFlow.open_movie_and_theater()` removed the previous "selected theater and schedules are ready" short-circuit when configurable targets were introduced. When CGV opens the booking page with the configured theater already selected and the picker closed, the runtime unnecessarily searches for the legacy `자주가는 CGV 목록 수정` launcher. If that exact control is absent or its accessible markup has changed, the flow fails closed.
+The live no-seat reproduction showed that CGV changes the route to `/cnm/movieBook/movie` before rendering the theater controls. At the first check there was no region input, configured-theater element, or theater launcher. About 500 ms later the region-search input and the rest of the booking UI appeared. `CheckoutFlow.open_movie_and_theater()` checked once immediately after the route change and therefore treated a normal delayed render as a missing launcher. The configurable-target change also removed the previous "selected theater and schedules are ready" short-circuit, so an already-ready screen had no direct success path.
 
 ## Design
 
 After selecting the configured movie, the runtime will inspect the visible booking state in this order:
 
-1. If the configured theater is visibly selected, at least one showtime is present, and the configured format is present, continue without reopening the picker.
-2. If the region-search input is already visible, use it.
-3. Otherwise, open the theater picker using a small ordered set of semantic signals, including the legacy accessible label and visible theater-selection controls.
-4. Require the region-search input to appear before typing the configured theater.
-5. Require the exact configured theater row and enabled confirmation button before continuing.
+1. After the route change, poll the booking-page state for at most 10 seconds instead of making a single immediate decision.
+2. If the configured theater is visibly selected, at least one showtime is present, and the configured format is present, continue without reopening the picker.
+3. If the region-search input becomes visible, use it.
+4. Only after the bounded wait expires, try to open the theater picker using a small ordered set of semantic signals, including the legacy accessible label and visible theater-selection controls.
+5. Require the region-search input to appear before typing the configured theater.
+6. Require the exact configured theater row and enabled confirmation button before continuing.
 
 No fallback may silently select a different theater, movie, format, date, showtime, or seat.
 
@@ -37,6 +38,7 @@ Add deterministic browser-flow tests for:
 - semantic theater-selection launcher available: it opens the picker;
 - no ready state and no launcher: fail closed with the existing error;
 - a different theater displayed: never treat it as the configured theater.
+- a region-search input rendered after a short delay: wait and continue instead of raising a missing-launcher error.
 
 Run the full unit suite, lint, compile checks, and platform script parsing. Install the patched runtime locally only after all checks pass. Confirm one monitor and one Playwright driver, `armed`, and `match: null`; do not generate a manual CGV request or test booking.
 
