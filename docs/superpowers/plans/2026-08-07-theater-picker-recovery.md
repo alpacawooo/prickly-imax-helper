@@ -142,6 +142,8 @@ Require the picker to close and the configured theater, format, and showtimes to
 
 The first installed-runtime verification passed with `theater_ready=true` and `picker_closed=true`; showtime, seat, voucher, and submission clicks all remained false.
 
+After the structural-selector change, three consecutive installed-runtime repetitions also passed with `theater_ready=true` and `picker_closed=true` on every run. Showtime, seat, voucher, and submission clicks remained false in all three repetitions.
+
 ### Task 5: Remove ordering and transient-click assumptions
 
 - [x] **Step 1: Add RED tests for reversed DOM order and an ignored first row click**
