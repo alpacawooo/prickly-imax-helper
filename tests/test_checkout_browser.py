@@ -61,6 +61,44 @@ class CheckoutBrowserTests(unittest.TestCase):
             self.flow.prove_ready(self.match)
         self.assertIsNone(self.page.evaluate("() => window.clicked"))
 
+    def test_configured_theater_showtime_and_format_are_ready(self):
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8>
+            <button aria-pressed=true>용산아이파크몰</button>
+            <button>21:00-23:45 8 / 624석</button><h3>IMAX관</h3>"""
+        )
+        self.assertEqual(
+            self.flow._booking_page_state("용산아이파크몰", "IMAX"),
+            {"picker": False, "target_ready": True},
+        )
+
+    def test_different_theater_is_not_ready(self):
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8>
+            <button aria-pressed=true>왕십리</button>
+            <button>21:00-23:45 8 / 624석</button><h3>IMAX관</h3>"""
+        )
+        self.assertEqual(
+            self.flow._booking_page_state("용산아이파크몰", "IMAX"),
+            {"picker": False, "target_ready": False},
+        )
+
+    def test_legacy_theater_picker_launcher_is_clicked(self):
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8>
+            <button onclick="window.pickerOpened=true"><span class=voice-only>자주가는 CGV 목록 수정</span></button>"""
+        )
+        self.assertTrue(self.flow._open_theater_picker())
+        self.assertTrue(self.page.evaluate("() => window.pickerOpened"))
+
+    def test_semantic_theater_picker_launcher_is_clicked(self):
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8>
+            <button aria-label="극장 선택" onclick="window.pickerOpened=true">극장 선택</button>"""
+        )
+        self.assertTrue(self.flow._open_theater_picker())
+        self.assertTrue(self.page.evaluate("() => window.pickerOpened"))
+
 
 if __name__ == "__main__":
     unittest.main()

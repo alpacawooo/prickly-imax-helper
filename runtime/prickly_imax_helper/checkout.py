@@ -186,6 +186,48 @@ class CheckoutFlow:
         if status != "clear":
             raise DuplicateBlocked(f"existing matching ticket status is {status}")
 
+    def _booking_page_state(self, theater: str, format_name: str) -> dict[str, bool]:
+        return self.page.evaluate(
+            r"""target => {
+              const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+              const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+              const picker = [...document.querySelectorAll('input')]
+                .some(element => visible(element) && element.placeholder === '지역을 입력해주세요');
+              const theaterVisible = [...document.querySelectorAll('button,[role="button"]')]
+                .some(element => visible(element) && compact(element.textContent) === target.theater);
+              const schedules = [...document.querySelectorAll('button')]
+                .some(element => visible(element) && /\d{2}:\d{2}-\d{2}:\d{2}/.test(compact(element.textContent)));
+              const formatVisible = compact(document.body.innerText)
+                .toLocaleLowerCase()
+                .includes(target.formatName.toLocaleLowerCase());
+              return {picker, target_ready: !picker && theaterVisible && schedules && formatVisible};
+            }""",
+            {"theater": theater, "formatName": format_name},
+        )
+
+    def _open_theater_picker(self) -> bool:
+        return bool(
+            self.page.evaluate(
+                r"""() => {
+                  const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+                  const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+                  const buttons = [...document.querySelectorAll('button')]
+                    .filter(element => visible(element) && !element.disabled);
+                  const legacy = buttons.find(element =>
+                    compact(element.querySelector('.voice-only')?.textContent) === '자주가는 CGV 목록 수정');
+                  const exact = buttons.find(element => compact(element.innerText) === '극장 선택');
+                  const semantic = buttons.find(element => {
+                    const label = compact(element.getAttribute('aria-label') || element.getAttribute('title'));
+                    return label.includes('극장') && (label.includes('선택') || label.includes('수정'));
+                  });
+                  const launcher = legacy || exact || semantic;
+                  if (!launcher) return false;
+                  launcher.click();
+                  return true;
+                }"""
+            )
+        )
+
     def open_movie_and_theater(self) -> None:
         movie = str(self.config["movie"])
         theater = str(self.config["theater"])
@@ -200,18 +242,11 @@ class CheckoutFlow:
         if not clicked:
             raise CheckoutError(f"movie button not found: {movie}")
         self._wait("() => location.pathname === '/cnm/movieBook/movie'")
-        ready = self.page.evaluate(
-            r"""() => ({
-              picker: !![...document.querySelectorAll('input')].find(x => x.offsetParent && x.placeholder === '지역을 입력해주세요')
-            })"""
-        )
+        ready = self._booking_page_state(theater, format_name)
+        if ready["target_ready"]:
+            return
         if not ready["picker"]:
-            opened = self.page.evaluate(
-                r"""() => { const b = [...document.querySelectorAll('button')].find(x =>
-                x.querySelector('.voice-only')?.textContent.trim() === '자주가는 CGV 목록 수정' && x.offsetParent);
-                if (!b) return false; b.click(); return true; }"""
-            )
-            if not opened:
+            if not self._open_theater_picker():
                 raise CheckoutError("theater picker launcher not found")
         self._wait("() => !![...document.querySelectorAll('input')].find(x => x.offsetParent && x.placeholder === '지역을 입력해주세요')")
         self.page.locator('input[placeholder="지역을 입력해주세요"]:visible').fill(theater)
