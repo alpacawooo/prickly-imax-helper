@@ -241,6 +241,20 @@ class CheckoutFlow:
             )
         )
 
+    def _theater_selection_registered(self, theater: str) -> bool:
+        return bool(
+            self.page.evaluate(
+                r"""theater => {
+                  const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+                  const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+                  const buttons = [...document.querySelectorAll('button')].filter(visible);
+                  return buttons.some(button => !button.disabled && compact(button.textContent) === '극장선택') ||
+                    buttons.some(button => compact(button.textContent) === `${theater} 닫기`);
+                }""",
+                theater,
+            )
+        )
+
     def _select_theater_from_picker(self, theater: str, format_name: str) -> None:
         search = self.page.locator('input[placeholder="지역을 입력해주세요"]:visible')
         search.fill(theater)
@@ -251,17 +265,30 @@ class CheckoutFlow:
             20_000,
             theater,
         )
-        if exact.count() > 1:
-            exact.nth(exact.count() - 1).click()
+        suggestion_index = int(
+            exact.evaluate_all(
+                "values => values.findIndex(value => "
+                "value.offsetParent && !value.disabled && !value.closest('li'))"
+            )
+        )
+        if suggestion_index >= 0:
+            exact.nth(suggestion_index).click()
             self._wait(
-                "theater => [...document.querySelectorAll('button')].filter(b => "
-                "b.offsetParent && !b.disabled && b.textContent.trim() === theater).length === 1",
+                "theater => ![...document.querySelectorAll('button')].some(b => "
+                "b.offsetParent && !b.disabled && b.textContent.trim() === theater && !b.closest('li'))",
                 10_000,
                 theater,
             )
-        if exact.count() != 1:
+        actual = self.page.locator("li:visible").get_by_role("button", name=theater, exact=True)
+        if actual.count() != 1:
             raise CheckoutError(f"actual theater row not found: {theater}")
-        exact.first.click()
+        actual.click()
+        selection_registered = self._theater_selection_registered(theater)
+        if not selection_registered:
+            self.page.wait_for_timeout(500)
+            selection_registered = self._theater_selection_registered(theater)
+        if not selection_registered:
+            actual.click()
         self._wait(
             "() => [...document.querySelectorAll('button')].some(b => "
             "b.offsetParent && !b.disabled && b.textContent.trim() === '극장선택')"

@@ -136,6 +136,16 @@ Click the duplicate suggestion, wait for one exact actual row, click it, require
 
 The focused regression and all 115 unit tests pass. Ruff, compile, macOS script parsing, and `git diff --check` pass.
 
-- [ ] **Step 5: Install and repeat the controlled live no-seat test**
+- [x] **Step 5: Install and repeat the controlled live no-seat test**
 
 Require the picker to close and the configured theater, format, and showtimes to be proven. Do not click a showtime or proceed to seats.
+
+The first installed-runtime verification passed with `theater_ready=true` and `picker_closed=true`; showtime, seat, voucher, and submission clicks all remained false.
+
+### Task 5: Remove ordering and transient-click assumptions
+
+- [x] **Step 1: Add RED tests for reversed DOM order and an ignored first row click**
+- [x] **Step 2: Select the suggestion outside `li` and the actual row inside visible `li`**
+- [x] **Step 3: Retry once only when no selected chip or confirmation is visible**
+- [x] **Step 4: Pass all 116 tests, Ruff, compile, script parsing, and diff checks**
+- [x] **Step 5: Install and pass a controlled live theater-preparation test**

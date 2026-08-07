@@ -10,6 +10,8 @@ The live no-seat reproduction showed two independent pre-seat failures. First, C
 
 Second, the current picker requires three distinct actions after typing a theater: click the search suggestion, wait for the duplicate exact labels to collapse to the single actual theater row, click that row, then click the enabled `극장선택` confirmation button. The previous code clicked only the last of two exact labels and immediately waited for confirmation. That first click merely applied the search filter, so confirmation could never appear.
 
+The follow-up live test also proved that text order and exact-label counts are not a reliable selector contract. The remaining exact label can be a real `li > button`, yet a click immediately after the search transition may not register. The flow therefore distinguishes the suggestion outside a theater-list item from the actual visible `li` row, and retries the actual row once only when neither a selected-theater chip nor the enabled confirmation button appears.
+
 ## Design
 
 After selecting the configured movie, the runtime will inspect the visible booking state in this order:
@@ -19,8 +21,10 @@ After selecting the configured movie, the runtime will inspect the visible booki
 3. If the region-search input becomes visible, use it.
 4. Only after the bounded wait expires, try to open the theater picker using a small ordered set of semantic signals, including the legacy accessible label and visible theater-selection controls.
 5. Require the region-search input to appear before typing the configured theater.
-6. If a search suggestion and actual row share the same exact label, click the suggestion and require the results to settle to one exact actual row.
-7. Click the actual row, require the enabled `극장선택` confirmation button, click it once, and prove the configured theater, format, and showtimes are ready before continuing.
+6. If a search suggestion and actual row share the same exact label, identify the suggestion structurally as an exact button outside a theater-list `li`, click it, and require it to disappear.
+7. Identify exactly one visible exact theater button inside a list `li` and click it.
+8. If neither the selected-theater chip nor an enabled `극장선택` confirmation appears after 500 ms, retry that same actual row once. Never retry when selection is already proven.
+9. Require the enabled confirmation button, click it once, and prove the configured theater, format, and showtimes are ready before continuing.
 
 No fallback may silently select a different theater, movie, format, date, showtime, or seat.
 
@@ -43,6 +47,8 @@ Add deterministic browser-flow tests for:
 - a different theater displayed: never treat it as the configured theater.
 - a region-search input rendered after a short delay: wait and continue instead of raising a missing-launcher error.
 - duplicate search-suggestion and theater-row labels: require suggestion, actual row, and confirmation in that order.
+- reversed suggestion/row DOM order: use structure instead of array position.
+- an ignored first actual-row click: retry once only when no selection state is visible.
 
 Run the full unit suite, lint, compile checks, and platform script parsing. Install the patched runtime locally only after all checks pass. Confirm one monitor and one Playwright driver, `armed`, and `match: null`. A controlled live no-seat test may stop after proving the theater and IMAX showtime list; it must never click a showtime, seat, voucher, or submission control.
 
