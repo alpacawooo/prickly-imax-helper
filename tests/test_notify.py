@@ -8,10 +8,54 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from prickly_imax_helper.monitor import _notify
 from prickly_imax_helper.notify import MAIL_SCRIPT, OUTLOOK_SCRIPT, send_email
+from prickly_imax_helper.paths import RuntimePaths
 
 
 class NotificationTests(unittest.TestCase):
+    def test_attempt_linked_notification_records_each_successful_channel(self):
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            config = {"notification": {"email": "private@example.com"}}
+            with patch("prickly_imax_helper.monitor.show_notification"), patch(
+                "prickly_imax_helper.monitor.send_email"
+            ), patch("prickly_imax_helper.monitor.write_event") as write:
+                _notify(paths, config, "subject", "body", attempt_id="attempt-a")
+
+        self.assertEqual(
+            [(call.args[1], call.kwargs) for call in write.call_args_list],
+            [
+                ("notification_result", {"attempt_id": "attempt-a", "channel": "desktop", "outcome": "passed"}),
+                ("notification_result", {"attempt_id": "attempt-a", "channel": "email", "outcome": "passed"}),
+            ],
+        )
+
+    def test_attempt_linked_notification_records_failures_without_recipient(self):
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            config = {"notification": {"email": "private@example.com"}}
+            with patch(
+                "prickly_imax_helper.monitor.show_notification", side_effect=RuntimeError("desktop unavailable")
+            ), patch("prickly_imax_helper.monitor.send_email", side_effect=RuntimeError("mail unavailable")), patch(
+                "prickly_imax_helper.monitor.write_event"
+            ) as write:
+                _notify(paths, config, "subject", "body", attempt_id="attempt-a")
+
+        events = [(call.args[1], call.kwargs) for call in write.call_args_list]
+        self.assertEqual(
+            events,
+            [
+                ("desktop_notification_failed", {"error": "desktop unavailable"}),
+                ("notification_result", {"attempt_id": "attempt-a", "channel": "desktop", "outcome": "failed"}),
+                ("email_failed", {"error": "mail unavailable"}),
+                ("notification_result", {"attempt_id": "attempt-a", "channel": "email", "outcome": "failed"}),
+            ],
+        )
+        self.assertNotIn("private@example.com", repr(events))
+
     @unittest.skipUnless(platform.system() == "Darwin", "AppleScript compiler is macOS-only")
     def test_mail_applescript_compiles(self):
         with tempfile.TemporaryDirectory() as temp:

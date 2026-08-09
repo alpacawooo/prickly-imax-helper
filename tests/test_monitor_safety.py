@@ -247,6 +247,53 @@ class MonitorRestartSafetyTests(unittest.TestCase):
             launch.assert_not_called()
             self.assertEqual(read_state(paths.heartbeat)["status"], "unknown_after_submit")
 
+    def test_restart_before_submission_records_correlated_interruption_first(self):
+        timeline = []
+        match = {"date": "2026-08-21", "time": "24:30", "seats": ["G13", "G14"], "pair": "G13-G14"}
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            write_config(paths.config, copy.deepcopy(VALID_CONFIG))
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+            transition(paths.heartbeat, Status.ARMED)
+            transition(paths.heartbeat, Status.STAGING, attempt_id="attempt-a", match=match)
+
+            def record_event(_log_dir, event, **fields):
+                timeline.append(("event", event, fields))
+
+            def record_heartbeat(_paths, status, detail="", **fields):
+                timeline.append(("heartbeat", status.value, fields))
+
+            with patch("prickly_imax_helper.monitor.write_event", side_effect=record_event), patch(
+                "prickly_imax_helper.monitor._heartbeat", side_effect=record_heartbeat
+            ), patch("prickly_imax_helper.monitor.launch_browser", side_effect=RuntimeError("stop after recovery")):
+                with self.assertRaisesRegex(RuntimeError, "stop after recovery"):
+                    run(paths)
+
+        self.assertEqual(
+            timeline[:2],
+            [
+                ("event", "checkout_attempt_interrupted", {"attempt_id": "attempt-a", "match": match}),
+                ("heartbeat", "recovering", {}),
+            ],
+        )
+
+    def test_submission_restart_never_records_pre_submit_interruption(self):
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            write_config(paths.config, copy.deepcopy(VALID_CONFIG))
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+            transition(paths.heartbeat, Status.ARMED)
+            transition(paths.heartbeat, Status.STAGING, attempt_id="attempt-a", match={"pair": "G13-G14"})
+            transition(paths.heartbeat, Status.SUBMITTING)
+            with patch("prickly_imax_helper.monitor.write_event") as write, patch(
+                "prickly_imax_helper.monitor.launch_browser"
+            ) as launch, patch("prickly_imax_helper.monitor._notify"):
+                self.assertEqual(run(paths), 2)
+            launch.assert_not_called()
+            self.assertFalse(any(call.args[1] == "checkout_attempt_interrupted" for call in write.call_args_list))
+
     def test_dry_run_scans_without_checkout(self):
         class FakeSession:
             page = object()

@@ -34,15 +34,56 @@ def rate_limit_backoff_seconds(streak: int, base_seconds: float) -> float:
     return min(MAX_RATE_LIMIT_COOLDOWN_SECONDS, base_seconds * (2 ** (streak - 1)))
 
 
-def _notify(paths: RuntimePaths, config: dict[str, Any], subject: str, body: str) -> None:
+def _notify(
+    paths: RuntimePaths,
+    config: dict[str, Any],
+    subject: str,
+    body: str,
+    *,
+    attempt_id: str | None = None,
+) -> None:
     try:
         show_notification(subject, body)
     except Exception as exc:
         write_event(paths.logs, "desktop_notification_failed", error=str(exc))
+        if attempt_id is not None:
+            write_event(
+                paths.logs,
+                "notification_result",
+                attempt_id=attempt_id,
+                channel="desktop",
+                outcome="failed",
+            )
+    else:
+        if attempt_id is not None:
+            write_event(
+                paths.logs,
+                "notification_result",
+                attempt_id=attempt_id,
+                channel="desktop",
+                outcome="passed",
+            )
     try:
         send_email(config["notification"]["email"], subject, body)
     except Exception as exc:
         write_event(paths.logs, "email_failed", error=str(exc))
+        if attempt_id is not None:
+            write_event(
+                paths.logs,
+                "notification_result",
+                attempt_id=attempt_id,
+                channel="email",
+                outcome="failed",
+            )
+    else:
+        if attempt_id is not None:
+            write_event(
+                paths.logs,
+                "notification_result",
+                attempt_id=attempt_id,
+                channel="email",
+                outcome="passed",
+            )
 
 
 def _heartbeat(paths: RuntimePaths, status: Status, detail: str = "", **fields: Any) -> None:
@@ -89,12 +130,24 @@ def _checkout(
     except DuplicateBlocked as exc:
         recorder.terminal("blocked_duplicate", error=str(exc))
         _heartbeat(paths, Status.BLOCKED_DUPLICATE, str(exc), match=match, attempt_id=recorder.attempt_id)
-        _notify(paths, config, "Prickly IMAX 예매 중단", "기존 예매가 확인되어 자동 예매를 중단했습니다.")
+        _notify(
+            paths,
+            config,
+            "Prickly IMAX 예매 중단",
+            "기존 예매가 확인되어 자동 예매를 중단했습니다.",
+            attempt_id=recorder.attempt_id,
+        )
         return Status.BLOCKED_DUPLICATE.value
     except PaymentBlocked as exc:
         recorder.terminal("blocked_payment", error=str(exc))
         _heartbeat(paths, Status.BLOCKED_PAYMENT, str(exc), match=match, attempt_id=recorder.attempt_id)
-        _notify(paths, config, "Prickly IMAX 결제 중단", "관람권 수량 또는 0원 잔액을 증명하지 못해 결제를 실행하지 않았습니다.")
+        _notify(
+            paths,
+            config,
+            "Prickly IMAX 결제 중단",
+            "관람권 수량 또는 0원 잔액을 증명하지 못해 결제를 실행하지 않았습니다.",
+            attempt_id=recorder.attempt_id,
+        )
         return Status.BLOCKED_PAYMENT.value
     except SeatVanished as exc:
         recorder.terminal("seat_vanished", error=str(exc))
@@ -120,7 +173,13 @@ def _checkout(
     except UnknownAfterSubmit as exc:
         recorder.terminal("unknown_after_submit", error=str(exc))
         _heartbeat(paths, Status.UNKNOWN_AFTER_SUBMIT, str(exc), match=match, attempt_id=recorder.attempt_id)
-        _notify(paths, config, "Prickly IMAX 결과 확인 필요", "최종 제출 이후 모바일티켓 확인에 실패했습니다. 안전을 위해 재시도하지 않습니다.")
+        _notify(
+            paths,
+            config,
+            "Prickly IMAX 결과 확인 필요",
+            "최종 제출 이후 모바일티켓 확인에 실패했습니다. 안전을 위해 재시도하지 않습니다.",
+            attempt_id=recorder.attempt_id,
+        )
         return Status.UNKNOWN_AFTER_SUBMIT.value
     recorder.terminal("completed")
     _heartbeat(
@@ -131,7 +190,13 @@ def _checkout(
         proof=result.proof,
         attempt_id=recorder.attempt_id,
     )
-    _notify(paths, config, "Prickly IMAX 예매 완료", f"{match['date']} {match['time']} {match['pair']} 예매가 완료됐습니다.")
+    _notify(
+        paths,
+        config,
+        "Prickly IMAX 예매 완료",
+        f"{match['date']} {match['time']} {match['pair']} 예매가 완료됐습니다.",
+        attempt_id=recorder.attempt_id,
+    )
     return Status.COMPLETED.value
 
 
@@ -155,7 +220,8 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
         raise AlreadyRunning("monitor is already running") from exc
     try:
 
-        current = read_state(paths.heartbeat).get("status")
+        startup_state = read_state(paths.heartbeat)
+        current = startup_state.get("status")
         if paths.stop_requested.exists():
             if current != Status.STOPPED.value:
                 _heartbeat(paths, Status.STOPPED, "stop request is present")
@@ -167,6 +233,15 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
             _notify(paths, config, "Prickly IMAX 결과 확인 필요", "최종 제출 중 프로세스가 종료된 기록이 있어 자동 재시도를 중단했습니다.")
             return 2
         if current == Status.STAGING.value:
+            attempt_id = startup_state.get("attempt_id")
+            match = startup_state.get("match")
+            if isinstance(attempt_id, str) and attempt_id and isinstance(match, dict):
+                write_event(
+                    paths.logs,
+                    "checkout_attempt_interrupted",
+                    attempt_id=attempt_id,
+                    match=match,
+                )
             _heartbeat(paths, Status.RECOVERING, "interrupted before submission; rebuilding browser state")
         if current in {None, Status.UNCONFIGURED.value, Status.STOPPED.value}:
             _heartbeat(paths, Status.LOGIN_REQUIRED, "monitor starting; login verification pending")
