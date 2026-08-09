@@ -34,7 +34,9 @@ def eligible_shows(
     now: datetime | None = None,
 ) -> list[dict[str, Any]]:
     day = date(int(ymd[:4]), int(ymd[4:6]), int(ymd[6:8]))
-    minimum_lead = int(config.get("minimum_lead_minutes", 180))
+    minimum_lead = config.get("minimum_lead_minutes", 180)
+    if type(minimum_lead) is not int or not 180 <= minimum_lead <= 1440:
+        raise ValueError("minimum_lead_minutes must be an integer from 180 through 1440")
     result = []
     for show in schedules:
         if str(config["format"]).casefold() not in str(show.get("movkndDsplNm", "")).casefold():

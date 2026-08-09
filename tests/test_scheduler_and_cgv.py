@@ -132,6 +132,42 @@ class SchedulerTests(unittest.TestCase):
                 now=datetime(2026, 8, 10, 18, 0),
             )
 
+    def test_minimum_lead_accepts_configured_boundaries(self):
+        lower = odyssey()
+        lower["minimum_lead_minutes"] = 180
+        lower_result = eligible_shows(
+            "20260810",
+            [{"scnsrtTm": "2100", "movkndDsplNm": "IMAX"}],
+            lower,
+            now=datetime(2026, 8, 10, 18, 0, tzinfo=KST),
+        )
+
+        upper = odyssey()
+        upper["minimum_lead_minutes"] = 1440
+        upper_result = eligible_shows(
+            "20260811",
+            [{"scnsrtTm": "1900", "movkndDsplNm": "IMAX"}],
+            upper,
+            now=datetime(2026, 8, 10, 19, 0, tzinfo=KST),
+        )
+
+        self.assertEqual([show["time"] for show in lower_result], ["21:00"])
+        self.assertEqual([show["time"] for show in upper_result], ["19:00"])
+
+    def test_minimum_lead_rejects_invalid_config_types_and_ranges(self):
+        for value in (False, True, None, "180", 180.0, 179, 1441):
+            with self.subTest(value=value):
+                config = odyssey()
+                config["minimum_lead_minutes"] = value
+
+                with self.assertRaisesRegex(ValueError, "minimum_lead_minutes must be an integer from 180 through 1440"):
+                    eligible_shows(
+                        "20260810",
+                        [{"scnsrtTm": "2100", "movkndDsplNm": "IMAX"}],
+                        config,
+                        now=datetime(2026, 8, 10, 18, 0, tzinfo=KST),
+                    )
+
 
 class FakeBudget:
     def __init__(self) -> None:
