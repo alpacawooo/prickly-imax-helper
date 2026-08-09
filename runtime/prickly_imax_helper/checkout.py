@@ -282,16 +282,55 @@ class CheckoutFlow:
                 10_000,
                 theater,
             )
-        actual = self.page.locator("li:visible").get_by_role("button", name=theater, exact=True)
-        if actual.count() != 1:
+        try:
+            self._wait(
+                r"""theater => {
+                  const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+                  const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+                  return [...document.querySelectorAll('button')].filter(button =>
+                    visible(button) && !button.disabled && button.closest('li') &&
+                    compact(button.textContent) === theater).length === 1;
+                }""",
+                10_000,
+                theater,
+            )
+        except PlaywrightTimeoutError as exc:
+            raise CheckoutError(f"actual theater row not found: {theater}") from exc
+        actual_clicked = self.page.evaluate(
+            r"""theater => {
+              const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+              const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+              const rows = [...document.querySelectorAll('button')].filter(button =>
+                visible(button) && !button.disabled && button.closest('li') &&
+                compact(button.textContent) === theater);
+              if (rows.length !== 1) return false;
+              rows[0].click();
+              return true;
+            }""",
+            theater,
+        )
+        if not actual_clicked:
             raise CheckoutError(f"actual theater row not found: {theater}")
-        actual.click()
         selection_registered = self._theater_selection_registered(theater)
         if not selection_registered:
             self.page.wait_for_timeout(500)
             selection_registered = self._theater_selection_registered(theater)
         if not selection_registered:
-            actual.click()
+            retried = self.page.evaluate(
+                r"""theater => {
+                  const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+                  const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+                  const rows = [...document.querySelectorAll('button')].filter(button =>
+                    visible(button) && !button.disabled && button.closest('li') &&
+                    compact(button.textContent) === theater);
+                  if (rows.length !== 1) return false;
+                  rows[0].click();
+                  return true;
+                }""",
+                theater,
+            )
+            if not retried:
+                raise CheckoutError(f"actual theater row retry was not safe: {theater}")
         self._wait(
             "() => [...document.querySelectorAll('button')].some(b => "
             "b.offsetParent && !b.disabled && b.textContent.trim() === '극장선택')"
