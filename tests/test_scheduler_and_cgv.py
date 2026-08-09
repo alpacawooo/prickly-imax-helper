@@ -3,13 +3,19 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import Mock
+from zoneinfo import ZoneInfo
 
 from prickly_imax_helper.cgv import CgvSession, LoginRequired, RateLimited
 from prickly_imax_helper.paths import RuntimePaths
+from prickly_imax_helper.policy import has_minimum_lead
 from prickly_imax_helper.presets import odyssey
 from prickly_imax_helper.scheduler import FairScanState, changed_seat_targets, eligible_shows, match_for
+
+
+KST = ZoneInfo("Asia/Seoul")
 
 
 class SchedulerTests(unittest.TestCase):
@@ -41,9 +47,9 @@ class SchedulerTests(unittest.TestCase):
             {"movkndDsplNm": "IMAX 2D", "scnsrtTm": "0630", "scnsNo": "018", "scnSseq": "1", "frSeatCnt": 2},
             {"movkndDsplNm": "IMAX 2D", "scnsrtTm": "2300", "scnsNo": "018", "scnSseq": "2", "frSeatCnt": 2},
         ]
-        saturday = eligible_shows("20260808", schedules, config)
+        saturday = eligible_shows("20260808", schedules, config, now=datetime(2026, 8, 7, 0, 0, tzinfo=KST))
         self.assertEqual([show["time"] for show in saturday], ["06:30", "23:00"])
-        sunday = eligible_shows("20260809", schedules, config)
+        sunday = eligible_shows("20260809", schedules, config, now=datetime(2026, 8, 8, 0, 0, tzinfo=KST))
         self.assertEqual([show["time"] for show in sunday], ["06:30"])
         seats = [f"H{i}" for i in range(1, 31)]
         result = match_for(saturday[0], {"all": seats, "available": ["H15", "H16"]}, config)
@@ -56,7 +62,75 @@ class SchedulerTests(unittest.TestCase):
             {"movkndDsplNm": "IMAX 2D", "scnsrtTm": "1900"},
             {"movkndDsplNm": "IMAX LASER 2D", "scnsrtTm": "1930"},
         ]
-        self.assertEqual([show["time"] for show in eligible_shows("20260806", schedules, config)], ["19:30"])
+        self.assertEqual(
+            [
+                show["time"]
+                for show in eligible_shows(
+                    "20260806", schedules, config, now=datetime(2026, 8, 5, 0, 0, tzinfo=KST)
+                )
+            ],
+            ["19:30"],
+        )
+
+    def test_minimum_lead_accepts_exactly_180_minutes_and_rejects_less(self):
+        config = odyssey()
+        schedules = [
+            {"scnsrtTm": "2100", "movkndDsplNm": "IMAX", "scnsNo": "1", "scnSseq": "1"},
+            {"scnsrtTm": "2059", "movkndDsplNm": "IMAX", "scnsNo": "1", "scnSseq": "2"},
+        ]
+        now = datetime(2026, 8, 10, 18, 0, tzinfo=KST)
+
+        result = eligible_shows("20260810", schedules, config, now=now)
+
+        self.assertEqual([show["time"] for show in result], ["21:00"])
+
+    def test_2430_rolls_into_the_next_calendar_day(self):
+        config = odyssey()
+        config["time_rules"]["sunday"] = {"any_time": True}
+        schedules = [{"scnsrtTm": "2430", "movkndDsplNm": "IMAX"}]
+
+        accepted = eligible_shows(
+            "20260809", schedules, config,
+            now=datetime(2026, 8, 9, 21, 30, tzinfo=KST),
+        )
+        rejected = eligible_shows(
+            "20260809", schedules, config,
+            now=datetime(2026, 8, 9, 21, 31, tzinfo=KST),
+        )
+
+        self.assertEqual([show["time"] for show in accepted], ["24:30"])
+        self.assertEqual(rejected, [])
+
+    def test_later_date_remains_eligible(self):
+        config = odyssey()
+        schedules = [{"scnsrtTm": "1900", "movkndDsplNm": "IMAX"}]
+
+        result = eligible_shows(
+            "20260811", schedules, config,
+            now=datetime(2026, 8, 10, 23, 0, tzinfo=KST),
+        )
+
+        self.assertEqual([show["time"] for show in result], ["19:00"])
+
+    def test_aware_utc_now_is_converted_to_korea_time(self):
+        config = odyssey()
+        schedules = [{"scnsrtTm": "2100", "movkndDsplNm": "IMAX"}]
+
+        result = eligible_shows(
+            "20260810", schedules, config,
+            now=datetime(2026, 8, 10, 9, 0, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual([show["time"] for show in result], ["21:00"])
+
+    def test_minimum_lead_rejects_naive_now(self):
+        with self.assertRaisesRegex(ValueError, "now must include timezone information"):
+            has_minimum_lead(
+                "20260810",
+                "21:00",
+                180,
+                now=datetime(2026, 8, 10, 18, 0),
+            )
 
 
 class FakeBudget:

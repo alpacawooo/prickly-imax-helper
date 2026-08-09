@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
-from .policy import eligible_start, rank_best_block
+from .policy import eligible_start, has_minimum_lead, rank_best_block
 
 
 @dataclass
@@ -26,8 +26,15 @@ class FairScanState:
         return value
 
 
-def eligible_shows(ymd: str, schedules: list[dict[str, Any]], config: dict[str, Any]) -> list[dict[str, Any]]:
+def eligible_shows(
+    ymd: str,
+    schedules: list[dict[str, Any]],
+    config: dict[str, Any],
+    *,
+    now: datetime | None = None,
+) -> list[dict[str, Any]]:
     day = date(int(ymd[:4]), int(ymd[4:6]), int(ymd[6:8]))
+    minimum_lead = int(config.get("minimum_lead_minutes", 180))
     result = []
     for show in schedules:
         if str(config["format"]).casefold() not in str(show.get("movkndDsplNm", "")).casefold():
@@ -36,7 +43,12 @@ def eligible_shows(ymd: str, schedules: list[dict[str, Any]], config: dict[str, 
         if not raw.isdigit() or len(raw) != 4:
             continue
         start = f"{raw[:2]}:{raw[2:]}"
-        if eligible_start(day, start, config):
+        if eligible_start(day, start, config) and has_minimum_lead(
+            ymd,
+            start,
+            minimum_lead,
+            now=now,
+        ):
             result.append({**show, "ymd": ymd, "time": start})
     return result
 
