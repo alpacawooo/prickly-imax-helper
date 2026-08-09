@@ -30,9 +30,10 @@ PAGE = """<!doctype html><html lang=\"ko\"><meta charset=\"utf-8\"><meta name=\"
 <label>토요일 시작 하한<input name=saturday_after pattern=\"(?:[01]\\d|2\\d):[0-5]\\d\" placeholder=\"제한 없음\" value=\"__SATURDAY_AFTER__\"></label><label>토요일 시작 상한(미만)<input name=saturday_before pattern=\"(?:[01]\\d|2\\d):[0-5]\\d\" placeholder=\"제한 없음\" value=\"__SATURDAY_BEFORE__\"></label><span></span>
 <label>일요일 시작 하한<input name=sunday_after pattern=\"(?:[01]\\d|2\\d):[0-5]\\d\" placeholder=\"제한 없음\" value=\"__SUNDAY_AFTER__\"></label><label>일요일 시작 상한(미만)<input name=sunday_before pattern=\"(?:[01]\\d|2\\d):[0-5]\\d\" placeholder=\"제한 없음\" value=\"__SUNDAY_BEFORE__\"></label><span></span></div>
 <p class=hint>시간은 00:00~29:59 형식입니다. 빈칸은 해당 방향의 제한 없음입니다. 새로 열리는 예매 날짜는 계속 자동 포함됩니다.</p>
+<label>상영 시작 최소 여유(분)<input required type=number name=\"minimum_lead_minutes\" min=\"180\" max=\"1440\" step=\"1\" value=\"__MINIMUM_LEAD_MINUTES__\"></label>
 <div class=\"grid\"><label>같은 행 연속 좌석 수<input required type=number name=party_size min=1 max=8 value=\"__PARTY_SIZE__\"></label><label>허용 열(쉼표 또는 공백 구분)<input required name=rows value=\"__ROWS__\" placeholder=\"D,E,F,G,H,I,J\"></label><label>각 행 양끝 제외 비율(%)<input required type=number name=edge_percent min=0 max=49 step=1 value=\"__EDGE_PERCENT__\"></label><label>좌석 우선순위<select required name=preference><option value=\"closest_to_center\" __PREFERENCE_CENTER__>중앙에 가까운 연속 좌석 우선</option><option value=\"row_order_then_left\" __PREFERENCE_ROW__>입력한 열 순서, 왼쪽 번호 우선</option></select></label></div>
 <label>알림을 받을 메일 서비스<select required name=email_provider><option value=\"\">선택하세요</option><option value=\"gmail\" __PROVIDER_GMAIL__>Gmail</option><option value=\"naver\" __PROVIDER_NAVER__>네이버 메일</option><option value=\"icloud\" __PROVIDER_ICLOUD__>iCloud Mail (Apple)</option><option value=\"other\" __PROVIDER_OTHER__>기타 메일</option></select></label>
-<label>결과를 받을 이메일 주소<input required type=email name=email value=\"__EMAIL__\" autocomplete=email></label><p class=hint>받는 주소는 운영체제와 상관없이 선택할 수 있습니다. 발송은 Mac의 Apple Mail 또는 Windows의 Outlook 데스크톱을 로컬로 사용하며, 이메일 비밀번호나 앱 비밀번호는 Helper에 입력하지 않습니다.</p><p>설정 저장 시 선택한 주소로 __NOTIFIER__ 테스트 메일을 한 번 보냅니다.</p></fieldset>
+<label>결과를 받을 이메일 주소<input required type=email name=email value=\"__EMAIL__\" autocomplete=email></label><p class=hint>받는 주소는 운영체제와 상관없이 선택할 수 있습니다. 발송은 Mac의 Apple Mail 또는 Windows의 Outlook 데스크톱을 로컬로 사용하며, 이메일 비밀번호나 앱 비밀번호는 Helper에 입력하지 않습니다. 이 주소를 아이폰 Mail에 등록하고 iOS 설정에서 Mail 알림을 허용하면 예매 결과를 휴대폰에서도 확인할 수 있습니다. 이메일은 지연될 수 있고 무음 모드·집중 모드를 Helper가 해제할 수 없습니다.</p><p>설정 저장 시 선택한 주소로 __NOTIFIER__ 테스트 메일을 한 번 보냅니다.</p></fieldset>
 <fieldset><legend>3. 자동 예매 사전동의</legend><div class=warning>설정한 인원수와 같은 수의 등록된 IMAX 관람권으로 결제 잔액이 0원일 때만 조건에 맞는 좌석을 한 번 자동 예매합니다. 기존 예매 취소·변경과 중복 제출은 하지 않습니다.</div>
 <label><input style=\"width:auto\" required type=checkbox name=consent value=yes> 위 조건의 자동 좌석 선택과 1회 최종 제출에 동의합니다.</label>
 <label><input style=\"width:auto\" required type=checkbox name=network value=yes> 같은 공인 IP를 사용하는 집·회사 네트워크에서 이 Helper를 한 대만 실행합니다.</label></fieldset>
@@ -51,6 +52,7 @@ def _default_form_values() -> dict[str, str]:
         "saturday_before": "",
         "sunday_after": str(config["time_rules"]["sunday"].get("at_or_after") or ""),
         "sunday_before": str(config["time_rules"]["sunday"].get("before") or ""),
+        "minimum_lead_minutes": str(config["minimum_lead_minutes"]),
         "party_size": str(config["party_size"]),
         "rows": ",".join(config["rows"]),
         "edge_percent": str(round(float(config["edge_exclusion"]) * 100)),
@@ -74,6 +76,7 @@ def _render_page(token: str, message: str, values: dict[str, str]) -> str:
         "__SATURDAY_BEFORE__": values["saturday_before"],
         "__SUNDAY_AFTER__": values["sunday_after"],
         "__SUNDAY_BEFORE__": values["sunday_before"],
+        "__MINIMUM_LEAD_MINUTES__": values["minimum_lead_minutes"],
         "__PARTY_SIZE__": values["party_size"],
         "__ROWS__": values["rows"],
         "__EDGE_PERCENT__": values["edge_percent"],
@@ -92,6 +95,12 @@ def _render_page(token: str, message: str, values: dict[str, str]) -> str:
 def _booking_config(values: dict[str, str]) -> dict[str, object]:
     config = odyssey()
     try:
+        minimum_lead_minutes = int(values["minimum_lead_minutes"])
+    except ValueError as exc:
+        raise ConfigError("상영 시작 최소 여유는 180~1440분의 정수로 입력해 주세요.") from exc
+    if not 180 <= minimum_lead_minutes <= 1440:
+        raise ConfigError("상영 시작 최소 여유는 최소 180분, 최대 1440분입니다.")
+    try:
         party_size = int(values["party_size"])
         edge_exclusion = float(values["edge_percent"]) / 100
     except ValueError as exc:
@@ -102,6 +111,7 @@ def _booking_config(values: dict[str, str]) -> dict[str, object]:
             "movie": values["movie"].strip(),
             "theater": values["theater"].strip(),
             "format": values["screen_format"].strip(),
+            "minimum_lead_minutes": minimum_lead_minutes,
             "party_size": party_size,
             "rows": rows,
             "edge_exclusion": edge_exclusion,

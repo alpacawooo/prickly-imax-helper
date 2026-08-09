@@ -42,6 +42,10 @@ class SetupServerTests(unittest.TestCase):
                         self.assertIn(f'value="{provider}"', page)
                     for field in ("movie", "theater", "screen_format", "party_size", "rows", "edge_percent"):
                         self.assertIn(f'name={field}', page)
+                    self.assertIn('name="minimum_lead_minutes"', page)
+                    self.assertIn('min="180"', page)
+                    self.assertIn("아이폰", page)
+                    self.assertIn("집중 모드", page)
                     self.assertNotRegex(page, r"__[A-Z_]+__")
                 token = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["token"][0]
                 payload = urllib.parse.urlencode(
@@ -53,6 +57,7 @@ class SetupServerTests(unittest.TestCase):
                         "movie": "테스트 영화",
                         "theater": "테스트CGV",
                         "screen_format": "IMAX 2D",
+                        "minimum_lead_minutes": "240",
                         "weekday_after": "18:30",
                         "weekday_before": "23:00",
                         "saturday_after": "10:00",
@@ -82,6 +87,7 @@ class SetupServerTests(unittest.TestCase):
                 self.assertEqual(config["movie"], "테스트 영화")
                 self.assertEqual(config["theater"], "테스트CGV")
                 self.assertEqual(config["format"], "IMAX 2D")
+                self.assertEqual(config["minimum_lead_minutes"], 240)
                 self.assertEqual(config["party_size"], 3)
                 self.assertEqual(config["payment"]["voucher_count"], 3)
                 self.assertEqual(config["rows"], ["F", "G", "H"])
@@ -90,6 +96,46 @@ class SetupServerTests(unittest.TestCase):
                 self.assertEqual(config["target"], target)
                 heartbeat = json.loads(paths.heartbeat.read_text(encoding="utf-8"))
                 self.assertEqual(heartbeat["status"], "login_required")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=2)
+
+    def test_rejects_minimum_lead_below_three_hours_without_saving(self):
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp) / "runtime")
+            server, url = run_setup(paths, open_page=False)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                token = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["token"][0]
+                payload = urllib.parse.urlencode(
+                    {
+                        "token": token,
+                        "action": "save",
+                        "email": "pilot@example.com",
+                        "email_provider": "gmail",
+                        "minimum_lead_minutes": "179",
+                        "consent": "yes",
+                        "network": "yes",
+                    }
+                ).encode("utf-8")
+                request = urllib.request.Request(
+                    f"http://127.0.0.1:{server.server_port}/action", data=payload, method="POST"
+                )
+                with patch("prickly_imax_helper.setup_server.login_verified", return_value=True), patch(
+                    "prickly_imax_helper.setup_server.resolve_target"
+                ) as resolve_target, patch("prickly_imax_helper.setup_server.send_email") as send_email:
+                    with self.assertRaises(urllib.error.HTTPError) as denied:
+                        urllib.request.urlopen(request, timeout=2)
+                    try:
+                        self.assertEqual(denied.exception.code, 400)
+                        self.assertIn("최소 180분", denied.exception.read().decode("utf-8"))
+                    finally:
+                        denied.exception.close()
+                    resolve_target.assert_not_called()
+                    send_email.assert_not_called()
+                self.assertFalse(paths.config.exists())
             finally:
                 server.shutdown()
                 server.server_close()

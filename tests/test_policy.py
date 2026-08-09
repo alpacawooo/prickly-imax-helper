@@ -33,6 +33,25 @@ class PolicyTests(unittest.TestCase):
         custom["time_rules"]["weekday"]["at_or_after"] = "18:00"
         self.assertEqual(policy.validate(custom), {"ok": True, "errors": []})
 
+    def test_plugin_minimum_lead_boundary_and_legacy_default(self):
+        for value in (180, 1440):
+            with self.subTest(valid=value):
+                config = copy.deepcopy(CONFIG)
+                config["minimum_lead_minutes"] = value
+                self.assertEqual(policy.validate(config), {"ok": True, "errors": []})
+
+        legacy = copy.deepcopy(CONFIG)
+        legacy.pop("minimum_lead_minutes", None)
+        self.assertEqual(policy.validate(legacy), {"ok": True, "errors": []})
+
+        for value in (179, True, 1441):
+            with self.subTest(invalid=value):
+                config = copy.deepcopy(CONFIG)
+                config["minimum_lead_minutes"] = value
+                result = policy.validate(config)
+                self.assertFalse(result["ok"])
+                self.assertTrue(any("minimum_lead_minutes" in error for error in result["errors"]))
+
     def test_center_adjacent_pair_wins(self):
         seats = [f"H{i}" for i in range(1, 31)]
         result = policy.rank_best_block({"all": seats, "available": ["H15", "H16", "H20", "H21"]}, CONFIG)
