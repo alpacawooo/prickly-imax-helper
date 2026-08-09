@@ -271,14 +271,16 @@ class CheckoutFlow:
         suggestion_index = int(
             exact.evaluate_all(
                 "values => values.findIndex(value => "
-                "value.offsetParent && !value.disabled && !value.closest('li'))"
+                "value.offsetParent && !value.disabled && "
+                "(value.closest('.search-result') || !value.closest('li')))"
             )
         )
         if suggestion_index >= 0:
             exact.nth(suggestion_index).click()
             self._wait(
                 "theater => ![...document.querySelectorAll('button')].some(b => "
-                "b.offsetParent && !b.disabled && b.textContent.trim() === theater && !b.closest('li'))",
+                "b.offsetParent && !b.disabled && b.textContent.trim() === theater && "
+                "(b.closest('.search-result') || !b.closest('li')))",
                 10_000,
                 theater,
             )
@@ -288,7 +290,7 @@ class CheckoutFlow:
                   const compact = value => (value || '').replace(/\s+/g, ' ').trim();
                   const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
                   return [...document.querySelectorAll('button')].filter(button =>
-                    visible(button) && !button.disabled && button.closest('li') &&
+                    visible(button) && !button.disabled && button.closest('li') && !button.closest('.search-result') &&
                     compact(button.textContent) === theater).length === 1;
                 }""",
                 10_000,
@@ -301,7 +303,7 @@ class CheckoutFlow:
               const compact = value => (value || '').replace(/\s+/g, ' ').trim();
               const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
               const rows = [...document.querySelectorAll('button')].filter(button =>
-                visible(button) && !button.disabled && button.closest('li') &&
+                visible(button) && !button.disabled && button.closest('li') && !button.closest('.search-result') &&
                 compact(button.textContent) === theater);
               if (rows.length !== 1) return false;
               rows[0].click();
@@ -321,7 +323,7 @@ class CheckoutFlow:
                   const compact = value => (value || '').replace(/\s+/g, ' ').trim();
                   const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
                   const rows = [...document.querySelectorAll('button')].filter(button =>
-                    visible(button) && !button.disabled && button.closest('li') &&
+                    visible(button) && !button.disabled && button.closest('li') && !button.closest('.search-result') &&
                     compact(button.textContent) === theater);
                   if (rows.length !== 1) return false;
                   rows[0].click();

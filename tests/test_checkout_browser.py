@@ -171,14 +171,26 @@ class CheckoutBrowserTests(unittest.TestCase):
         self.page.set_content(
             """<!doctype html><meta charset=utf-8>
             <input placeholder="지역을 입력해주세요">
-            <ul>
-              <li><button id="actual" type="button">용산아이파크몰</button></li>
-              <li id="stale"><button type="button">용산아이파크몰</button></li>
-            </ul>
+            <div class="search-result active"><ul>
+              <li><button id="suggestion" type="button">용산아이파크몰</button></li>
+            </ul></div>
             <script>
-              setTimeout(() => stale.remove(), 300);
-              actual.onclick = () => document.body.insertAdjacentHTML(
-                'beforeend', '<button id="confirm" type="button">극장선택</button>');
+              window.suggestionClicks = 0;
+              window.actualClicks = 0;
+              suggestion.onclick = () => {
+                window.suggestionClicks += 1;
+                document.querySelector('.search-result').remove();
+                document.body.insertAdjacentHTML('beforeend', `<ul>
+                  <li><button id="actual" type="button">용산아이파크몰</button></li>
+                  <li id="stale"><button type="button">용산아이파크몰</button></li>
+                </ul>`);
+                actual.onclick = () => {
+                  window.actualClicks += 1;
+                  document.body.insertAdjacentHTML(
+                    'beforeend', '<button id="confirm" type="button">극장선택</button>');
+                };
+                setTimeout(() => stale.remove(), 700);
+              };
               document.addEventListener('click', event => {
                 if (event.target.id !== 'confirm') return;
                 document.querySelector('input').remove();
@@ -190,6 +202,8 @@ class CheckoutBrowserTests(unittest.TestCase):
 
         self.flow._select_theater_from_picker("용산아이파크몰", "IMAX")
 
+        self.assertEqual(self.page.evaluate("() => window.suggestionClicks"), 1)
+        self.assertEqual(self.page.evaluate("() => window.actualClicks"), 1)
         self.assertTrue(self.flow._booking_page_state("용산아이파크몰", "IMAX")["target_ready"])
 
     def test_current_date_accepts_cgv_today_label(self):
