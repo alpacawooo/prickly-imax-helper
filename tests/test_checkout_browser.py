@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime as dt
 import unittest
 
 from prickly_imax_helper.browser import CHROME
@@ -165,6 +166,19 @@ class CheckoutBrowserTests(unittest.TestCase):
 
         self.assertEqual(self.page.evaluate("() => window.actualClicks"), 2)
         self.assertTrue(self.flow._booking_page_state("용산아이파크몰", "IMAX")["target_ready"])
+
+    def test_current_date_accepts_cgv_today_label(self):
+        today = dt.date.today()
+        self.page.set_content(
+            f"""<!doctype html><meta charset=utf-8>
+            <button onclick="window.dateClicked=true">
+              <span class="dayScroll_txt__test">오늘</span>
+              <span class="dayScroll_number__test">{today.day:02d}</span>
+            </button>"""
+        )
+
+        self.assertTrue(self.flow._click_match_date(today.isoformat()))
+        self.assertTrue(self.page.evaluate("() => window.dateClicked"))
 
 
 if __name__ == "__main__":

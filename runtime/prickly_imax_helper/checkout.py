@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime as dt
 import re
 import time
 from dataclasses import dataclass
@@ -321,19 +322,25 @@ class CheckoutFlow:
         self._wait("() => !![...document.querySelectorAll('input')].find(x => x.offsetParent && x.placeholder === '지역을 입력해주세요')")
         self._select_theater_from_picker(theater, format_name)
 
-    def open_match(self, match: dict[str, Any]) -> None:
-        year, month, day = map(int, match["date"].split("-"))
-        import datetime as dt
-
-        weekday = KOREAN_WEEKDAYS[dt.date(year, month, day).weekday()]
-        clicked = self.page.evaluate(
-            r"""target => { const buttons = [...document.querySelectorAll('button')].filter(b =>
-            b.offsetParent && !b.disabled && b.querySelector('[class*=dayScroll_txt]') && b.querySelector('[class*=dayScroll_number]'));
-            const button = buttons.find(x => x.querySelector('[class*=dayScroll_txt]').textContent.trim() === target.weekday &&
-            x.querySelector('[class*=dayScroll_number]').textContent.trim() === target.day);
-            if (!button) return false; button.click(); return true; }""",
-            {"weekday": weekday, "day": f"{day:02d}"},
+    def _click_match_date(self, date_value: str) -> bool:
+        year, month, day = map(int, date_value.split("-"))
+        target_date = dt.date(year, month, day)
+        weekday = KOREAN_WEEKDAYS[target_date.weekday()]
+        return bool(
+            self.page.evaluate(
+                r"""target => { const buttons = [...document.querySelectorAll('button')].filter(b =>
+                b.offsetParent && !b.disabled && b.querySelector('[class*=dayScroll_txt]') && b.querySelector('[class*=dayScroll_number]'));
+                const button = buttons.find(x => {
+                const label = x.querySelector('[class*=dayScroll_txt]').textContent.trim();
+                return (label === target.weekday || (target.today && label === '오늘')) &&
+                x.querySelector('[class*=dayScroll_number]').textContent.trim() === target.day; });
+                if (!button) return false; button.click(); return true; }""",
+                {"weekday": weekday, "day": f"{day:02d}", "today": target_date == dt.date.today()},
+            )
         )
+
+    def open_match(self, match: dict[str, Any]) -> None:
+        clicked = self._click_match_date(str(match["date"]))
         if not clicked:
             raise SeatVanished("target date is no longer open")
         self._wait(
