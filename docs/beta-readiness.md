@@ -41,6 +41,7 @@ This checklist is the release gate. A checked implementation item is not equival
 - [x] Verify the private prerelease contains both authorization-gated platform archives and both checksum files; download count remained zero at publication verification (2026-08-05).
 - [x] Replace the private-beta guide's draft wording with the exact private repository and published prerelease links (2026-08-05).
 - [x] Add a privacy-safe three-pilot evidence generator and validator that requires macOS and Windows, a Windows standard user, distinct recipient providers, all lifecycle steps, local-only credentials, archive/diagnose digests, and no email or absolute user path in evidence.
+- [x] Install and verify checkout-stage audit/recovery build `005a4ca` on macOS (2026-08-09). The complete local suite passed 141 tests; Ruff 0.14.2, compileall, shell syntax, and diff checks passed. Repository and installed `checkout.py` matched at SHA-256 `cf03cf4626f6cf788ce43fc9df0034bb5c2c70ae366712ad3f53bb85ca4b9567`; `checkout_attempt.py` matched at `7c096134bc278ba2f47b3be000067c78a5248983e9e69f8af5c669ce14ce739c`; `monitor.py` matched at `5cad560406c64ebf800375ba300ddf75954fd7fc0043ae0206593db0c1bb5755`. A controlled logged-in check selected one available showtime, reached `/cnm/selectVisitorCnt`, recognized the exact configured `일반 2명` control, confirmed it remained unselected, and returned to the movie page without clicking party, seat, voucher, or payment controls. Historical checkout audit accounted for all 14 retained matches as theater picker 10, today-label 2, general-party render 1, and `legacy_unknown` 1; the unknown D28-D29 result was not assigned an invented cause. Final resident state was `armed` with `match: null`, exactly one monitor and one Playwright driver, and no Hermes CGV-profile process. This verifies recognition and fail-closed staging only; it does not prove a real booking, voucher application, payment, or mobile ticket.
 
 ## Required before calling the beta successful
 
@@ -61,6 +62,8 @@ python3 scripts/soak_audit.py start --home ~/.prickly-imax-helper
 python3 scripts/soak_audit.py verify --home ~/.prickly-imax-helper
 python3 scripts/pilot_audit.py init --output ~/prickly-pilot-evidence
 python3 scripts/pilot_audit.py verify --input ~/prickly-pilot-evidence
+python3 scripts/checkout_audit.py report --input ~/.prickly-imax-helper/logs
+python3 scripts/checkout_audit.py verify --input ~/.prickly-imax-helper/logs
 ```
 
 The release metadata may include a public-safe `authorization_reference`, such as an approval letter, contract, or support-ticket number. It must never contain credentials or private approval text. When no public reference exists, the SHA-256 fingerprint of the privately retained source document is sufficient; the source document itself is never copied into a release.
