@@ -6,6 +6,8 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+
 from .browser import CGV_BOOKING_URL
 
 
@@ -359,17 +361,67 @@ class CheckoutFlow:
             raise SeatVanished("target showtime disappeared")
         self._wait("() => location.pathname === '/cnm/selectVisitorCnt'")
 
-    def select_party_and_seats(self, match: dict[str, Any]) -> None:
-        party = int(self.config["party_size"])
+    def _wait_for_general_party_control(self, party: int, timeout_ms: int = 10_000) -> bool:
+        try:
+            self.page.wait_for_function(
+                r"""party => {
+                  const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+                  const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+                  const groups = [...document.querySelectorAll('[role=group]')].filter(visible);
+                  const group = groups.find(element => [...element.children].some(child =>
+                    visible(child) && compact(child.textContent) === '일반'));
+                  if (!group) return false;
+                  return [...group.querySelectorAll('button')].some(button =>
+                    visible(button) && !button.disabled && button.getAttribute('aria-label') === `${party} 선택`);
+                }""",
+                arg=party,
+                timeout=timeout_ms,
+            )
+        except PlaywrightTimeoutError:
+            return False
+        return True
+
+    def _select_general_party(self, party: int, timeout_ms: int = 10_000) -> None:
+        if not self._wait_for_general_party_control(party, timeout_ms=timeout_ms):
+            raise CheckoutError("general admission count control not ready")
         selected = self.page.evaluate(
-            r"""party => { const groups = [...document.querySelectorAll('[role=group]')].filter(g =>
-            g.offsetParent && [...g.children].some(c => c.textContent.trim() === '일반'));
-            const b = groups[0]?.querySelector(`button[aria-label="${party} 선택"]`);
-            if (!b) return false; if (b.getAttribute('aria-pressed') !== 'true') b.click(); return true; }""",
+            r"""party => {
+              const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+              const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+              const groups = [...document.querySelectorAll('[role=group]')].filter(visible);
+              const group = groups.find(element => [...element.children].some(child =>
+                visible(child) && compact(child.textContent) === '일반'));
+              const button = [...(group?.querySelectorAll('button') || [])].find(element =>
+                visible(element) && !element.disabled && element.getAttribute('aria-label') === `${party} 선택`);
+              if (!button) return false;
+              if (button.getAttribute('aria-pressed') !== 'true') button.click();
+              return true;
+            }""",
             party,
         )
         if not selected:
-            raise CheckoutError("general admission count control not found")
+            raise CheckoutError("general admission count control not ready")
+        try:
+            self.page.wait_for_function(
+                r"""party => {
+                  const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+                  const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+                  const groups = [...document.querySelectorAll('[role=group]')].filter(visible);
+                  const group = groups.find(element => [...element.children].some(child =>
+                    visible(child) && compact(child.textContent) === '일반'));
+                  const button = [...(group?.querySelectorAll('button') || [])].find(element =>
+                    visible(element) && !element.disabled && element.getAttribute('aria-label') === `${party} 선택`);
+                  return button?.getAttribute('aria-pressed') === 'true';
+                }""",
+                arg=party,
+                timeout=timeout_ms,
+            )
+        except PlaywrightTimeoutError as exc:
+            raise CheckoutError("general admission count selection not proven") from exc
+
+    def select_party_and_seats(self, match: dict[str, Any]) -> None:
+        party = int(self.config["party_size"])
+        self._select_general_party(party)
         seats = match["seats"]
         result = self.page.evaluate(
             r"""wanted => { const found = []; for (const seat of wanted) {

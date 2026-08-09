@@ -4,7 +4,7 @@ import datetime as dt
 import unittest
 
 from prickly_imax_helper.browser import CHROME
-from prickly_imax_helper.checkout import CheckoutFlow, PaymentBlocked, UnknownAfterSubmit
+from prickly_imax_helper.checkout import CheckoutError, CheckoutFlow, PaymentBlocked, UnknownAfterSubmit
 from prickly_imax_helper.presets import odyssey
 
 
@@ -179,6 +179,70 @@ class CheckoutBrowserTests(unittest.TestCase):
 
         self.assertTrue(self.flow._click_match_date(today.isoformat()))
         self.assertTrue(self.page.evaluate("() => window.dateClicked"))
+
+    def test_waits_for_delayed_general_party_control(self):
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8>
+            <script>
+              setTimeout(() => document.body.insertAdjacentHTML('beforeend', `
+                <div role="group"><div>일반</div>
+                  <button aria-label="1 선택" aria-pressed="false">1</button>
+                  <button aria-label="2 선택" aria-pressed="false"
+                    onclick="this.setAttribute('aria-pressed','true')">2</button>
+                </div>`), 500);
+            </script>"""
+        )
+
+        self.flow._select_general_party(2, timeout_ms=2_000)
+
+        self.assertEqual(
+            self.page.locator('[role=group]').get_by_role("button", name="2 선택").get_attribute("aria-pressed"),
+            "true",
+        )
+
+    def test_selects_two_only_inside_exact_general_group(self):
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8>
+            <div role=group><div>일반</div><button aria-label="2 선택" aria-pressed=false
+              onclick="window.general=(window.general||0)+1;this.setAttribute('aria-pressed','true')">2</button></div>
+            <div role=group><div>청소년</div><button aria-label="2 선택" aria-pressed=false
+              onclick="window.youth=(window.youth||0)+1;this.setAttribute('aria-pressed','true')">2</button></div>
+            <div role=group><div>우대</div><button aria-label="2 선택" aria-pressed=false
+              onclick="window.priority=(window.priority||0)+1;this.setAttribute('aria-pressed','true')">2</button></div>"""
+        )
+
+        self.flow._select_general_party(2, timeout_ms=500)
+
+        self.assertEqual(self.page.evaluate("() => window.general"), 1)
+        self.assertIsNone(self.page.evaluate("() => window.youth"))
+        self.assertIsNone(self.page.evaluate("() => window.priority"))
+
+    def test_missing_general_party_control_times_out_without_click(self):
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8>
+            <div role=group><div>청소년</div><button aria-label="2 선택"
+              onclick="window.youth=(window.youth||0)+1">2</button></div>
+            <div role=group><div>우대</div><button aria-label="2 선택"
+              onclick="window.priority=(window.priority||0)+1">2</button></div>"""
+        )
+
+        with self.assertRaises(CheckoutError):
+            self.flow._select_general_party(2, timeout_ms=100)
+
+        self.assertIsNone(self.page.evaluate("() => window.youth"))
+        self.assertIsNone(self.page.evaluate("() => window.priority"))
+
+    def test_unproven_general_selection_is_not_clicked_twice(self):
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8>
+            <div role=group><div>일반</div><button aria-label="2 선택" aria-pressed=false
+              onclick="window.general=(window.general||0)+1">2</button></div>"""
+        )
+
+        with self.assertRaises(CheckoutError):
+            self.flow._select_general_party(2, timeout_ms=100)
+
+        self.assertEqual(self.page.evaluate("() => window.general"), 1)
 
 
 if __name__ == "__main__":
