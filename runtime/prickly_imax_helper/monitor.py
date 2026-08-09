@@ -6,6 +6,7 @@ from typing import Any
 from .browser import launch_browser
 from .cgv import CgvSession, LoginRequired, RateLimited
 from .checkout import CheckoutError, CheckoutFlow, DuplicateBlocked, PaymentBlocked, SeatVanished, UnknownAfterSubmit
+from .checkout_attempt import CheckoutAttemptRecorder
 from .config import ConfigError, load_config
 from .eventlog import write_event
 from .locks import LockUnavailable, locked_file
@@ -48,52 +49,88 @@ def _heartbeat(paths: RuntimePaths, status: Status, detail: str = "", **fields: 
     transition(paths.heartbeat, status, detail=detail, **fields)
 
 
-def _checkout(paths: RuntimePaths, config: dict[str, Any], session: CgvSession, match: dict[str, Any]) -> str:
-    _heartbeat(paths, Status.STAGING, match=match)
+def _checkout(
+    paths: RuntimePaths,
+    config: dict[str, Any],
+    session: CgvSession,
+    match: dict[str, Any],
+    recorder: CheckoutAttemptRecorder,
+) -> str:
+    _heartbeat(paths, Status.STAGING, match=match, attempt_id=recorder.attempt_id)
     flow = CheckoutFlow(session.page, config)
     try:
-        flow.ensure_no_existing_ticket(match, separate_tab=True)
-        flow.open_movie_and_theater()
-        selected_target = session.booking_target_from_page()
-        expected_target = config.get("target") or {
-            "company_code": "A420",
-            "site_no": "0013",
-            "movie_no": "30001323",
-        }
-        if selected_target != expected_target:
-            raise CheckoutError("selected movie/theater identifiers do not match the monitored target")
-        flow.open_match(match)
-        flow.select_party_and_seats(match)
-        flow.open_payment_and_apply_vouchers()
-        flow.ensure_no_existing_ticket(match, separate_tab=True)
-        # Revalidate policy-sensitive order state before crossing the one-way boundary.
-        flow.prove_ready(match)
+        with recorder.stage("duplicate_guard_before"):
+            flow.ensure_no_existing_ticket(match, separate_tab=True)
+        with recorder.stage("theater"):
+            flow.open_movie_and_theater()
+            selected_target = session.booking_target_from_page()
+            expected_target = config.get("target") or {
+                "company_code": "A420",
+                "site_no": "0013",
+                "movie_no": "30001323",
+            }
+            if selected_target != expected_target:
+                raise CheckoutError("selected movie/theater identifiers do not match the monitored target")
+        with recorder.stage("date"):
+            flow._require_match_date(match)
+        with recorder.stage("showtime"):
+            flow._open_match_showtime(match)
+        with recorder.stage("party"):
+            flow._select_general_party(int(config["party_size"]))
+        with recorder.stage("seats"):
+            flow._select_seats(match)
+        with recorder.stage("vouchers"):
+            flow.open_payment_and_apply_vouchers()
+        with recorder.stage("zero_balance"):
+            flow.prove_ready(match)
+        with recorder.stage("duplicate_guard_final"):
+            flow.ensure_no_existing_ticket(match, separate_tab=True)
+        recorder.mark("submission_ready")
     except DuplicateBlocked as exc:
-        _heartbeat(paths, Status.BLOCKED_DUPLICATE, str(exc), match=match)
+        recorder.terminal("blocked_duplicate", error=str(exc))
+        _heartbeat(paths, Status.BLOCKED_DUPLICATE, str(exc), match=match, attempt_id=recorder.attempt_id)
         _notify(paths, config, "Prickly IMAX 예매 중단", "기존 예매가 확인되어 자동 예매를 중단했습니다.")
         return Status.BLOCKED_DUPLICATE.value
     except PaymentBlocked as exc:
-        _heartbeat(paths, Status.BLOCKED_PAYMENT, str(exc), match=match)
+        recorder.terminal("blocked_payment", error=str(exc))
+        _heartbeat(paths, Status.BLOCKED_PAYMENT, str(exc), match=match, attempt_id=recorder.attempt_id)
         _notify(paths, config, "Prickly IMAX 결제 중단", "관람권 수량 또는 0원 잔액을 증명하지 못해 결제를 실행하지 않았습니다.")
         return Status.BLOCKED_PAYMENT.value
     except SeatVanished as exc:
+        recorder.terminal("seat_vanished", error=str(exc))
         _heartbeat(paths, Status.ARMED, str(exc), match=None)
-        write_event(paths.logs, "seat_vanished", match=match, error=str(exc))
         return Status.ARMED.value
     except CheckoutError as exc:
-        _heartbeat(paths, Status.RECOVERING, str(exc), match=match)
-        write_event(paths.logs, "checkout_pre_submit_error", match=match, error=str(exc))
+        recorder.terminal("checkout_pre_submit_error", error=str(exc))
+        _heartbeat(paths, Status.RECOVERING, str(exc), match=match, attempt_id=recorder.attempt_id)
         return Status.RECOVERING.value
 
-    _heartbeat(paths, Status.SUBMITTING, "all final checks passed; one submission attempt", match=match)
+    _heartbeat(
+        paths,
+        Status.SUBMITTING,
+        "all final checks passed; one submission attempt",
+        match=match,
+        attempt_id=recorder.attempt_id,
+    )
     try:
-        flow.submit_once()
-        result = flow.verify_mobile_ticket(match)
+        with recorder.stage("submission"):
+            flow.submit_once()
+        with recorder.stage("mobile_ticket"):
+            result = flow.verify_mobile_ticket(match)
     except UnknownAfterSubmit as exc:
-        _heartbeat(paths, Status.UNKNOWN_AFTER_SUBMIT, str(exc), match=match)
+        recorder.terminal("unknown_after_submit", error=str(exc))
+        _heartbeat(paths, Status.UNKNOWN_AFTER_SUBMIT, str(exc), match=match, attempt_id=recorder.attempt_id)
         _notify(paths, config, "Prickly IMAX 결과 확인 필요", "최종 제출 이후 모바일티켓 확인에 실패했습니다. 안전을 위해 재시도하지 않습니다.")
         return Status.UNKNOWN_AFTER_SUBMIT.value
-    _heartbeat(paths, Status.COMPLETED, "mobile ticket verified", match=match, proof=result.proof)
+    recorder.terminal("completed")
+    _heartbeat(
+        paths,
+        Status.COMPLETED,
+        "mobile ticket verified",
+        match=match,
+        proof=result.proof,
+        attempt_id=recorder.attempt_id,
+    )
     _notify(paths, config, "Prickly IMAX 예매 완료", f"{match['date']} {match['time']} {match['pair']} 예매가 완료됐습니다.")
     return Status.COMPLETED.value
 
@@ -183,14 +220,15 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
                         seat_map = session.seats(show["ymd"], str(show["scnsNo"]), str(show["scnSseq"]))
                         match = match_for(show, seat_map, config)
                         if match:
-                            write_event(paths.logs, "seat_match", match=match)
                             if allow_checkout:
-                                result = _checkout(paths, config, session, match)
+                                recorder = CheckoutAttemptRecorder.start(paths.logs, match)
+                                result = _checkout(paths, config, session, match, recorder)
                                 if result == Status.RECOVERING.value:
                                     checkout_guard_unavailable = True
                                 elif result != Status.ARMED.value:
                                     return 0
                             else:
+                                write_event(paths.logs, "seat_match", match=match)
                                 write_event(paths.logs, "dry_run_match_not_selected", match=match)
                             break
                     if checkout_guard_unavailable:

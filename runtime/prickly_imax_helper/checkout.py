@@ -341,10 +341,12 @@ class CheckoutFlow:
             )
         )
 
-    def open_match(self, match: dict[str, Any]) -> None:
+    def _require_match_date(self, match: dict[str, Any]) -> None:
         clicked = self._click_match_date(str(match["date"]))
         if not clicked:
             raise SeatVanished("target date is no longer open")
+
+    def _open_match_showtime(self, match: dict[str, Any]) -> None:
         self._wait(
             r"""target => [...document.querySelectorAll('button')].some(b => b.offsetParent && !b.disabled &&
             b.textContent.replace(/\s+/g, ' ').trim().startsWith(target + '-'))""",
@@ -360,6 +362,10 @@ class CheckoutFlow:
         if not clicked:
             raise SeatVanished("target showtime disappeared")
         self._wait("() => location.pathname === '/cnm/selectVisitorCnt'")
+
+    def open_match(self, match: dict[str, Any]) -> None:
+        self._require_match_date(match)
+        self._open_match_showtime(match)
 
     def _wait_for_general_party_control(self, party: int, timeout_ms: int = 10_000) -> bool:
         try:
@@ -419,9 +425,8 @@ class CheckoutFlow:
         except PlaywrightTimeoutError as exc:
             raise CheckoutError("general admission count selection not proven") from exc
 
-    def select_party_and_seats(self, match: dict[str, Any]) -> None:
+    def _select_seats(self, match: dict[str, Any]) -> None:
         party = int(self.config["party_size"])
-        self._select_general_party(party)
         seats = match["seats"]
         result = self.page.evaluate(
             r"""wanted => { const found = []; for (const seat of wanted) {
@@ -433,6 +438,10 @@ class CheckoutFlow:
         )
         if not result.get("ok") or int(result.get("count", 0)) != party:
             raise SeatVanished(f"target seat vanished: {result.get('missing')}")
+
+    def select_party_and_seats(self, match: dict[str, Any]) -> None:
+        self._select_general_party(int(self.config["party_size"]))
+        self._select_seats(match)
 
     def open_payment_and_apply_vouchers(self) -> None:
         clicked = self.page.evaluate(
