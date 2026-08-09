@@ -14,3 +14,4 @@ build/
 *.cookie
 *.secret
 pilot-evidence/
+.worktrees/
