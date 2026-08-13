@@ -3,6 +3,9 @@ from __future__ import annotations
 import importlib.util
 import copy
 import json
+import os
+import subprocess
+import sys
 import unittest
 from datetime import date
 from pathlib import Path
@@ -19,6 +22,19 @@ CONFIG = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 
 
 class PolicyTests(unittest.TestCase):
+    def test_korea_timezone_loads_without_system_timezone_database(self):
+        environment = os.environ.copy()
+        environment["PYTHONTZPATH"] = ""
+        completed = subprocess.run(
+            [sys.executable, "-c", "from prickly_imax_helper.policy import KOREA_TIMEZONE; print(KOREA_TIMEZONE.key)"],
+            capture_output=True,
+            text=True,
+            env=environment,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(completed.stdout.strip(), "Asia/Seoul")
+
     def test_default_config_is_valid(self):
         self.assertEqual(policy.validate(CONFIG), {"ok": True, "errors": []})
 
