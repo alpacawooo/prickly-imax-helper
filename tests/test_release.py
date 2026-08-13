@@ -83,8 +83,10 @@ class ReleaseTests(unittest.TestCase):
     def test_installers_clear_the_stop_request_before_starting_service(self):
         mac_installer = (ROOT / "scripts/Install.command").read_text(encoding="utf-8")
         windows_installer = (ROOT / "scripts/Install.ps1").read_text(encoding="utf-8-sig")
-        self.assertIn('/bin/rm -f -- "${APP_HOME}/state/stop-requested"', mac_installer)
-        self.assertIn('Remove-Item -LiteralPath (Join-Path $AppHome "state\\stop-requested") -Force', windows_installer)
+        self.assertLess(mac_installer.index('/bin/mv -- "${STOP_REQUEST}"'), mac_installer.index('prickly-imax" --home "${APP_HOME}" dry-run'))
+        self.assertIn('/bin/mv -- "${STOP_REQUEST_BACKUP}" "${STOP_REQUEST}"', mac_installer)
+        self.assertLess(windows_installer.index('Move-Item -LiteralPath $StopRequest -Destination $StopRequestBackup'), windows_installer.index('& $LauncherCmd --home $AppHome dry-run'))
+        self.assertIn('Move-Item -LiteralPath $StopRequestBackup -Destination $StopRequest', windows_installer)
 
     def test_windows_installer_is_pinned_and_user_scoped(self):
         installer = (ROOT / "scripts/Install.ps1").read_text(encoding="utf-8")
