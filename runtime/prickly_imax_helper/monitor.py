@@ -278,7 +278,8 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
                         previous_dates = set(planner.open_dates)
                         planner.replace_dates(session.open_dates())
                         last_open_date_refresh = time.monotonic()
-                        write_event(paths.logs, "open_dates_refreshed", count=len(planner.open_dates))
+                        if set(planner.open_dates) != previous_dates:
+                            write_event(paths.logs, "open_dates_refreshed", count=len(planner.open_dates))
                         for discovered in sorted(set(planner.open_dates) - previous_dates):
                             write_event(paths.logs, "booking_date_discovered", ymd=discovered)
                     elif action.kind == "schedule" and action.ymd is not None:
@@ -296,7 +297,12 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
                             write_event(paths.logs, "hot_target_pruned", reason="schedule_policy")
                         else:
                             seat_map = session.seats(show["ymd"], str(show["scnsNo"]), str(show["scnSseq"]))
-                            match = match_for(show, seat_map, config)
+                            if not seat_map.get("all"):
+                                planner.remove_hot_target(show, prioritize_discovery=True)
+                                write_event(paths.logs, "hot_target_pruned", reason="seat_map_empty")
+                                match = None
+                            else:
+                                match = match_for(show, seat_map, config)
                             if match:
                                 if allow_checkout:
                                     recorder = CheckoutAttemptRecorder.start(paths.logs, match)
@@ -308,6 +314,7 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
                                 else:
                                     write_event(paths.logs, "seat_match", match=match)
                                     write_event(paths.logs, "dry_run_match_not_selected", match=match)
+                    planner.complete(action)
                     if checkout_guard_unavailable:
                         write_event(paths.logs, "checkout_guard_retry_deferred", seconds=CHECKOUT_GUARD_RETRY_SECONDS)
                         if max_cycles is not None:

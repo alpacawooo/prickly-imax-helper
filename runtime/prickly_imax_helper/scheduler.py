@@ -29,6 +29,8 @@ class BalancedScanPlanner:
     hot_targets: list[dict[str, Any]] = field(default_factory=list)
     hot_cursor: int = 0
     hot_actions_since_discovery: int = 0
+    invalidated_hot_keys: set[str] = field(default_factory=set)
+    priority_schedule_dates: list[str] = field(default_factory=list)
 
     def replace_dates(self, values: list[str]) -> None:
         dates = list(dict.fromkeys(values))
@@ -37,12 +39,20 @@ class BalancedScanPlanner:
             if ymd not in dates:
                 self.schedules.pop(ymd, None)
                 self.schedule_refreshed_at.pop(ymd, None)
+        self.invalidated_hot_keys = {
+            key for key in self.invalidated_hot_keys if key.split("|", 1)[0] in dates
+        }
+        self.priority_schedule_dates = [ymd for ymd in self.priority_schedule_dates if ymd in dates]
         self._replace_hot_targets(
             [show for ymd in dates for show in self.schedules.get(ymd, [])]
         )
 
     def update_schedule(self, ymd: str, shows: list[dict[str, Any]], *, now: float) -> None:
         normalized = [{**show, "ymd": ymd} for show in shows]
+        self.invalidated_hot_keys = {
+            key for key in self.invalidated_hot_keys if key.split("|", 1)[0] != ymd
+        }
+        self.priority_schedule_dates = [value for value in self.priority_schedule_dates if value != ymd]
         self.schedules[ymd] = normalized
         self.schedule_refreshed_at[ymd] = now
         self._replace_hot_targets(
@@ -51,7 +61,11 @@ class BalancedScanPlanner:
 
     def _replace_hot_targets(self, values: list[dict[str, Any]]) -> None:
         previous_keys = [show_key(show) for show in self.hot_targets]
-        next_by_key = {show_key(show): show for show in values}
+        next_by_key = {
+            show_key(show): show
+            for show in values
+            if show_key(show) not in self.invalidated_hot_keys
+        }
         ordered_keys = [key for key in previous_keys if key in next_by_key]
         ordered_keys.extend(key for key in next_by_key if key not in ordered_keys)
         if previous_keys:
@@ -66,17 +80,22 @@ class BalancedScanPlanner:
         else:
             self.hot_cursor %= len(self.hot_targets)
 
-    def remove_hot_target(self, show: dict[str, Any]) -> None:
+    def remove_hot_target(self, show: dict[str, Any], *, prioritize_discovery: bool = False) -> None:
         key = show_key(show)
+        self.invalidated_hot_keys.add(key)
+        ymd = str(show["ymd"])
+        if prioritize_discovery and ymd not in self.priority_schedule_dates:
+            self.priority_schedule_dates.append(ymd)
         self._replace_hot_targets([candidate for candidate in self.hot_targets if show_key(candidate) != key])
 
     def _next_discovery(self, *, open_dates_due: bool) -> ScanAction:
-        self.hot_actions_since_discovery = 0
         if open_dates_due or not self.open_dates:
             return ScanAction("discovery", "open_dates")
         unloaded = [ymd for ymd in self.open_dates if ymd not in self.schedules]
         if unloaded:
             return ScanAction("discovery", "schedule", ymd=unloaded[0])
+        if self.priority_schedule_dates:
+            return ScanAction("discovery", "schedule", ymd=self.priority_schedule_dates[0])
         stalest = min(self.open_dates, key=lambda ymd: self.schedule_refreshed_at.get(ymd, float("-inf")))
         return ScanAction("discovery", "schedule", ymd=stalest)
 
@@ -85,9 +104,23 @@ class BalancedScanPlanner:
         if not self.hot_targets or self.hot_actions_since_discovery >= 4:
             return self._next_discovery(open_dates_due=open_dates_due)
         show = self.hot_targets[self.hot_cursor]
-        self.hot_cursor = (self.hot_cursor + 1) % len(self.hot_targets)
-        self.hot_actions_since_discovery += 1
         return ScanAction("hot", "seats", ymd=str(show["ymd"]), show=show)
+
+    def complete(self, action: ScanAction) -> None:
+        if action.lane == "discovery":
+            self.hot_actions_since_discovery = 0
+            return
+        if action.show is None:
+            raise ValueError("hot scan action requires a show")
+        key = show_key(action.show)
+        keys = [show_key(show) for show in self.hot_targets]
+        if key in keys:
+            self.hot_cursor = (keys.index(key) + 1) % len(keys)
+        elif self.hot_targets:
+            self.hot_cursor %= len(self.hot_targets)
+        else:
+            self.hot_cursor = 0
+        self.hot_actions_since_discovery += 1
 
     def metrics(self, *, now: float) -> dict[str, int | float]:
         count = len(self.hot_targets)

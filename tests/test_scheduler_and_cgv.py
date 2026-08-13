@@ -37,7 +37,11 @@ class SchedulerTests(unittest.TestCase):
             now=10.0,
         )
 
-        actions = [planner.next_action(now=11.0 + index, open_dates_due=False) for index in range(5)]
+        actions = []
+        for index in range(5):
+            action = planner.next_action(now=11.0 + index, open_dates_due=False)
+            actions.append(action)
+            planner.complete(action)
 
         self.assertEqual([action.lane for action in actions], ["hot", "hot", "hot", "hot", "discovery"])
         self.assertEqual(
@@ -52,6 +56,7 @@ class SchedulerTests(unittest.TestCase):
         planner.replace_dates(["20260820", "20260821"])
 
         first = planner.next_action(now=1.0, open_dates_due=False)
+        planner.complete(first)
         planner.update_schedule("20260820", [], now=2.0)
         second = planner.next_action(now=3.0, open_dates_due=False)
 
@@ -65,8 +70,10 @@ class SchedulerTests(unittest.TestCase):
         planner.update_schedule("20260821", [], now=30.0)
 
         due = planner.next_action(now=40.0, open_dates_due=True)
+        planner.complete(due)
         planner.replace_dates(["20260820", "20260821", "20260822"])
         new_date = planner.next_action(now=41.0, open_dates_due=False)
+        planner.complete(new_date)
         planner.update_schedule("20260822", [], now=42.0)
         stalest = planner.next_action(now=43.0, open_dates_due=False)
 
@@ -81,14 +88,58 @@ class SchedulerTests(unittest.TestCase):
         second = {"ymd": "20260820", "scnsNo": "18", "scnSseq": "2", "time": "22:00"}
         third = {"ymd": "20260820", "scnsNo": "18", "scnSseq": "3", "time": "24:30"}
         planner.update_schedule("20260820", [first, second], now=1.0)
-        self.assertEqual(planner.next_action(now=2.0, open_dates_due=False).show["scnSseq"], "1")
+        action = planner.next_action(now=2.0, open_dates_due=False)
+        self.assertEqual(action.show["scnSseq"], "1")
+        planner.complete(action)
 
         planner.update_schedule("20260820", [first, second, third], now=3.0)
-        self.assertEqual(planner.next_action(now=4.0, open_dates_due=False).show["scnSseq"], "2")
+        action = planner.next_action(now=4.0, open_dates_due=False)
+        self.assertEqual(action.show["scnSseq"], "2")
+        planner.complete(action)
         planner.update_schedule("20260820", [first, third], now=5.0)
 
-        remaining = [planner.next_action(now=6.0 + index, open_dates_due=False).show["scnSseq"] for index in range(2)]
+        remaining = []
+        for index in range(2):
+            action = planner.next_action(now=6.0 + index, open_dates_due=False)
+            remaining.append(action.show["scnSseq"])
+            planner.complete(action)
         self.assertEqual(remaining, ["3", "1"])
+
+    def test_balanced_planner_does_not_advance_until_action_completes(self):
+        planner = BalancedScanPlanner(minimum_interval_seconds=1.0)
+        planner.replace_dates(["20260820"])
+        planner.update_schedule(
+            "20260820",
+            [
+                {"scnsNo": "18", "scnSseq": "1", "time": "19:00"},
+                {"scnsNo": "18", "scnSseq": "2", "time": "22:00"},
+            ],
+            now=1.0,
+        )
+
+        failed = planner.next_action(now=2.0, open_dates_due=False)
+        retried = planner.next_action(now=3.0, open_dates_due=False)
+        self.assertEqual(retried, failed)
+        self.assertEqual(planner.hot_actions_since_discovery, 0)
+
+        planner.complete(retried)
+        advanced = planner.next_action(now=4.0, open_dates_due=False)
+        self.assertEqual(advanced.show["scnSseq"], "2")
+        self.assertEqual(planner.hot_actions_since_discovery, 1)
+
+    def test_removed_hot_target_stays_pruned_until_schedule_refresh(self):
+        planner = BalancedScanPlanner(minimum_interval_seconds=1.0)
+        show = {"ymd": "20260820", "scnsNo": "18", "scnSseq": "1", "time": "19:00"}
+        planner.replace_dates(["20260820"])
+        planner.update_schedule("20260820", [show], now=1.0)
+
+        planner.remove_hot_target(show, prioritize_discovery=True)
+        planner.replace_dates(["20260820"])
+        self.assertEqual(planner.hot_targets, [])
+        self.assertEqual(planner.next_action(now=2.0, open_dates_due=False).ymd, "20260820")
+
+        planner.update_schedule("20260820", [show], now=3.0)
+        self.assertEqual([candidate["scnSseq"] for candidate in planner.hot_targets], ["1"])
 
     def test_balanced_planner_metrics_disclose_revisit_estimate(self):
         planner = BalancedScanPlanner(minimum_interval_seconds=1.0)

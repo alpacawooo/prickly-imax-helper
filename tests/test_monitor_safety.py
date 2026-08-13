@@ -129,6 +129,96 @@ class MonitorRestartSafetyTests(unittest.TestCase):
             self.assertEqual(seat_calls, [])
             self.assertEqual(read_state(paths.heartbeat)["hot_target_count"], 0)
 
+    def test_empty_seat_map_prunes_target_and_prioritizes_schedule_refresh(self):
+        calls = []
+
+        class FakeSession:
+            page = object()
+
+            def __init__(self, *args, **kwargs):
+                pass
+
+            @contextlib.contextmanager
+            def locked(self):
+                yield self
+
+            def require_login(self):
+                return None
+
+            def open_dates(self):
+                calls.append(("open_dates", None))
+                return ["20260820"]
+
+            def schedules(self, ymd):
+                calls.append(("schedule", ymd))
+                return [{"movkndDsplNm": "IMAX", "scnsrtTm": "1900", "scnsNo": "18", "scnSseq": "1"}]
+
+            def seats(self, _ymd, _screen_no, sequence):
+                calls.append(("seats", sequence))
+                return {"all": [], "available": []}
+
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            write_config(paths.config, copy.deepcopy(VALID_CONFIG))
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+
+            with patch("prickly_imax_helper.monitor.launch_browser"), patch(
+                "prickly_imax_helper.monitor.CgvSession", FakeSession
+            ):
+                self.assertEqual(run(paths, max_cycles=4, allow_checkout=False), 0)
+
+            self.assertEqual(
+                calls,
+                [
+                    ("open_dates", None),
+                    ("schedule", "20260820"),
+                    ("seats", "1"),
+                    ("schedule", "20260820"),
+                ],
+            )
+
+    def test_first_matching_seat_map_stops_scanning_after_one_checkout(self):
+        class FakeSession:
+            page = object()
+
+            def __init__(self, *args, **kwargs):
+                pass
+
+            @contextlib.contextmanager
+            def locked(self):
+                yield self
+
+            def require_login(self):
+                return None
+
+            def open_dates(self):
+                return ["20260820"]
+
+            def schedules(self, _ymd):
+                return [{"movkndDsplNm": "IMAX", "scnsrtTm": "1900", "scnsNo": "18", "scnSseq": "1"}]
+
+            def seats(self, *_args):
+                return {
+                    "all": [f"H{number}" for number in range(1, 11)],
+                    "available": ["H5", "H6"],
+                }
+
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            write_config(paths.config, copy.deepcopy(VALID_CONFIG))
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+
+            with patch("prickly_imax_helper.monitor.launch_browser"), patch(
+                "prickly_imax_helper.monitor.CgvSession", FakeSession
+            ), patch(
+                "prickly_imax_helper.monitor._checkout", return_value=Status.COMPLETED.value
+            ) as checkout:
+                self.assertEqual(run(paths, max_cycles=20, allow_checkout=True), 0)
+
+            checkout.assert_called_once()
+
     def test_new_booking_dates_are_refreshed_within_thirty_seconds(self):
         self.assertLessEqual(OPEN_DATE_REFRESH_SECONDS, 30.0)
 
