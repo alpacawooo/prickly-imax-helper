@@ -112,6 +112,7 @@ if (-not $DryRun) {
     Write-Host "좌석과 결제를 누르지 않는 연결 검사를 실행합니다."
     & $LauncherCmd --home $AppHome dry-run
     if ($LASTEXITCODE -ne 0) { throw "무클릭 연결 검사에 실패해 상주 감시를 시작하지 않습니다." }
+    Remove-Item -LiteralPath (Join-Path $AppHome "state\stop-requested") -Force -ErrorAction SilentlyContinue
 
     $Action = New-ScheduledTaskAction -Execute $PythonExe -Argument "`"$LauncherPy`" --home `"$AppHome`" run"
     $CurrentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name

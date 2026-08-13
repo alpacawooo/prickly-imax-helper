@@ -131,6 +131,7 @@ fi
 if [[ ${DRY_RUN} != 1 ]]; then
   print "좌석과 결제를 누르지 않는 연결 검사를 실행합니다."
   "${VENV_DIR}/bin/prickly-imax" --home "${APP_HOME}" dry-run
+  /bin/rm -f -- "${APP_HOME}/state/stop-requested"
 fi
 
 if [[ ${DRY_RUN} != 1 ]]; then
