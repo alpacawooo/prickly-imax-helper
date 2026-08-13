@@ -268,7 +268,7 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
                     session.require_login()
                     current = read_state(paths.heartbeat).get("status")
                     if current != Status.ARMED.value:
-                        _heartbeat(paths, Status.ARMED, "CGV login verified", match=None)
+                        _heartbeat(paths, Status.ARMED, "CGV login verified", match=None, errors=0)
                     now = time.time()
                     if not state.open_dates or now - last_open_date_refresh >= OPEN_DATE_REFRESH_SECONDS:
                         state.replace_dates(session.open_dates())
@@ -276,7 +276,7 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
                         write_event(paths.logs, "open_dates_refreshed", count=len(state.open_dates))
                     ymd = state.next_date()
                     if ymd is None:
-                        _heartbeat(paths, Status.ARMED, "no open dates", open_dates=0, match=None)
+                        _heartbeat(paths, Status.ARMED, "no open dates", open_dates=0, match=None, errors=0)
                         if max_cycles is not None:
                             return 0
                         time.sleep(5)
@@ -322,6 +322,7 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
                         scanned_date=ymd,
                         eligible_shows=len(shows),
                         match=None,
+                        errors=0,
                     )
                     completed_cycles += 1
                     if max_cycles is not None and completed_cycles >= max_cycles:
