@@ -12,12 +12,11 @@ from .eventlog import write_event
 from .locks import LockUnavailable, locked_file
 from .notify import send_email, show_notification
 from .paths import RuntimePaths
-from .scheduler import FairScanState, changed_seat_targets, eligible_shows, match_for
+from .scheduler import BalancedScanPlanner, eligible_shows, match_for
 from .state import TERMINAL, Status, read_state, transition
 
 
 OPEN_DATE_REFRESH_SECONDS = 30.0
-UNCHANGED_SEAT_PROBE_SECONDS = 60.0
 MAX_RATE_LIMIT_COOLDOWN_SECONDS = 3600.0
 CHECKOUT_GUARD_RETRY_SECONDS = 300.0
 
@@ -246,9 +245,10 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
         if current in {None, Status.UNCONFIGURED.value, Status.STOPPED.value}:
             _heartbeat(paths, Status.LOGIN_REQUIRED, "monitor starting; login verification pending")
         launch_browser(paths)
-        state = FairScanState()
+        planner = BalancedScanPlanner(
+            minimum_interval_seconds=float(config["request_policy"]["minimum_interval_seconds"]),
+        )
         last_open_date_refresh = 0.0
-        last_seat_probe: dict[str, float] = {}
         consecutive_errors = 0
         rate_limit_streak = 0
         session = CgvSession(
@@ -268,44 +268,53 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
                     session.require_login()
                     current = read_state(paths.heartbeat).get("status")
                     if current != Status.ARMED.value:
-                        _heartbeat(paths, Status.ARMED, "CGV login verified", match=None)
-                    now = time.time()
-                    if not state.open_dates or now - last_open_date_refresh >= OPEN_DATE_REFRESH_SECONDS:
-                        state.replace_dates(session.open_dates())
-                        last_open_date_refresh = now
-                        write_event(paths.logs, "open_dates_refreshed", count=len(state.open_dates))
-                    ymd = state.next_date()
-                    if ymd is None:
-                        _heartbeat(paths, Status.ARMED, "no open dates", open_dates=0, match=None)
-                        if max_cycles is not None:
-                            return 0
-                        time.sleep(5)
-                        continue
-                    shows = eligible_shows(ymd, session.schedules(ymd), config)
-                    changed = changed_seat_targets(state, shows, int(config["party_size"]))
-                    targets = []
-                    for show in shows:
-                        key = f"{show['ymd']}|{show.get('scnsNo')}|{show.get('scnSseq')}"
-                        if show in changed or now - last_seat_probe.get(key, 0.0) >= UNCHANGED_SEAT_PROBE_SECONDS:
-                            targets.append(show)
+                        _heartbeat(paths, Status.ARMED, "CGV login verified", match=None, errors=0)
+                    now = time.monotonic()
+                    open_dates_due = not planner.open_dates or now - last_open_date_refresh >= OPEN_DATE_REFRESH_SECONDS
+                    action = planner.next_action(now=now, open_dates_due=open_dates_due)
                     checkout_guard_unavailable = False
-                    for show in targets:
-                        key = f"{show['ymd']}|{show.get('scnsNo')}|{show.get('scnSseq')}"
-                        last_seat_probe[key] = time.time()
-                        seat_map = session.seats(show["ymd"], str(show["scnsNo"]), str(show["scnSseq"]))
-                        match = match_for(show, seat_map, config)
-                        if match:
-                            if allow_checkout:
-                                recorder = CheckoutAttemptRecorder.start(paths.logs, match)
-                                result = _checkout(paths, config, session, match, recorder)
-                                if result == Status.RECOVERING.value:
-                                    checkout_guard_unavailable = True
-                                elif result != Status.ARMED.value:
-                                    return 0
+                    eligible_count = len(planner.hot_targets)
+                    if action.kind == "open_dates":
+                        previous_dates = set(planner.open_dates)
+                        planner.replace_dates(session.open_dates())
+                        last_open_date_refresh = time.monotonic()
+                        if set(planner.open_dates) != previous_dates:
+                            write_event(paths.logs, "open_dates_refreshed", count=len(planner.open_dates))
+                        for discovered in sorted(set(planner.open_dates) - previous_dates):
+                            write_event(paths.logs, "booking_date_discovered", ymd=discovered)
+                    elif action.kind == "schedule" and action.ymd is not None:
+                        previous_keys = {f"{show['ymd']}|{show.get('scnsNo')}|{show.get('scnSseq')}" for show in planner.hot_targets}
+                        shows = eligible_shows(action.ymd, session.schedules(action.ymd), config)
+                        planner.update_schedule(action.ymd, shows, now=time.monotonic())
+                        next_keys = {f"{show['ymd']}|{show.get('scnsNo')}|{show.get('scnSseq')}" for show in planner.hot_targets}
+                        if next_keys != previous_keys:
+                            write_event(paths.logs, "hot_queue_changed", count=len(next_keys))
+                        eligible_count = len(shows)
+                    elif action.kind == "seats" and action.show is not None:
+                        show = action.show
+                        if not eligible_shows(show["ymd"], [show], config):
+                            planner.remove_hot_target(show)
+                            write_event(paths.logs, "hot_target_pruned", reason="schedule_policy")
+                        else:
+                            seat_map = session.seats(show["ymd"], str(show["scnsNo"]), str(show["scnSseq"]))
+                            if not seat_map.get("all"):
+                                planner.remove_hot_target(show, prioritize_discovery=True)
+                                write_event(paths.logs, "hot_target_pruned", reason="seat_map_empty")
+                                match = None
                             else:
-                                write_event(paths.logs, "seat_match", match=match)
-                                write_event(paths.logs, "dry_run_match_not_selected", match=match)
-                            break
+                                match = match_for(show, seat_map, config)
+                            if match:
+                                if allow_checkout:
+                                    recorder = CheckoutAttemptRecorder.start(paths.logs, match)
+                                    result = _checkout(paths, config, session, match, recorder)
+                                    if result == Status.RECOVERING.value:
+                                        checkout_guard_unavailable = True
+                                    elif result != Status.ARMED.value:
+                                        return 0
+                                else:
+                                    write_event(paths.logs, "seat_match", match=match)
+                                    write_event(paths.logs, "dry_run_match_not_selected", match=match)
+                    planner.complete(action)
                     if checkout_guard_unavailable:
                         write_event(paths.logs, "checkout_guard_retry_deferred", seconds=CHECKOUT_GUARD_RETRY_SECONDS)
                         if max_cycles is not None:
@@ -314,14 +323,18 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
                         continue
                     consecutive_errors = 0
                     rate_limit_streak = 0
+                    metrics = planner.metrics(now=time.monotonic())
                     _heartbeat(
                         paths,
                         Status.ARMED,
                         "scan completed",
-                        open_dates=len(state.open_dates),
-                        scanned_date=ymd,
-                        eligible_shows=len(shows),
+                        open_dates=len(planner.open_dates),
+                        scanned_date=action.ymd,
+                        eligible_shows=eligible_count,
                         match=None,
+                        errors=0,
+                        last_scan_lane=action.lane,
+                        **metrics,
                     )
                     completed_cycles += 1
                     if max_cycles is not None and completed_cycles >= max_cycles:

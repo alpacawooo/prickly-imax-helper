@@ -2,8 +2,38 @@ from __future__ import annotations
 
 import math
 import re
-from datetime import date
+from datetime import date, datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
+
+
+KOREA_TIMEZONE = ZoneInfo("Asia/Seoul")
+
+
+def show_start_at(ymd: str, start: str) -> datetime:
+    if len(ymd) != 8 or not ymd.isdigit():
+        raise ValueError("show date must be YYYYMMDD")
+    if not isinstance(start, str) or not re.fullmatch(r"\d{2}:\d{2}", start):
+        raise ValueError("show start must be HH:MM with hour 00 through 29")
+    hour, minute = map(int, start.split(":"))
+    if not 0 <= hour <= 29 or not 0 <= minute <= 59:
+        raise ValueError("show start must be HH:MM with hour 00 through 29")
+    base = datetime.strptime(ymd, "%Y%m%d").replace(tzinfo=KOREA_TIMEZONE)
+    return base + timedelta(hours=hour, minutes=minute)
+
+
+def has_minimum_lead(
+    ymd: str,
+    start: str,
+    minimum_lead_minutes: int,
+    *,
+    now: datetime | None = None,
+) -> bool:
+    current = datetime.now(KOREA_TIMEZONE) if now is None else now
+    if current.tzinfo is None or current.utcoffset() is None:
+        raise ValueError("now must include timezone information")
+    current_korea = current.astimezone(KOREA_TIMEZONE)
+    return show_start_at(ymd, start) - current_korea >= timedelta(minutes=minimum_lead_minutes)
 
 
 def eligible_start(day: date, start: str, config: dict[str, Any]) -> bool:

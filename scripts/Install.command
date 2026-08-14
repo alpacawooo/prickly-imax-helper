@@ -130,7 +130,19 @@ fi
 
 if [[ ${DRY_RUN} != 1 ]]; then
   print "좌석과 결제를 누르지 않는 연결 검사를 실행합니다."
-  "${VENV_DIR}/bin/prickly-imax" --home "${APP_HOME}" dry-run
+  STOP_REQUEST=${APP_HOME}/state/stop-requested
+  STOP_REQUEST_BACKUP=${APP_HOME}/state/stop-requested.install-backup
+  /bin/rm -f -- "${STOP_REQUEST_BACKUP}"
+  if [[ -f ${STOP_REQUEST} ]]; then
+    /bin/mv -- "${STOP_REQUEST}" "${STOP_REQUEST_BACKUP}"
+  fi
+  if ! "${VENV_DIR}/bin/prickly-imax" --home "${APP_HOME}" dry-run; then
+    if [[ -f ${STOP_REQUEST_BACKUP} ]]; then
+      /bin/mv -- "${STOP_REQUEST_BACKUP}" "${STOP_REQUEST}"
+    fi
+    exit 1
+  fi
+  /bin/rm -f -- "${STOP_REQUEST_BACKUP}"
 fi
 
 if [[ ${DRY_RUN} != 1 ]]; then

@@ -3,16 +3,163 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import Mock
+from zoneinfo import ZoneInfo
 
 from prickly_imax_helper.cgv import CgvSession, LoginRequired, RateLimited
 from prickly_imax_helper.paths import RuntimePaths
+from prickly_imax_helper.policy import has_minimum_lead
 from prickly_imax_helper.presets import odyssey
-from prickly_imax_helper.scheduler import FairScanState, changed_seat_targets, eligible_shows, match_for
+from prickly_imax_helper.scheduler import (
+    BalancedScanPlanner,
+    FairScanState,
+    changed_seat_targets,
+    eligible_shows,
+    match_for,
+)
+
+
+KST = ZoneInfo("Asia/Seoul")
 
 
 class SchedulerTests(unittest.TestCase):
+    def test_balanced_planner_emits_four_fair_hot_actions_then_discovery(self):
+        planner = BalancedScanPlanner(minimum_interval_seconds=1.0)
+        planner.replace_dates(["20260820", "20260821"])
+        planner.update_schedule(
+            "20260820",
+            [
+                {"ymd": "20260820", "scnsNo": "18", "scnSseq": "1", "time": "19:00"},
+                {"ymd": "20260820", "scnsNo": "18", "scnSseq": "2", "time": "22:00"},
+            ],
+            now=10.0,
+        )
+
+        actions = []
+        for index in range(5):
+            action = planner.next_action(now=11.0 + index, open_dates_due=False)
+            actions.append(action)
+            planner.complete(action)
+
+        self.assertEqual([action.lane for action in actions], ["hot", "hot", "hot", "hot", "discovery"])
+        self.assertEqual(
+            [action.show["scnSseq"] for action in actions[:4]],
+            ["1", "2", "1", "2"],
+        )
+        self.assertEqual(actions[4].kind, "schedule")
+        self.assertEqual(actions[4].ymd, "20260821")
+
+    def test_balanced_planner_uses_only_discovery_until_hot_target_exists(self):
+        planner = BalancedScanPlanner(minimum_interval_seconds=1.0)
+        planner.replace_dates(["20260820", "20260821"])
+
+        first = planner.next_action(now=1.0, open_dates_due=False)
+        planner.complete(first)
+        planner.update_schedule("20260820", [], now=2.0)
+        second = planner.next_action(now=3.0, open_dates_due=False)
+
+        self.assertEqual((first.lane, first.kind, first.ymd), ("discovery", "schedule", "20260820"))
+        self.assertEqual((second.lane, second.kind, second.ymd), ("discovery", "schedule", "20260821"))
+
+    def test_balanced_planner_prioritizes_open_dates_then_new_and_stalest_dates(self):
+        planner = BalancedScanPlanner(minimum_interval_seconds=1.0)
+        planner.replace_dates(["20260820", "20260821"])
+        planner.update_schedule("20260820", [], now=20.0)
+        planner.update_schedule("20260821", [], now=30.0)
+
+        due = planner.next_action(now=40.0, open_dates_due=True)
+        planner.complete(due)
+        planner.replace_dates(["20260820", "20260821", "20260822"])
+        new_date = planner.next_action(now=41.0, open_dates_due=False)
+        planner.complete(new_date)
+        planner.update_schedule("20260822", [], now=42.0)
+        stalest = planner.next_action(now=43.0, open_dates_due=False)
+
+        self.assertEqual((due.lane, due.kind), ("discovery", "open_dates"))
+        self.assertEqual(new_date.ymd, "20260822")
+        self.assertEqual(stalest.ymd, "20260820")
+
+    def test_balanced_planner_preserves_cursor_and_prunes_authoritatively(self):
+        planner = BalancedScanPlanner(minimum_interval_seconds=1.0)
+        planner.replace_dates(["20260820"])
+        first = {"ymd": "20260820", "scnsNo": "18", "scnSseq": "1", "time": "19:00"}
+        second = {"ymd": "20260820", "scnsNo": "18", "scnSseq": "2", "time": "22:00"}
+        third = {"ymd": "20260820", "scnsNo": "18", "scnSseq": "3", "time": "24:30"}
+        planner.update_schedule("20260820", [first, second], now=1.0)
+        action = planner.next_action(now=2.0, open_dates_due=False)
+        self.assertEqual(action.show["scnSseq"], "1")
+        planner.complete(action)
+
+        planner.update_schedule("20260820", [first, second, third], now=3.0)
+        action = planner.next_action(now=4.0, open_dates_due=False)
+        self.assertEqual(action.show["scnSseq"], "2")
+        planner.complete(action)
+        planner.update_schedule("20260820", [first, third], now=5.0)
+
+        remaining = []
+        for index in range(2):
+            action = planner.next_action(now=6.0 + index, open_dates_due=False)
+            remaining.append(action.show["scnSseq"])
+            planner.complete(action)
+        self.assertEqual(remaining, ["3", "1"])
+
+    def test_balanced_planner_does_not_advance_until_action_completes(self):
+        planner = BalancedScanPlanner(minimum_interval_seconds=1.0)
+        planner.replace_dates(["20260820"])
+        planner.update_schedule(
+            "20260820",
+            [
+                {"scnsNo": "18", "scnSseq": "1", "time": "19:00"},
+                {"scnsNo": "18", "scnSseq": "2", "time": "22:00"},
+            ],
+            now=1.0,
+        )
+
+        failed = planner.next_action(now=2.0, open_dates_due=False)
+        retried = planner.next_action(now=3.0, open_dates_due=False)
+        self.assertEqual(retried, failed)
+        self.assertEqual(planner.hot_actions_since_discovery, 0)
+
+        planner.complete(retried)
+        advanced = planner.next_action(now=4.0, open_dates_due=False)
+        self.assertEqual(advanced.show["scnSseq"], "2")
+        self.assertEqual(planner.hot_actions_since_discovery, 1)
+
+    def test_removed_hot_target_stays_pruned_until_schedule_refresh(self):
+        planner = BalancedScanPlanner(minimum_interval_seconds=1.0)
+        show = {"ymd": "20260820", "scnsNo": "18", "scnSseq": "1", "time": "19:00"}
+        planner.replace_dates(["20260820"])
+        planner.update_schedule("20260820", [show], now=1.0)
+
+        planner.remove_hot_target(show, prioritize_discovery=True)
+        planner.replace_dates(["20260820"])
+        self.assertEqual(planner.hot_targets, [])
+        self.assertEqual(planner.next_action(now=2.0, open_dates_due=False).ymd, "20260820")
+
+        planner.update_schedule("20260820", [show], now=3.0)
+        self.assertEqual([candidate["scnSseq"] for candidate in planner.hot_targets], ["1"])
+
+    def test_balanced_planner_metrics_disclose_revisit_estimate(self):
+        planner = BalancedScanPlanner(minimum_interval_seconds=1.0)
+        planner.replace_dates(["20260820", "20260821"])
+        planner.update_schedule(
+            "20260820",
+            [
+                {"ymd": "20260820", "scnsNo": "18", "scnSseq": str(index), "time": "19:00"}
+                for index in range(1, 4)
+            ],
+            now=10.0,
+        )
+
+        metrics = planner.metrics(now=40.0)
+
+        self.assertEqual(metrics["hot_target_count"], 3)
+        self.assertEqual(metrics["estimated_hot_revisit_seconds"], 4.0)
+        self.assertEqual(metrics["discovery_queue_count"], 1)
+        self.assertEqual(metrics["oldest_schedule_age_seconds"], 30.0)
+
     def test_dates_rotate_fairly_and_refresh_dynamically(self):
         state = FairScanState()
         state.replace_dates(["20260805", "20260806", "20260807"])
@@ -41,9 +188,9 @@ class SchedulerTests(unittest.TestCase):
             {"movkndDsplNm": "IMAX 2D", "scnsrtTm": "0630", "scnsNo": "018", "scnSseq": "1", "frSeatCnt": 2},
             {"movkndDsplNm": "IMAX 2D", "scnsrtTm": "2300", "scnsNo": "018", "scnSseq": "2", "frSeatCnt": 2},
         ]
-        saturday = eligible_shows("20260808", schedules, config)
+        saturday = eligible_shows("20260808", schedules, config, now=datetime(2026, 8, 7, 0, 0, tzinfo=KST))
         self.assertEqual([show["time"] for show in saturday], ["06:30", "23:00"])
-        sunday = eligible_shows("20260809", schedules, config)
+        sunday = eligible_shows("20260809", schedules, config, now=datetime(2026, 8, 8, 0, 0, tzinfo=KST))
         self.assertEqual([show["time"] for show in sunday], ["06:30"])
         seats = [f"H{i}" for i in range(1, 31)]
         result = match_for(saturday[0], {"all": seats, "available": ["H15", "H16"]}, config)
@@ -56,7 +203,111 @@ class SchedulerTests(unittest.TestCase):
             {"movkndDsplNm": "IMAX 2D", "scnsrtTm": "1900"},
             {"movkndDsplNm": "IMAX LASER 2D", "scnsrtTm": "1930"},
         ]
-        self.assertEqual([show["time"] for show in eligible_shows("20260806", schedules, config)], ["19:30"])
+        self.assertEqual(
+            [
+                show["time"]
+                for show in eligible_shows(
+                    "20260806", schedules, config, now=datetime(2026, 8, 5, 0, 0, tzinfo=KST)
+                )
+            ],
+            ["19:30"],
+        )
+
+    def test_minimum_lead_accepts_exactly_180_minutes_and_rejects_less(self):
+        config = odyssey()
+        schedules = [
+            {"scnsrtTm": "2100", "movkndDsplNm": "IMAX", "scnsNo": "1", "scnSseq": "1"},
+            {"scnsrtTm": "2059", "movkndDsplNm": "IMAX", "scnsNo": "1", "scnSseq": "2"},
+        ]
+        now = datetime(2026, 8, 10, 18, 0, tzinfo=KST)
+
+        result = eligible_shows("20260810", schedules, config, now=now)
+
+        self.assertEqual([show["time"] for show in result], ["21:00"])
+
+    def test_2430_rolls_into_the_next_calendar_day(self):
+        config = odyssey()
+        config["time_rules"]["sunday"] = {"any_time": True}
+        schedules = [{"scnsrtTm": "2430", "movkndDsplNm": "IMAX"}]
+
+        accepted = eligible_shows(
+            "20260809", schedules, config,
+            now=datetime(2026, 8, 9, 21, 30, tzinfo=KST),
+        )
+        rejected = eligible_shows(
+            "20260809", schedules, config,
+            now=datetime(2026, 8, 9, 21, 31, tzinfo=KST),
+        )
+
+        self.assertEqual([show["time"] for show in accepted], ["24:30"])
+        self.assertEqual(rejected, [])
+
+    def test_later_date_remains_eligible(self):
+        config = odyssey()
+        schedules = [{"scnsrtTm": "1900", "movkndDsplNm": "IMAX"}]
+
+        result = eligible_shows(
+            "20260811", schedules, config,
+            now=datetime(2026, 8, 10, 23, 0, tzinfo=KST),
+        )
+
+        self.assertEqual([show["time"] for show in result], ["19:00"])
+
+    def test_aware_utc_now_is_converted_to_korea_time(self):
+        config = odyssey()
+        schedules = [{"scnsrtTm": "2100", "movkndDsplNm": "IMAX"}]
+
+        result = eligible_shows(
+            "20260810", schedules, config,
+            now=datetime(2026, 8, 10, 9, 0, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual([show["time"] for show in result], ["21:00"])
+
+    def test_minimum_lead_rejects_naive_now(self):
+        with self.assertRaisesRegex(ValueError, "now must include timezone information"):
+            has_minimum_lead(
+                "20260810",
+                "21:00",
+                180,
+                now=datetime(2026, 8, 10, 18, 0),
+            )
+
+    def test_minimum_lead_accepts_configured_boundaries(self):
+        lower = odyssey()
+        lower["minimum_lead_minutes"] = 180
+        lower_result = eligible_shows(
+            "20260810",
+            [{"scnsrtTm": "2100", "movkndDsplNm": "IMAX"}],
+            lower,
+            now=datetime(2026, 8, 10, 18, 0, tzinfo=KST),
+        )
+
+        upper = odyssey()
+        upper["minimum_lead_minutes"] = 1440
+        upper_result = eligible_shows(
+            "20260811",
+            [{"scnsrtTm": "1900", "movkndDsplNm": "IMAX"}],
+            upper,
+            now=datetime(2026, 8, 10, 19, 0, tzinfo=KST),
+        )
+
+        self.assertEqual([show["time"] for show in lower_result], ["21:00"])
+        self.assertEqual([show["time"] for show in upper_result], ["19:00"])
+
+    def test_minimum_lead_rejects_invalid_config_types_and_ranges(self):
+        for value in (False, True, None, "180", 180.0, 179, 1441):
+            with self.subTest(value=value):
+                config = odyssey()
+                config["minimum_lead_minutes"] = value
+
+                with self.assertRaisesRegex(ValueError, "minimum_lead_minutes must be an integer from 180 through 1440"):
+                    eligible_shows(
+                        "20260810",
+                        [{"scnsrtTm": "2100", "movkndDsplNm": "IMAX"}],
+                        config,
+                        now=datetime(2026, 8, 10, 18, 0, tzinfo=KST),
+                    )
 
 
 class FakeBudget:

@@ -8,6 +8,7 @@ Required fields:
 - screen format and party size
 - allowed dates or all open dates
 - weekday/time rules
+- minimum lead time before the show starts
 - allowed rows and edge exclusion ratio
 - center preference
 - payment method and maximum payable balance
@@ -23,12 +24,14 @@ Default Odyssey profile:
 - weekday: start at or after 19:00
 - Saturday: no time restriction
 - Sunday: start before 22:00
+- minimum lead: 180 minutes
 - rows: D through J
 - exclude: 20% at each row edge
 - preference: consecutive same-row seats closest to center
 - duplicate booking, cancellation, and seat changes: forbidden
 
-Movie, CGV theater, IMAX display format, party size, time windows, rows, edge exclusion, and center preference are user-editable defaults. Same-row adjacency, all-open-date refresh, duplicate prevention, no cancellation/change, voucher-only zero-balance submission, and the request budget remain enforced safety boundaries.
+Movie, CGV theater, IMAX display format, party size, time windows, rows, edge exclusion, and center preference are user-editable defaults. The minimum lead time can be increased as high as 1,440 minutes, but the default 180-minute safety floor cannot be lowered. CGV extended clocks from `24:00` through `29:59` are normalized to the following calendar day before this check. Same-row adjacency, all-open-date refresh, duplicate prevention, no cancellation/change, voucher-only zero-balance submission, and the request budget remain enforced safety boundaries.
 
 The user logs in personally in the dedicated Chrome window. Confirm login by visible account state, not by reading credentials.
 The recipient provider is independent of the operating system. Use Apple Mail on macOS or classic Outlook desktop on Windows only as the local sending bridge, and never request an email password or app password.
+The configured recipient account may also be used in the iPhone Mail app. This is ordinary email notification, not direct mobile push: delivery can be delayed, and the helper cannot bypass silent mode or Focus on the iPhone.
