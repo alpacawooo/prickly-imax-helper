@@ -22,8 +22,8 @@
 ### Task 1: Acquire and identify the two authorized originals
 
 **Files:**
-- Create: `content/assets/source-originals/fuckinggoodmovies/odyssey-agamemnon-front-original.jpg`
-- Create: `content/assets/source-originals/fuckinggoodmovies/odyssey-agamemnon-profile-original.jpg`
+- Create: `content/assets/source-originals/fuckinggoodmovies/odyssey-agamemnon-fullbody-original.jpg`
+- Create: `content/assets/source-originals/fuckinggoodmovies/odyssey-giants-forest-original.jpg`
 
 **Interfaces:**
 - Consumes: the authenticated Instagram post and the two approved screenshots in the conversation.
@@ -62,8 +62,8 @@ git commit -m "content: add authorized Odyssey still originals"
 ### Task 2: Produce and verify the carousel derivatives
 
 **Files:**
-- Create: `content/assets/odyssey-clean/odyssey-agamemnon-front-1080x1350.jpg`
-- Create: `content/assets/odyssey-clean/odyssey-agamemnon-profile-1080x1350.jpg`
+- Create: `content/assets/odyssey-clean/odyssey-agamemnon-fullbody-1080x1350.jpg`
+- Create: `content/assets/odyssey-clean/odyssey-giants-forest-1080x1350.jpg`
 
 **Interfaces:**
 - Consumes: the two immutable source JPEGs from Task 1.
@@ -75,26 +75,26 @@ git commit -m "content: add authorized Odyssey still originals"
 mkdir -p content/assets/odyssey-clean
 ```
 
-- [ ] **Step 2: Resize and center-crop the front frame**
+- [ ] **Step 2: Resize and center-crop the full-body frame**
 
 ```bash
 sips --resampleWidth 1080 \
-  content/assets/source-originals/fuckinggoodmovies/odyssey-agamemnon-front-original.jpg \
-  --out /tmp/odyssey-agamemnon-front-width1080.jpg
+  content/assets/source-originals/fuckinggoodmovies/odyssey-agamemnon-fullbody-original.jpg \
+  --out /tmp/odyssey-agamemnon-fullbody-width1080.jpg
 sips --cropToHeightWidth 1350 1080 \
-  /tmp/odyssey-agamemnon-front-width1080.jpg \
-  --out content/assets/odyssey-clean/odyssey-agamemnon-front-1080x1350.jpg
+  /tmp/odyssey-agamemnon-fullbody-width1080.jpg \
+  --out content/assets/odyssey-clean/odyssey-agamemnon-fullbody-1080x1350.jpg
 ```
 
-- [ ] **Step 3: Resize and center-crop the profile frame**
+- [ ] **Step 3: Resize and center-crop the giants frame**
 
 ```bash
 sips --resampleWidth 1080 \
-  content/assets/source-originals/fuckinggoodmovies/odyssey-agamemnon-profile-original.jpg \
-  --out /tmp/odyssey-agamemnon-profile-width1080.jpg
+  content/assets/source-originals/fuckinggoodmovies/odyssey-giants-forest-original.jpg \
+  --out /tmp/odyssey-giants-forest-width1080.jpg
 sips --cropToHeightWidth 1350 1080 \
-  /tmp/odyssey-agamemnon-profile-width1080.jpg \
-  --out content/assets/odyssey-clean/odyssey-agamemnon-profile-1080x1350.jpg
+  /tmp/odyssey-giants-forest-width1080.jpg \
+  --out content/assets/odyssey-clean/odyssey-giants-forest-1080x1350.jpg
 ```
 
 - [ ] **Step 4: Verify exact dimensions**
@@ -120,4 +120,3 @@ Open both sources and derivatives side by side. Confirm that the face, helmet cr
 git add content/assets/odyssey-clean
 git commit -m "content: prepare clean Odyssey carousel stills"
 ```
-
