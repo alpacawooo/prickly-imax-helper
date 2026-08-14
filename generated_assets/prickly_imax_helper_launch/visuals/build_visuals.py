@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageOps
@@ -113,9 +114,45 @@ def card_four_scroll_offsets(
 
 def redact_visual_evidence(value: str) -> str:
     value = re.sub(r"[\w.+-]+@[\w.-]+", "[redacted-email]", value)
-    value = re.sub(r"(?i)(cookie|voucher|profile)\s*[=:]\s*\S+", r"\1=[redacted]", value)
-    value = re.sub(r"/Users/[^\s]+", "[redacted-path]", value)
+    value = re.sub(
+        r"(?i)(cookie|voucher|profile)\s*[=:]\s*[^\s,\"}]+", r"\1=[redacted]", value
+    )
+    value = re.sub(r"/Users/[^\s,\"}]+", "[redacted-path]", value)
     return value
+
+
+def read_redacted_monitor_state(command: Path) -> dict[str, object]:
+    completed = subprocess.run(
+        [str(command), "diagnose"], capture_output=True, text=True, check=True, timeout=20
+    )
+    payload = json.loads(redact_visual_evidence(completed.stdout))
+    status = payload.get("status", {})
+    if not isinstance(status, dict):
+        status = {}
+    return {
+        key: status.get(key)
+        for key in (
+            "status", "detail", "open_dates", "eligible_shows", "match", "errors",
+            "last_scan_lane",
+        )
+    }
+
+
+def sample_monitor_states(
+    read_state,
+    *,
+    count: int,
+    interval_seconds: float,
+    sleeper=time.sleep,
+) -> list[dict[str, object]]:
+    if count < 1 or interval_seconds < 0:
+        raise ValueError("monitor sampling requires a positive count and non-negative interval")
+    states: list[dict[str, object]] = []
+    for index in range(count):
+        states.append(read_state())
+        if index + 1 < count:
+            sleeper(interval_seconds)
+    return states
 
 
 def run(*args: str, cwd: Path | None = None) -> None:
@@ -286,14 +323,7 @@ def redacted_monitor_preview() -> Path:
     command = Path("/Users/woojinyoung/.local/bin/prickly-imax")
     data: dict[str, object] = {}
     if command.exists():
-        completed = subprocess.run(
-            [str(command), "diagnose"], capture_output=True, text=True, check=True, timeout=20
-        )
-        payload = json.loads(redact_visual_evidence(completed.stdout))
-        status = payload.get("status", {})
-        if isinstance(status, dict):
-            for key in ("status", "detail", "open_dates", "eligible_shows", "match", "errors", "last_scan_lane"):
-                data[key] = status.get(key)
+        data = read_redacted_monitor_state(command)
     rows = "".join(
         f"<div><span>{html_module.escape(str(key))}</span><b>{html_module.escape(json.dumps(value, ensure_ascii=False))}</b></div>"
         for key, value in data.items()

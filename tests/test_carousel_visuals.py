@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -92,6 +94,50 @@ def test_redaction_blocks_private_fields() -> None:
     redacted = builder.redact_visual_evidence(sample)
     for secret in ("a@example.com", "secret", "1234", "/Users/name/private"):
         assert secret not in redacted
+
+
+def test_monitor_sampling_reads_local_state_only() -> None:
+    builder = load_builder()
+    states = iter([
+        {"status": "armed", "open_dates": 12, "eligible_shows": 35, "match": None,
+         "last_scan_lane": "discovery"},
+        {"status": "armed", "open_dates": 12, "eligible_shows": 35, "match": None,
+         "last_scan_lane": "hot"},
+    ])
+    sleeps: list[float] = []
+    sampled = builder.sample_monitor_states(
+        lambda: next(states), count=2, interval_seconds=0.4, sleeper=sleeps.append
+    )
+    assert sampled[0]["last_scan_lane"] == "discovery"
+    assert sampled[1]["last_scan_lane"] == "hot"
+    assert sleeps == [0.4]
+
+
+def test_redacted_monitor_state_invokes_only_diagnose(monkeypatch) -> None:
+    builder = load_builder()
+    calls: list[tuple[list[str], dict[str, object]]] = []
+    payload = {
+        "status": {
+            "status": "armed", "detail": "email=a@example.com cookie=secret",
+            "open_dates": 12, "eligible_shows": 35, "match": None, "errors": 0,
+            "last_scan_lane": "hot", "profile": "/Users/name/private ",
+        }
+    }
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        return SimpleNamespace(stdout=json.dumps(payload), returncode=0)
+
+    monkeypatch.setattr(builder.subprocess, "run", fake_run)
+    state = builder.read_redacted_monitor_state(Path("/tmp/prickly-imax"))
+    assert [call[0] for call in calls] == [["/tmp/prickly-imax", "diagnose"]]
+    assert set(state) == {
+        "status", "detail", "open_dates", "eligible_shows", "match", "errors",
+        "last_scan_lane",
+    }
+    raw = json.dumps(state, ensure_ascii=False)
+    for secret in ("a@example.com", "secret", "/Users/name/private"):
+        assert secret not in raw
 
 
 def test_verify_video_carousel_rejects_wrong_count() -> None:
