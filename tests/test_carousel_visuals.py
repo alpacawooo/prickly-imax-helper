@@ -140,6 +140,39 @@ def test_redacted_monitor_state_invokes_only_diagnose(monkeypatch) -> None:
         assert secret not in raw
 
 
+def test_card_five_uses_actual_monitoring_stages_without_fake_match() -> None:
+    builder = load_builder()
+    states = [{
+        "status": "armed", "open_dates": 12, "eligible_shows": 35,
+        "match": None, "errors": 0, "last_scan_lane": "hot",
+    }] * 5
+    pages = builder.card_five_monitor_scene_htmls(states)
+    assert len(pages) == 5
+    assert "감시 시작" in pages[0] and "armed" in pages[0]
+    assert "열린 날짜·회차 확인" in pages[1]
+    assert "연속 좌석 감시" in pages[2] and "hot" in pages[2]
+    assert "후보가 없으면 계속 순환" in pages[3] and "null" in pages[3]
+    assert "좌석 발견 시" in pages[4]
+    assert "match&quot;: true" not in "\n".join(pages)
+
+
+def test_scene_sequence_encoder_builds_five_input_eight_second_video(
+    tmp_path: Path, monkeypatch
+) -> None:
+    builder = load_builder()
+    captured: list[tuple[str, ...]] = []
+    monkeypatch.setattr(builder, "run", lambda *args, **_kwargs: captured.append(args))
+    frames = [tmp_path / f"frame-{index}.png" for index in range(5)]
+    builder.render_scene_sequence(frames, tmp_path / "card-05.mp4", duration=8)
+    args = captured[0]
+    command = " ".join(args)
+    assert args.count("-i") == 5
+    assert command.count("xfade=") == 4
+    assert "-t 8" in command
+    assert "fps=30" in command
+    assert "yuv420p" in command
+
+
 def test_verify_video_carousel_rejects_wrong_count() -> None:
     builder = load_builder()
     try:

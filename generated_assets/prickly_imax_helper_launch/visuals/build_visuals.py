@@ -361,10 +361,10 @@ def cinematic_page(body: str, composition: str) -> str:
     .condition-focus{background:#090909;color:#f7f7f4}.condition-focus .copy{left:58px;right:58px;top:72px}.condition-focus .copy h1{font-size:67px;line-height:1.12;letter-spacing:-4.3px}.condition-focus .form-focus{position:absolute;left:58px;right:58px;top:320px;height:620px;overflow:hidden;background:#fff;border-top:1px solid #2c2c2c;border-bottom:1px solid #2c2c2c}.condition-focus .form-focus img{display:block;width:972px;height:auto;transform:translateY(-390px)}.condition-focus .condition-list{position:absolute;left:58px;right:58px;bottom:92px;display:grid;grid-template-columns:1fr 1fr;gap:0 42px;border-top:2px solid #353535}.condition-focus .condition-list div{padding:22px 0;border-bottom:1px solid #353535;font-size:32px;font-weight:820}.condition-focus .condition-list span{display:block;margin-bottom:7px;color:#92928d;font-size:19px;font-weight:700}.condition-focus .meta{display:none}
     .guide{background:#111}.guide .media{left:360px;width:720px;object-fit:cover;object-position:50% 10%;filter:saturate(.8)}.guide .shade{background:linear-gradient(90deg,rgba(0,0,0,.98) 0%,rgba(0,0,0,.92) 30%,rgba(0,0,0,.12) 78%)}.guide .copy{left:64px;right:430px;top:170px}.guide .copy h1{font-size:55px}.guide .copy p{font-size:23px;margin-top:40px}
     .compare{background:#020202}.compare .copy{left:58px;right:110px;top:54px}.compare .copy h1{font-size:53px;line-height:1.08;letter-spacing:-3.4px}.compare .copy p{position:absolute;top:1040px;margin:0;font-size:32px;line-height:1.32;max-width:900px}.compare-stack{position:absolute;left:48px;right:48px;top:210px;bottom:238px}.format-label{display:block;margin:0 0 14px;text-align:center;font-size:41px;line-height:1;font-weight:900;letter-spacing:-2.2px}.format-label.imax{margin-top:34px}.format-frame{display:block;width:100%;overflow:hidden;border:1px solid #868681;background:#050505}.format-frame.narrow{height:248px}.format-frame.tall{height:474px}.format-frame svg{display:block;width:100%;height:100%}.compare .meta{left:58px;bottom:34px;max-width:930px}
-    .flowstage{background:linear-gradient(150deg,#151515,#070707 70%)}.flowstage .ghost{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.24;filter:blur(4px) grayscale(.72)}.flowstage .stage-index{position:absolute;z-index:2;left:66px;top:96px;color:var(--red);font:800 24px/1 ui-monospace,monospace}.flowstage .copy{z-index:2;left:66px;right:66px;top:250px;text-shadow:0 2px 22px #000}.flowstage .copy h1{font-size:78px}.flowstage .copy p{font-size:34px;max-width:880px}.flowstage .rail{position:absolute;z-index:2;left:66px;right:66px;bottom:90px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.flowstage .rail i{height:5px;background:#333}.flowstage .rail i.on{background:var(--red)}
+    .monitor-process{background:#090909}.monitor-process .stage-index{position:absolute;left:66px;top:70px;color:var(--red);font:800 22px/1 ui-monospace,monospace}.monitor-process .copy{left:66px;right:66px;top:132px}.monitor-process .copy h1{font-size:70px;line-height:1.08;letter-spacing:-4.4px}.monitor-process .copy p{margin-top:17px;font-size:26px;color:#aaa}.monitor-process .diagnose{position:absolute;left:66px;right:66px;top:410px;border-top:1px solid #333;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.monitor-process .diagnose div{display:grid;grid-template-columns:310px 1fr;padding:24px 0;border-bottom:1px solid #252525}.monitor-process .diagnose span{color:#777;font-size:21px}.monitor-process .diagnose b{font-size:25px;font-weight:650}.monitor-process .diagnose div.focus span,.monitor-process .diagnose div.focus b{color:#f7f7f4}.monitor-process .diagnose div.focus{border-bottom-color:var(--red)}.monitor-process .rail{position:absolute;left:66px;right:66px;bottom:74px;display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.monitor-process .rail i{height:4px;background:#2f2f2f}.monitor-process .rail i.on{background:var(--red)}
     .outcome{background:#090909}.outcome .copy{top:185px}.outcome .copy h1{font-size:82px}.outcome .copy p{font-size:32px}.outcome-list{position:absolute;left:66px;right:66px;top:560px;display:grid;gap:20px}.outcome-list div{padding:22px 0;border-top:1px solid #353535;font-size:32px;color:#aaa}.outcome-list b{display:inline-block;width:58px;color:var(--red);font:800 22px ui-monospace,monospace}
     .note{background:#090909}.note .copy{left:74px;right:74px;top:240px}.note .copy h1{font-size:72px;line-height:1.22}.note .copy p{margin-top:150px;font-size:50px;line-height:1.38;color:#f1f1ec}.note .meta{bottom:72px;font-size:25px;color:#aaa}
-    :is(.compare,.evidence,.setup-scroll,.monitor,.condition-focus,.flowstage,.outcome,.note) .page-no{font-size:20px}:is(.compare,.evidence,.setup-scroll,.monitor,.flowstage,.outcome) .meta{font-size:18px}
+    :is(.compare,.evidence,.setup-scroll,.monitor,.condition-focus,.monitor-process,.outcome,.note) .page-no{font-size:20px}:is(.compare,.evidence,.setup-scroll,.monitor,.monitor-process,.outcome) .meta{font-size:18px}
     """
     return f'<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>{css}</style></head><body><main class="scene" data-composition="{html_module.escape(composition)}">{body}</main></body></html>'
 
@@ -390,47 +390,42 @@ def card_three_scene_htmls(evidence_png: Path, headline: str, page_total: int = 
     return pages
 
 
-def flow_stage_html(
-    *, number: int, index: int, title: str, detail: str, ghost: Path | None = None,
-    page_total: int = 6,
-) -> str:
-    ghost_html = f'<img class="ghost" src="{img_uri(ghost)}">' if ghost else ""
-    rail = "".join(f'<i class="{"on" if step <= index else ""}"></i>' for step in range(1, 5))
-    body = (
-        f'{ghost_html}<span class="stage-index">0{index} / 04</span>'
-        f'<span class="page-no">{number}/{page_total}</span>'
-        f'<section class="copy"><h1>{html_module.escape(title)}</h1>'
-        f'<p>{html_module.escape(detail)}</p></section><div class="rail">{rail}</div>'
-    )
-    return cinematic_page(body, f"card-{number}-stage-{index}").replace(
-        'class="scene"', 'class="scene flowstage"'
-    )
-
-
-def card_five_scene_htmls(setup_png: Path, monitor_png: Path) -> list[str]:
+def card_five_monitor_scene_htmls(states: list[dict[str, object]]) -> list[str]:
+    if len(states) != 5:
+        raise ValueError("card 5 requires five actual monitor samples")
     stages = [
-        ("조건 설정", "영화 · 극장 · 시간 · 붙어 있는 좌석", setup_png),
-        ("감시 시작", "새 날짜와 취소표를 로컬에서 확인", monitor_png),
-        ("연속 좌석 후보 발견", "설정한 인원수만큼 같은 행에 붙은 자리", None),
-        ("중복·관람권·잔액 검증", "조건이 하나라도 맞지 않으면 제출하지 않음", None),
-    ]
-    return [
-        flow_stage_html(number=5, index=index, title=title, detail=detail, ghost=ghost)
-        for index, (title, detail, ghost) in enumerate(stages, 1)
-    ]
-
-
-def card_seven_scene_htmls(_monitor_png: Path) -> list[str]:
-    stages = [
-        ("조건 일치", "설정한 회차와 연속 좌석 후보 확인", None),
-        ("안전검증 통과", "중복 예매 없음 · 관람권 수량 일치 · 잔액 0원", None),
-        ("최종 제출 1회", "결과가 불명확하면 자동으로 다시 제출하지 않음", None),
-        ("결과 이메일 전송", "완료 · 결과 확인 필요 · 안전 차단 상태를 알림", None),
+        ("감시 시작", "로컬 모니터가 켜진 상태", {"status"}),
+        ("열린 날짜·회차 확인", "현재와 새로 열리는 예매 범위를 확인", {"open_dates", "eligible_shows"}),
+        ("연속 좌석 감시", "빠른 대상과 새 날짜 탐색을 번갈아 확인", {"last_scan_lane"}),
+        ("후보가 없으면 계속 순환", "조건에 맞는 붙어 있는 좌석을 기다리는 중", {"match"}),
+        ("좌석 발견 시 안전검증 → 한 번 제출 → 이메일 알림", "실제 후보가 없으면 제출 단계로 가지 않음", set()),
     ]
     pages: list[str] = []
-    for index, (title, detail, ghost) in enumerate(stages, 1):
+    for index, (state, (title, detail, focused)) in enumerate(zip(states, stages), 1):
+        rows = "".join(
+            '<div class="{}"><span>{}</span><b>{}</b></div>'.format(
+                "focus" if key in focused else "",
+                html_module.escape(key),
+                html_module.escape(json.dumps(state.get(key), ensure_ascii=False)),
+            )
+            for key in (
+                "status", "open_dates", "eligible_shows", "last_scan_lane", "match", "errors"
+            )
+        )
+        rail = "".join(
+            f'<i class="{"on" if step <= index else ""}"></i>' for step in range(1, 6)
+        )
+        body = (
+            f'<span class="stage-index">0{index} / 05</span>'
+            '<span class="page-no">05/06</span>'
+            f'<section class="copy"><h1>{html_module.escape(title)}</h1>'
+            f'<p>{html_module.escape(detail)}</p></section>'
+            f'<section class="diagnose">{rows}</section><div class="rail">{rail}</div>'
+        )
         pages.append(
-            flow_stage_html(number=7, index=index, title=title, detail=detail, ghost=ghost)
+            cinematic_page(body, f"monitoring-process-stage-{index}").replace(
+                'class="scene"', 'class="scene monitor-process"'
+            )
         )
     return pages
 
@@ -533,14 +528,15 @@ def render_video_carousel_covers(cards: list[dict[str, object]]) -> list[Path]:
         html.write_text(source, encoding="utf-8")
         capture(html, png, 1080, 1350)
         paths.append(png)
-    for idx, source in enumerate(card_five_scene_htmls(setup_png, monitor_png), 1):
+    command = Path("/Users/woojinyoung/.local/bin/prickly-imax")
+    if not command.is_file():
+        raise FileNotFoundError("local prickly-imax diagnose command is unavailable")
+    states = sample_monitor_states(
+        lambda: read_redacted_monitor_state(command), count=5, interval_seconds=0.4
+    )
+    for idx, source in enumerate(card_five_monitor_scene_htmls(states), 1):
         html = HTML / f"video-carousel-05-stage-{idx}.html"
         png = SCENE_FRAMES / f"card05-{idx}.png"
-        html.write_text(source, encoding="utf-8")
-        capture(html, png, 1080, 1350)
-    for idx, source in enumerate(card_seven_scene_htmls(monitor_png), 1):
-        html = HTML / f"video-carousel-07-stage-{idx}.html"
-        png = SCENE_FRAMES / f"card07-{idx}.png"
         html.write_text(source, encoding="utf-8")
         capture(html, png, 1080, 1350)
     contact_sheet(paths, VIDEO_CAROUSEL / "contact-sheet.png", 4, (216, 270))
@@ -590,6 +586,38 @@ def render_card_four_scroll_video(
             )
 
 
+def render_scene_sequence(
+    frames: list[Path],
+    output: Path,
+    *,
+    duration: int,
+    fps: int = 30,
+) -> None:
+    if len(frames) < 2:
+        raise ValueError("scene sequence requires at least two frames")
+    inputs: list[str] = []
+    for frame in frames:
+        inputs.extend(("-loop", "1", "-t", "1.78", "-i", str(frame)))
+    offsets = (1.42, 3.02, 4.62, 6.22)
+    transitions: list[str] = []
+    previous = "[0:v]"
+    for index in range(1, len(frames)):
+        output_label = "[v]" if index + 1 == len(frames) else f"[x{index}]"
+        suffix = f",fps={fps},format=yuv420p" if output_label == "[v]" else ""
+        transitions.append(
+            f"{previous}[{index}:v]xfade=transition=fade:duration=0.18:"
+            f"offset={offsets[index - 1]:.2f}{suffix}{output_label}"
+        )
+        previous = output_label
+    run(
+        FFMPEG, "-loglevel", "error", "-y", *inputs,
+        "-filter_complex", ";".join(transitions),
+        "-map", "[v]", "-t", str(duration), "-an", "-c:v", "libx264",
+        "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart", str(output),
+    )
+
+
 def render_video_carousel_cards(
     cards: list[dict[str, object]],
     covers: list[Path],
@@ -622,23 +650,10 @@ def render_video_carousel_cards(
             )
             outputs.append(output)
             continue
-        frames = [SCENE_FRAMES / f"card{number:02d}-{idx}.png" for idx in range(1, 5)]
+        frames = [SCENE_FRAMES / f"card{number:02d}-{idx}.png" for idx in range(1, 6)]
         if not all(frame.is_file() for frame in frames):
             raise FileNotFoundError(f"card {number} scene frames are missing")
-        run(
-            FFMPEG, "-loglevel", "error", "-y",
-            "-loop", "1", "-t", "2.18", "-i", str(frames[0]),
-            "-loop", "1", "-t", "2.18", "-i", str(frames[1]),
-            "-loop", "1", "-t", "2.18", "-i", str(frames[2]),
-            "-loop", "1", "-t", "2.18", "-i", str(frames[3]),
-            "-filter_complex",
-            "[0:v][1:v]xfade=transition=fade:duration=0.18:offset=2.0[x1];"
-            "[x1][2:v]xfade=transition=fade:duration=0.18:offset=4.0[x2];"
-            "[x2][3:v]xfade=transition=fade:duration=0.18:offset=6.0,"
-            "fps=30,format=yuv420p[v]",
-            "-map", "[v]", "-t", str(duration), "-an", "-c:v", "libx264",
-            "-preset", "medium", "-crf", "18", "-movflags", "+faststart", str(output),
-        )
+        render_scene_sequence(frames, output, duration=duration)
         outputs.append(output)
     return outputs
 
