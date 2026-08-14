@@ -276,6 +276,60 @@ def render_video_carousel_covers(cards: list[dict[str, object]]) -> list[Path]:
     return paths
 
 
+def render_video_carousel_cards(
+    cards: list[dict[str, object]],
+    covers: list[Path],
+) -> list[Path]:
+    if len(cards) != len(covers):
+        raise ValueError("every video card requires one cover")
+    VIDEO_CARDS.mkdir(parents=True, exist_ok=True)
+    outputs: list[Path] = []
+    for card, cover in zip(cards, covers):
+        number = int(card["number"])
+        duration = int(card["duration"])
+        frame_count = duration * 30
+        motion = str(card["motion"])
+        if motion == "ken-burns":
+            zoom = "min(zoom+0.00014,1.025)"
+            x = "iw/2-(iw/zoom/2)"
+            y = "ih/2-(ih/zoom/2)"
+        elif motion == "proof-pan":
+            zoom = "1.010"
+            x = "iw/2-(iw/zoom/2)"
+            y = f"(ih-ih/zoom)*on/{frame_count}"
+        else:
+            zoom = "min(zoom+0.000035,1.007)"
+            x = "iw/2-(iw/zoom/2)"
+            y = "ih/2-(ih/zoom/2)"
+        output = VIDEO_CARDS / f"{number:02d}.mp4"
+        run(
+            FFMPEG,
+            "-loglevel",
+            "error",
+            "-y",
+            "-loop",
+            "1",
+            "-i",
+            str(cover),
+            "-t",
+            str(duration),
+            "-vf",
+            f"zoompan=z='{zoom}':x='{x}':y='{y}':d={frame_count}:s=1080x1350:fps=30,format=yuv420p",
+            "-an",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "medium",
+            "-crf",
+            "18",
+            "-movflags",
+            "+faststart",
+            str(output),
+        )
+        outputs.append(output)
+    return outputs
+
+
 def carousel_slides(setup_png: Path) -> list[str]:
     bg = img_uri(ASSETS / "cinema-background.png")
     common = """
@@ -467,7 +521,13 @@ def main() -> None:
     if args.video_carousel:
         cards = load_carousel_manifest()
         covers = render_video_carousel_covers(cards)
-        print(json.dumps({"video_carousel_covers": len(covers)}, ensure_ascii=False))
+        videos = render_video_carousel_cards(cards, covers)
+        print(
+            json.dumps(
+                {"video_carousel_covers": len(covers), "video_carousel_cards": len(videos)},
+                ensure_ascii=False,
+            )
+        )
         return
     build_legacy_assets()
 
