@@ -11,7 +11,7 @@ from pathlib import Path
 VISUALS = Path(__file__).resolve().parents[1]
 MANIFEST = VISUALS / "carousel_manifest.json"
 OUTPUT = VISUALS / "video-carousel"
-BUILD_HTML = VISUALS / "build" / "html"
+BUILD_SCRIPT = VISUALS / "build_visuals.py"
 BANNED_COPY = "Prickly AI는 사람이 반복하던 일을 실제로 작동하는 자동화로 바꾼다."
 
 
@@ -65,7 +65,7 @@ class VideoCarouselManifestTests(unittest.TestCase):
 
 class VideoCarouselOutputTests(unittest.TestCase):
     def test_condition_slide_uses_the_shared_dark_product_background(self) -> None:
-        source = (BUILD_HTML / "video-carousel-06.html").read_text(encoding="utf-8")
+        source = BUILD_SCRIPT.read_text(encoding="utf-8")
         self.assertIn(".condition-focus{background:#090909;color:#f7f7f4}", source)
         self.assertNotIn(".condition-focus{background:#f2f0eb", source)
 
