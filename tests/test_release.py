@@ -58,6 +58,19 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn("PLIST_PATH=${APP_HOME}/ai.prickly.imax-helper.plist", installer)
         self.assertIn("dry-run 설치가 완료됐습니다", installer)
 
+    def test_user_and_plugin_docs_disclose_midnight_only_discovery(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        runtime_contract = (
+            ROOT
+            / "plugins/prickly-imax-helper/skills/prickly-imax-booking/references/runtime-contract.md"
+        ).read_text(encoding="utf-8")
+
+        for document in (readme, runtime_contract):
+            self.assertIn("startup", document)
+            self.assertIn("Korea Standard Time midnight", document)
+            self.assertIn("no daytime schedule-discovery requests", document)
+            self.assertIn("serially", document)
+
     def test_install_and_uninstall_restrict_app_home_to_user_home(self):
         for name in ("Install.command", "Uninstall.command"):
             script = (ROOT / "scripts" / name).read_text(encoding="utf-8")
