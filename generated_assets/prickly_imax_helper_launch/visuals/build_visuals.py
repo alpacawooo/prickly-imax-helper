@@ -278,6 +278,27 @@ def cinematic_page(body: str, composition: str) -> str:
     return f'<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>{css}</style></head><body><main class="scene" data-composition="{html_module.escape(composition)}">{body}</main></body></html>'
 
 
+def card_three_scene_htmls(evidence_png: Path, headline: str) -> list[str]:
+    source = img_uri(evidence_png)
+    safe_headline = html_module.escape(headline).replace("\n", "<br>")
+    stages = [
+        ("top", "1석/624석 회차 발견", ""),
+        ("bottom", "좌석표에는 외딴 한 자리", ""),
+        ("bottom", safe_headline, "final"),
+    ]
+    pages: list[str] = []
+    for position, label, state in stages:
+        final = state == "final"
+        body = (
+            f'<img class="media" src="{source}" style="object-position:50% {"18%" if position == "top" else "82%"}">'
+            f'<div class="shade" style="opacity:{1 if final else .35}"></div>'
+            '<span class="page-no">3/8</span>'
+            f'<section class="copy"><h1 style="font-size:{58 if final else 40}px">{label}</h1></section>'
+        )
+        pages.append(cinematic_page(body, "single-seat-evidence-stage").replace('class="scene"', 'class="scene evidence"'))
+    return pages
+
+
 def card_seven_scene_htmls(setup_png: Path, monitor_png: Path, guide_png: Path) -> list[str]:
     stages = [
         (setup_png, "설정 완료", "영화 · 극장 · 시간 · 붙어 있는 좌석"),
@@ -375,6 +396,12 @@ def render_video_carousel_covers(cards: list[dict[str, object]]) -> list[Path]:
         html.write_text(source, encoding="utf-8")
         capture(html, png, 1080, 1350)
         paths.append(png)
+    evidence = ROOT / str(cards[2]["source"])
+    for idx, source in enumerate(card_three_scene_htmls(evidence, str(cards[2]["headline"])), 1):
+        html = HTML / f"video-carousel-03-stage-{idx}.html"
+        png = SCENE_FRAMES / f"card03-{idx}.png"
+        html.write_text(source, encoding="utf-8")
+        capture(html, png, 1080, 1350)
     for idx, source in enumerate(card_seven_scene_htmls(setup_png, monitor_png, guide_png), 1):
         html = HTML / f"video-carousel-07-stage-{idx}.html"
         png = SCENE_FRAMES / f"card07-{idx}.png"
@@ -400,6 +427,23 @@ def render_video_carousel_cards(
         recipe = motion_recipes()[motion]
         max_scale = float(recipe["max_scale"])
         output = VIDEO_CARDS / f"{number:02d}.mp4"
+        if motion == "evidence-pan":
+            evidence = ROOT / str(card["source"])
+            run(
+                FFMPEG, "-loglevel", "error", "-y",
+                "-loop", "1", "-t", "5.22", "-i", str(evidence),
+                "-loop", "1", "-t", "2.00", "-i", str(cover),
+                "-filter_complex",
+                "[0:v]scale=1242:1656,crop=1080:1350:0:"
+                "'if(lt(n,60),0,min((n-60)*3.4,306))',fps=30[pan];"
+                "[1:v]fps=30[claim];"
+                "[pan][claim]xfade=transition=fade:duration=0.22:offset=5.0,"
+                "format=yuv420p[v]",
+                "-map", "[v]", "-t", str(duration), "-an", "-c:v", "libx264",
+                "-preset", "medium", "-crf", "18", "-movflags", "+faststart", str(output),
+            )
+            outputs.append(output)
+            continue
         if motion == "three-scene-sequence":
             frames = [SCENE_FRAMES / f"card07-{idx}.png" for idx in range(1, 4)]
             if not all(frame.is_file() for frame in frames):

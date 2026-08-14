@@ -73,6 +73,16 @@ def test_card_seven_has_three_real_scene_states(tmp_path: Path) -> None:
     assert "설치 안내" in html[2]
 
 
+def test_card_three_stages_evidence_before_final_claim(tmp_path: Path) -> None:
+    builder = load_builder()
+    html = builder.card_three_scene_htmls(tmp_path / "evidence.png", "최종 문구")
+    assert len(html) == 3
+    assert "1석/624석" in html[0]
+    assert "붙어 있는 2석" not in html[0]
+    assert "외딴 한 자리" in html[1]
+    assert "최종 문구" in html[2]
+
+
 def test_redaction_blocks_private_fields() -> None:
     builder = load_builder()
     sample = "email=a@example.com cookie=secret voucher=1234 profile=/Users/name/private"
