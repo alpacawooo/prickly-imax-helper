@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Odyssey Still Cleanup Design</title>
+  <style>
+    :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Pretendard", sans-serif; }
+    body { margin: 0; background: #090909; color: #f5f5f5; }
+    main { width: min(1180px, calc(100% - 40px)); margin: 48px auto 80px; }
+    h1 { margin: 0 0 10px; font-size: clamp(32px, 5vw, 64px); letter-spacing: -.05em; }
+    .lead { color: #aaa; font-size: 18px; margin-bottom: 36px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+    article { background: #151515; border: 1px solid #292929; border-radius: 22px; overflow: hidden; }
+    img { width: 100%; aspect-ratio: 4/5; object-fit: cover; display: block; }
+    .copy { padding: 22px; }
+    h2 { margin: 0 0 8px; font-size: 24px; }
+    .tag { color: #ffca5c; font-weight: 700; }
+    ul { padding-left: 20px; color: #c9c9c9; line-height: 1.7; }
+    .rules { margin-top: 28px; padding: 24px; border-radius: 20px; background: #111; border-left: 4px solid #ffca5c; }
+    .rules strong { color: #ffca5c; }
+    @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>THE ODYSSEY<br>스틸 정리 기준</h1>
+    <p class="lead">영화 장면은 그대로 유지하고, 캡처 과정에서 생긴 UI만 제거한다.</p>
+    <section class="grid">
+      <article>
+        <img src="file:///var/folders/gj/3gcyw6750fl36wryx903jlcc0000gn/T/codex-clipboard-b47f13ec-ddb2-4c53-8d2b-c44ee5571723.png" alt="검은 투구 정면 스틸">
+        <div class="copy">
+          <h2>Image 01 · 보조 장면</h2>
+          <div class="tag">문제 제기 / 전환 슬라이드</div>
+          <ul><li>정면 얼굴과 갑옷 디테일 유지</li><li>좌우 화살표·하단 점·외곽 웹 UI 제거</li><li>잘린 깃털과 인물 형태를 임의로 재해석하지 않음</li></ul>
+        </div>
+      </article>
+      <article>
+        <img src="file:///var/folders/gj/3gcyw6750fl36wryx903jlcc0000gn/T/codex-clipboard-23f7c33d-6c05-4c08-b621-727ef646fcb1.png" alt="주황 배경 옆모습 스틸">
+        <div class="copy">
+          <h2>Image 02 · 메인 장면</h2>
+          <div class="tag">표지 / 가치 제안 슬라이드</div>
+          <ul><li>검정 갑옷과 주황 배경의 대비 유지</li><li>좌우 화살표·하단 점·외곽 웹 UI 제거</li><li>인물의 윤곽·조명·메달·갑옷 질감 보존</li></ul>
+        </div>
+      </article>
+    </section>
+    <section class="rules">
+      <strong>완료 기준</strong>
+      <ul><li>최종 출력 1080×1350 JPG 또는 PNG</li><li>새 텍스트·로고·워터마크 추가 금지</li><li>원본 인물, 갑옷, 색감, 광원 변경 금지</li><li>제거 흔적과 반복 무늬가 보이지 않을 것</li></ul>
+    </section>
+  </main>
+</body>
+</html>
