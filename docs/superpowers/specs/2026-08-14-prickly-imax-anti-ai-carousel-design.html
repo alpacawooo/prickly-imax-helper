@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Prickly IMAX · Human-edited carousel direction</title>
+  <style>
+    :root{--paper:#ececeb;--ink:#111;--muted:#676767;--red:#e43c35;--line:#cfcfcd}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--paper);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+    header,main{width:min(1510px,94vw);margin:auto}
+    header{padding:72px 0 48px;border-bottom:1px solid var(--line)}
+    h1{max-width:1050px;margin:0;font-size:clamp(48px,6vw,92px);line-height:1;letter-spacing:-.065em}
+    header p{max-width:820px;margin:30px 0 0;font-size:18px;line-height:1.7;color:#4d4d4d}
+    .keep{margin-top:36px;display:flex;gap:26px;flex-wrap:wrap;font-size:13px;font-weight:750}
+    .keep span:before{content:"";display:inline-block;width:18px;height:2px;margin:0 9px 4px 0;background:var(--red)}
+    main{padding:50px 0 100px}
+    .board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}
+    .slide{position:relative;aspect-ratio:4/5;overflow:hidden;background:#0b0b0c;color:#f5f5f2;border:1px solid #bfc0c0}
+    .slide img{width:100%;height:100%;display:block;object-fit:cover}
+    .n{position:absolute;z-index:6;right:17px;top:15px;font:650 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:rgba(255,255,255,.66)}
+    .copy{position:absolute;z-index:5}
+    .copy h2{margin:0;font-size:clamp(20px,1.8vw,30px);line-height:1.12;letter-spacing:-.055em}
+    .copy p{margin:11px 0 0;font-size:11px;line-height:1.5;color:rgba(255,255,255,.72)}
+    .red{color:var(--red)}
+    .s1 img{filter:saturate(.84) contrast(1.05);object-position:center 28%}
+    .s1:after{content:"";position:absolute;inset:35% 0 0;background:linear-gradient(transparent,rgba(0,0,0,.92))}
+    .s1 .copy{left:24px;right:20px;bottom:28px}.s1 .copy h2{font-size:31px}
+    .s2 img{filter:saturate(.58) contrast(1.08);object-position:center 28%}
+    .s2:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.75),transparent 73%)}
+    .s2 .copy{left:24px;top:46px;width:68%}.sold{display:inline-block;margin-top:18px;padding-top:8px;border-top:3px solid var(--red);font-size:11px;font-weight:850}
+    .s3{background:#f3f3f1;color:#111}.s3 .recording{position:absolute;inset:26px 18px 150px;background:#151515;overflow:hidden}
+    .refresh-line{height:26%;border-bottom:1px solid #393939;display:flex;align-items:center;padding:0 18px;color:#ddd;font-size:11px}.refresh-line:nth-child(2){opacity:.55}.refresh-line:nth-child(3){opacity:.22}
+    .s3 .copy{left:22px;right:22px;bottom:25px}.s3 .copy p{color:#696969}
+    .s4,.s5,.s6,.s7{background:#fff;color:#111}
+    .screen{position:absolute;inset:0;background:#fff}.screen img{object-position:top center;filter:none}
+    .s4 .screen{left:-20%;right:-20%;top:0;bottom:0}.s4:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 49%,rgba(255,255,255,.96) 72%)}
+    .s4 .copy{left:23px;right:23px;bottom:27px}.s4 .copy p,.s5 .copy p,.s6 .copy p,.s7 .copy p{color:#696969}
+    .note{position:absolute;z-index:7;font-size:10px;font-weight:750;padding-bottom:4px;border-bottom:1px solid var(--red);white-space:nowrap}
+    .s4 .a{left:24px;top:90px}.s4 .b{right:22px;top:181px}.s4 .c{left:27px;top:280px}
+    .s5 .screen{left:-6%;right:-6%;top:-5%;bottom:-9%;filter:saturate(.8)}
+    .s5:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(0,0,0,.82))}
+    .s5 .copy{left:23px;right:23px;bottom:29px;color:#fff}.s5 .copy p{color:rgba(255,255,255,.72)}
+    .s6 .screen{left:-35%;right:-5%;top:-3%;bottom:-5%}.s6:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent 36%,rgba(255,255,255,.92) 72%)}
+    .s6 .copy{right:23px;top:92px;width:46%}.s6 .rule{margin:16px 0;padding:8px 0;border-top:1px solid #bbb;font-size:10px;line-height:1.5}
+    .s7 .screen{left:-5%;right:-5%;top:0;bottom:0}.s7:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.92) 75%)}
+    .s7 .copy{left:23px;right:23px;bottom:26px}
+    .s8{background:#080808}.s8 .copy{left:25px;right:25px;top:98px}.s8 .copy h2{font-size:31px;line-height:1.18}.s8 .word{position:absolute;left:25px;bottom:55px;font-size:12px;color:#aaa}.s8 .word b{display:block;margin-top:8px;color:#fff;font-size:21px}
+    .section-title{margin:58px 0 24px;font-size:25px;letter-spacing:-.04em}
+    .checks{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line)}
+    .checks div{background:#f5f5f3;padding:24px}.checks b{font-size:15px}.checks p{margin:10px 0 0;color:#5d5d5d;font-size:13px;line-height:1.65}
+    footer{padding:28px 3vw;border-top:1px solid var(--line);font-size:11px;color:#6b6b6b;display:flex;justify-content:space-between}
+    @media(max-width:980px){.board{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:560px){.board,.checks{grid-template-columns:1fr}header{padding-top:48px}}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>같은 내용을 유지하고,<br>조립식 구도만 없앤다.</h1>
+    <p>기존 8장의 문제 제기, 실제 Helper 데모, 안전한 가치 제안과 댓글 CTA는 그대로다. 바뀌는 것은 장면별 구도, 실제 화면의 비중, 자막의 위치와 움직임뿐이다.</p>
+    <div class="keep"><span>8장 유지</span><span>문구와 사실관계 유지</span><span>Odyssey 스틸 유지</span><span>실제 제품 화면 유지</span></div>
+  </header>
+  <main>
+    <section class="board">
+      <article class="slide s1"><img src="../../../content/assets/odyssey-clean/odyssey-agamemnon-fullbody-1080x1350.jpg" alt="Odyssey 갑옷 스틸"><span class="n">01 / 08</span><div class="copy"><h2>용아맥 표를 구하려고<br>며칠째 새로고침하고 있다면.</h2><p>나 역시 같은 문제를 겪었다.</p></div></article>
+      <article class="slide s2"><img src="../../../content/assets/odyssey-clean/odyssey-giants-forest-1080x1350.jpg" alt="안개 속 병사 스틸"><span class="n">02 / 08</span><div class="copy"><h2>오디세이는 보고 싶은데<br>접속할 때마다 전석 매진.</h2><div class="sold">중고 거래에는 10만 원 넘는 표까지 올라왔다.</div></div></article>
+      <article class="slide s3"><span class="n" style="color:#777">03 / 08</span><div class="recording"><div class="refresh-line">CGV 좌석 확인</div><div class="refresh-line">자리를 발견하고 들어가면 이미 끝</div><div class="refresh-line">다시 새로고침</div></div><div class="copy"><h2>이걸 하루 종일<br>반복할 수는 없었다.</h2><p>실제 화면 녹화 사용. 가짜 브라우저 목업은 만들지 않는다.</p></div></article>
+      <article class="slide s4"><div class="screen"><img src="../../../generated_assets/prickly_imax_helper_launch/visuals/assets/helper-setup-preview.png" alt="Helper 설정 화면"></div><span class="n" style="color:#777">04 / 08</span><span class="note a">영화</span><span class="note b">시간</span><span class="note c">붙어 있는 좌석</span><div class="copy"><h2>그래서 직접 만들었다.</h2><p>실제 설정 화면 위에 필요한 표시만 남긴다.</p></div></article>
+      <article class="slide s5"><div class="screen"><img src="../../../generated_assets/prickly_imax_helper_launch/visuals/assets/helper-setup-preview.png" alt="감시 화면 대체 이미지"></div><span class="n">05 / 08</span><div class="copy"><h2>조건을 저장하면<br>새 날짜와 취소표를 확인한다.</h2><p>최종 출력에는 개인정보를 제거한 실제 감시 녹화를 사용한다.</p></div></article>
+      <article class="slide s6"><div class="screen"><img src="../../../generated_assets/prickly_imax_helper_launch/visuals/assets/helper-setup-preview.png" alt="조건 설정 화면"></div><span class="n" style="color:#777">06 / 08</span><div class="copy"><h2>아무 좌석이나<br>선택하지 않는다.</h2><div class="rule">같은 행 연속 2석<br>원하는 열 · 중앙 우선<br>상영 시작 3시간 전</div><p>스크롤과 한 번의 강조로 보여준다.</p></div></article>
+      <article class="slide s7"><div class="screen"><img src="../../../generated_assets/prickly_imax_helper_launch/visuals/assets/install-guide-preview.png" alt="설치 안내 화면"></div><span class="n" style="color:#777">07 / 08</span><div class="copy"><h2>이제 CGV 화면을<br>계속 지켜볼 필요가 없다.</h2><p>설정 완료 → 감시 중 → 설치 안내를 한 영상으로 연결한다.</p></div></article>
+      <article class="slide s8"><span class="n">08 / 08</span><div class="copy"><h2>나처럼 용아맥 새로고침에<br>지친 사람이 있다면</h2></div><div class="word">댓글에<b>아이맥스</b></div></article>
+    </section>
+
+    <h2 class="section-title">이번 적용에서 제거하는 것</h2>
+    <section class="checks">
+      <div><b>반복 템플릿</b><p>모든 장의 이미지와 설명을 같은 비율로 나누지 않는다. 장면의 목적에 따라 전체 화면, 좌우 분할, 비대칭 여백을 선택한다.</p></div>
+      <div><b>가짜 제품 표현</b><p>브라우저, 터미널, 휴대폰을 새로 그리지 않는다. 실제 설정·감시·Notion 화면만 사용한다.</p></div>
+      <div><b>장식성 UI</b><p>pill, badge, 기능 카드, 반복 아이콘과 불필요한 영문 kicker를 제거한다.</p></div>
+      <div><b>장식성 모션</b><p>느린 확대, 실제 커서 이동, 필요한 영역 강조만 사용한다. 모션이 없어도 메시지가 남아야 한다.</p></div>
+    </section>
+  </main>
+  <footer><span>PRICKLY IMAX HELPER · ANTI-AI VISUAL SYSTEM</span><span>DESIGN REVIEW</span></footer>
+</body>
+</html>
