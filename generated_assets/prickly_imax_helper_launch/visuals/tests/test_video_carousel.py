@@ -89,37 +89,34 @@ class VideoCarouselOutputTests(unittest.TestCase):
         self.assertIn(".format-frame.narrow{height:248px}", source)
         self.assertIn(".format-frame.tall{height:474px}", source)
 
-    def test_cards_two_through_eight_use_twenty_percent_larger_type(self) -> None:
+    def test_cards_two_through_six_use_large_mobile_type(self) -> None:
         source = BUILD_SCRIPT.read_text(encoding="utf-8")
         expected_rules = (
             ".compare .copy h1{font-size:53px",
             ".evidence .copy h1{font-size:70px}",
             ".setup-scroll .copy h1{font-size:62px",
-            ".flowstage .copy h1{font-size:78px}",
-            ".condition-focus .copy h1{font-size:67px",
-            ".outcome .copy h1{font-size:82px}",
+            ".monitor-process .copy h1{font-size:70px",
             ".note .copy h1{font-size:72px",
         )
         for rule in expected_rules:
             self.assertIn(rule, source)
 
-    def test_condition_slide_uses_the_shared_dark_product_background(self) -> None:
+    def test_monitoring_process_uses_the_shared_dark_product_background(self) -> None:
         source = BUILD_SCRIPT.read_text(encoding="utf-8")
-        self.assertIn(".condition-focus{background:#090909;color:#f7f7f4}", source)
-        self.assertNotIn(".condition-focus{background:#f2f0eb", source)
+        self.assertIn(".monitor-process{background:#090909}", source)
 
-    def test_eight_png_covers_are_exact_instagram_dimensions(self) -> None:
+    def test_six_png_covers_are_exact_instagram_dimensions(self) -> None:
         covers = sorted((OUTPUT / "covers").glob("*.png"))
-        self.assertEqual(len(covers), 8)
+        self.assertEqual(len(covers), 6)
         for cover in covers:
             self.assertEqual(png_size(cover), (1080, 1350), cover)
 
-    def test_publishable_sequence_has_five_pngs_and_three_mp4s(self) -> None:
+    def test_publishable_sequence_has_four_pngs_and_two_mp4s(self) -> None:
         cards = self.load_cards()
         media = sorted((OUTPUT / "cards").glob("*"))
         self.assertEqual(
             [path.name for path in media],
-            ["01.png", "02.png", "03.png", "04.mp4", "05.mp4", "06.png", "07.mp4", "08.png"],
+            ["01.png", "02.png", "03.png", "04.mp4", "05.mp4", "06.png"],
         )
         for image in [path for path in media if path.suffix == ".png"]:
             self.assertEqual(png_size(image), (1080, 1350), image)
@@ -153,8 +150,12 @@ class VideoCarouselOutputTests(unittest.TestCase):
         archive = VISUALS / "prickly-imax-helper-video-carousel.zip"
         with zipfile.ZipFile(archive) as bundle:
             names = bundle.namelist()
-        self.assertEqual(sum(name.startswith("cards/") and name.endswith(".mp4") for name in names), 3)
-        self.assertEqual(sum(name.startswith("cards/") and name.endswith(".png") for name in names), 5)
+        card_names = sorted(name for name in names if name.startswith("cards/") and name != "cards/")
+        self.assertEqual(
+            card_names,
+            ["cards/01.png", "cards/02.png", "cards/03.png", "cards/04.mp4", "cards/05.mp4", "cards/06.png"],
+        )
+        self.assertFalse(any(name.startswith("cards/07.") or name.startswith("cards/08.") for name in names))
         self.assertEqual(sum(name.startswith("covers/") for name in names), 0)
         self.assertNotIn("ScreenRecording_08-14-2026 17-39-23_1.MP4", names)
 

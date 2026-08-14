@@ -513,6 +513,10 @@ def video_carousel_covers(
 def render_video_carousel_covers(cards: list[dict[str, object]]) -> list[Path]:
     for directory in (ASSETS, BUILD, HTML, SCENE_FRAMES, VIDEO_CAROUSEL, VIDEO_COVERS, VIDEO_CARDS):
         directory.mkdir(parents=True, exist_ok=True)
+    for stale in VIDEO_COVERS.glob("*.png"):
+        stale.unlink()
+    for stale in SCENE_FRAMES.glob("card*.png"):
+        stale.unlink()
     setup_png = ASSETS / "helper-setup-preview.png"
     if not setup_png.is_file():
         setup_png = setup_preview()
@@ -719,44 +723,44 @@ def package_video_carousel(
     covers: list[Path],
     media: list[Path],
 ) -> Path:
-    if len(cards) != 8 or len(covers) != 8 or len(media) != 8:
-        raise ValueError("publishable package requires eight ordered media files and eight review covers")
+    if len(cards) != 6 or len(covers) != 6 or len(media) != 6:
+        raise ValueError("publishable package requires six ordered media files and six review covers")
     contact = VIDEO_CAROUSEL / "contact-sheet.png"
     checksummed = [*covers, *media, contact]
     sums = "".join(f"{sha256(path)}  {path.relative_to(VIDEO_CAROUSEL)}\n" for path in checksummed)
     (VIDEO_CAROUSEL / "SHA256SUMS").write_text(sums, encoding="utf-8")
     readme = """# Prickly IMAX Helper 혼합 캐러셀
 
-- 업로드 순서: `01.png` · `02.png` · `03.png` · `04.mp4` · `05.mp4` · `06.png` · `07.mp4` · `08.png`
-- PNG 5개와 MP4 3개는 모두 1080×1350입니다.
+- 업로드 순서: `01.png` · `02.png` · `03.png` · `04.mp4` · `05.mp4` · `06.png`
+- PNG 4개와 MP4 2개는 모두 1080×1350입니다.
 - Card 4는 실제 설정 화면을 빠르게 아래로 스크롤하는 3초 영상입니다.
-- Card 5와 Card 7은 H.264, yuv420p, 30fps, 무음, 각 8초입니다.
+- Card 5는 실제 로컬 `diagnose` 상태를 연결한 H.264, yuv420p, 30fps, 무음, 8초 영상입니다.
 - 댓글 키워드: `아이맥스`
 - 음악은 인스타그램 게시 단계에서 별도로 추가하세요.
-- Card 7은 Prickly 결과 흐름이며 CGV 모바일티켓·예매번호·완료 거래 화면을 만들지 않습니다.
+- Card 5는 실제 좌석 후보를 만들지 않고 현재 `match:null` 상태와 후보 발견 뒤의 안전 절차만 설명합니다.
 
 체크섬 확인: `shasum -a 256 -c SHA256SUMS`
 """
     (VIDEO_CAROUSEL / "README.md").write_text(readme, encoding="utf-8")
     qa = """# 혼합 캐러셀 최종 QA
 
-- 게시용 PNG: 5개
-- 게시용 MP4: 3개 (Card 4, Card 5, Card 7)
-- 검수용 PNG 표지: 8개
+- 게시용 PNG: 4개
+- 게시용 MP4: 2개 (Card 4, Card 5)
+- 검수용 PNG 표지: 6개
 - 해상도: 전부 1080×1350
-- 비디오: H.264 · yuv420p · 30fps · 무음 · Card 4는 3초, Card 5·7은 8초
+- 비디오: H.264 · yuv420p · 30fps · 무음 · Card 4는 3초, Card 5는 8초
 - 오디세이 스틸: 사용자 사용 허용 게시물의 UI 없는 원본 2장
 - Card 2: 사용자 제공 The Direct 비교 자료 · 워터마크 유지 · IMAX 70mm와 용산 IMAX LASER 2D 형식 차이 표기
 - Card 3: 사용자 제공 실제 CGV 한 자리 화면, `연속 2석 없음` 범위로만 표현
 - 제품 설정 화면: 실제 로컬 Helper UI를 오프라인 렌더링
 - Card 4: 실제 설정 화면을 한눈에 이해하도록 위에서 아래로 연속 스크롤
 - 감시 화면: 개인정보를 제외한 실제 로컬 diagnose 값
-- Card 5: 조건 설정부터 안전검증까지의 작동 과정
-- Card 6: 실제 설정 화면 중 좌석 조건을 크게 보여주는 필드 중심 구도
-- Card 7: 조건 일치부터 결과 이메일까지의 제품 흐름
+- Card 5: 실제 로컬 `armed` 상태에서 날짜·회차·감시 큐·`match:null`을 보여주는 작동 과정
+- Card 6: 댓글 키워드를 안내하는 CTA
 - 반복 템플릿·가짜 브라우저·가짜 터미널·휴대폰 목업: 없음
 - 벤치마킹 계정 화면 녹화: 최종 결과물에서 제외
 - CGV 접속·회차·좌석·관람권·결제 조작: 없음
+- 제작 중 실행한 제품 명령: 로컬 `prickly-imax diagnose`만 사용
 - 가짜 모바일티켓·예매번호·QR·바코드·완료 거래 화면: 없음
 - 좌석 보장·CGV 제휴 주장: 없음
 - 카드 결제 자동화 주장: 없음
