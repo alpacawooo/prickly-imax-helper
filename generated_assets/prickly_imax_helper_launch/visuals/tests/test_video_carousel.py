@@ -27,25 +27,23 @@ class VideoCarouselManifestTests(unittest.TestCase):
     def load_cards(self) -> list[dict[str, object]]:
         return json.loads(MANIFEST.read_text(encoding="utf-8"))["cards"]
 
-    def test_manifest_has_eight_ordered_cards_and_exact_durations(self) -> None:
+    def test_manifest_has_six_ordered_cards_and_exact_durations(self) -> None:
         cards = self.load_cards()
-        self.assertEqual([card["number"] for card in cards], list(range(1, 9)))
+        self.assertEqual([card["number"] for card in cards], [1, 2, 3, 4, 5, 6])
         self.assertEqual(
             [card["media_type"] for card in cards],
-            ["png", "png", "png", "mp4", "mp4", "png", "mp4", "png"],
+            ["png", "png", "png", "mp4", "mp4", "png"],
         )
-        self.assertEqual([card["duration"] for card in cards], [None, None, None, 3, 8, None, 8, None])
+        self.assertEqual([card["duration"] for card in cards], [None, None, None, 3, 8, None])
         self.assertTrue(all(str(card["headline"]).strip() for card in cards))
-        allowed = {"none", "setup-scroll", "workflow-sequence", "outcome-sequence"}
+        allowed = {"none", "setup-scroll", "workflow-sequence"}
         self.assertTrue(all(card["motion"] in allowed for card in cards))
         self.assertGreaterEqual(len({card["composition"] for card in cards}), 6)
 
-    def test_card_seven_copy_describes_outcome_flow_without_fake_transaction(self) -> None:
-        card = self.load_cards()[6]
-        self.assertIn("결과 알림", str(card["headline"]) + str(card["supporting"]))
-        raw = json.dumps(card, ensure_ascii=False).lower()
-        for banned in ("모바일티켓", "예매번호", "qr", "barcode", "실제 예매 완료"):
-            self.assertNotIn(banned, raw)
+    def test_card_five_is_monitoring_process_and_card_six_is_cta(self) -> None:
+        cards = self.load_cards()
+        self.assertEqual(cards[4]["composition"], "monitoring-process")
+        self.assertEqual(cards[5]["composition"], "black-note-cta")
 
     def test_card_two_explains_why_the_odyssey_belongs_on_yongsan_imax(self) -> None:
         card = self.load_cards()[1]

@@ -36,7 +36,6 @@ ALLOWED_MOTIONS = {
     "none",
     "setup-scroll",
     "workflow-sequence",
-    "outcome-sequence",
 }
 ALLOWED_ANCHORS = {"bottom-left", "top-left", "bottom", "right", "center-left"}
 FORBIDDEN_SOURCE_TYPES = {"fake-browser", "fake-terminal", "phone-mockup", "fake-ticket"}
@@ -44,13 +43,13 @@ BANNED_COPY = "Prickly AI는 사람이 반복하던 일을 실제로 작동하�
 
 
 def validate_manifest(cards: list[dict[str, object]]) -> None:
-    if [card.get("number") for card in cards] != list(range(1, 9)):
-        raise ValueError("video carousel must contain cards 1 through 8 in order")
-    expected_media = ["png", "png", "png", "mp4", "mp4", "png", "mp4", "png"]
+    if [card.get("number") for card in cards] != list(range(1, 7)):
+        raise ValueError("video carousel must contain cards 1 through 6 in order")
+    expected_media = ["png", "png", "png", "mp4", "mp4", "png"]
     if [card.get("media_type") for card in cards] != expected_media:
-        raise ValueError("publishable sequence must contain five PNGs and MP4 cards 4, 5, and 7")
-    if [card.get("duration") for card in cards] != [None, None, None, 3, 8, None, 8, None]:
-        raise ValueError("card 4 must be three seconds and cards 5 and 7 eight seconds")
+        raise ValueError("publishable sequence must contain four PNGs and MP4 cards 4 and 5")
+    if [card.get("duration") for card in cards] != [None, None, None, 3, 8, None]:
+        raise ValueError("card 4 must be three seconds and card 5 eight seconds")
     required = {
         "number", "media_type", "duration", "source_type", "source", "headline", "supporting",
         "footer", "composition", "text_anchor", "motion",
@@ -67,7 +66,6 @@ def validate_manifest(cards: list[dict[str, object]]) -> None:
         expected_motion = {
             4: "setup-scroll",
             5: "workflow-sequence",
-            7: "outcome-sequence",
         }.get(int(number), "none")
         if card.get("motion") != expected_motion:
             raise ValueError(f"card {number} has motion that does not match its media type")
@@ -95,7 +93,6 @@ def motion_recipes() -> dict[str, dict[str, float | int]]:
     return {
         "setup-scroll": {"duration": 3, "fps": 30, "viewport_height": 800},
         "workflow-sequence": {"transition_ms": 180},
-        "outcome-sequence": {"transition_ms": 180},
     }
 
 
@@ -342,7 +339,7 @@ def cinematic_page(body: str, composition: str) -> str:
     return f'<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>{css}</style></head><body><main class="scene" data-composition="{html_module.escape(composition)}">{body}</main></body></html>'
 
 
-def card_three_scene_htmls(evidence_png: Path, headline: str) -> list[str]:
+def card_three_scene_htmls(evidence_png: Path, headline: str, page_total: int = 6) -> list[str]:
     source = img_uri(evidence_png)
     safe_headline = html_module.escape(headline).replace("\n", "<br>")
     stages = [
@@ -356,7 +353,7 @@ def card_three_scene_htmls(evidence_png: Path, headline: str) -> list[str]:
         body = (
             f'<img class="media" src="{source}" style="object-position:50% {"18%" if position == "top" else "82%"}">'
             f'<div class="shade" style="opacity:{1 if final else .35}"></div>'
-            '<span class="page-no">3/8</span>'
+            f'<span class="page-no">3/{page_total}</span>'
             f'<section class="copy"><h1 style="font-size:{70 if final else 48}px">{label}</h1></section>'
         )
         pages.append(cinematic_page(body, "single-seat-evidence-stage").replace('class="scene"', 'class="scene evidence"'))
@@ -364,13 +361,14 @@ def card_three_scene_htmls(evidence_png: Path, headline: str) -> list[str]:
 
 
 def flow_stage_html(
-    *, number: int, index: int, title: str, detail: str, ghost: Path | None = None
+    *, number: int, index: int, title: str, detail: str, ghost: Path | None = None,
+    page_total: int = 6,
 ) -> str:
     ghost_html = f'<img class="ghost" src="{img_uri(ghost)}">' if ghost else ""
     rail = "".join(f'<i class="{"on" if step <= index else ""}"></i>' for step in range(1, 5))
     body = (
         f'{ghost_html}<span class="stage-index">0{index} / 04</span>'
-        f'<span class="page-no">{number}/8</span>'
+        f'<span class="page-no">{number}/{page_total}</span>'
         f'<section class="copy"><h1>{html_module.escape(title)}</h1>'
         f'<p>{html_module.escape(detail)}</p></section><div class="rail">{rail}</div>'
     )
@@ -459,12 +457,11 @@ def video_carousel_covers(
     safe = lambda value: html_module.escape(str(value)).replace("\n", "<br>")
     sources = [img_uri(ROOT / str(card["source"])) if str(card["source"]) else "" for card in cards]
     scroll_source = setup_scroll_png or setup_png
-    sources[3], sources[4], sources[5], sources[6] = map(
-        img_uri, (scroll_source, monitor_png, scroll_source, monitor_png)
-    )
+    sources[3], sources[4] = map(img_uri, (scroll_source, monitor_png))
     result: list[str] = []
     media = lambda src: f'<img class="media" src="{src}">'
-    number = lambda n: f'<span class="page-no">{n}/8</span>'
+    page_total = len(cards)
+    number = lambda n: f'<span class="page-no">{n:02d}/{page_total:02d}</span>'
     result.append(cinematic_page(f'{media(sources[0])}<div class="shade"></div>{number(1)}<section class="copy"><span class="cover-kicker">{safe(cards[0]["kicker"])}</span><h1>{safe(cards[0]["headline"])}</h1><span class="cover-promise">{safe(cards[0]["promise"])}</span><p>{safe(cards[0]["supporting"])}</p></section><small class="meta">{safe(cards[0]["footer"])}</small>', str(cards[0]["composition"])).replace('class="scene"','class="scene full"'))
     comparison_stack = (
         '<div class="compare-stack">'
@@ -484,28 +481,7 @@ def video_carousel_covers(
         str(cards[3]["composition"]),
     ).replace('class="scene"','class="scene setup-scroll"'))
     result.append(cinematic_page(f'{media(sources[4])}<div class="shade"></div>{number(5)}<section class="copy"><h1>{safe(cards[4]["headline"])}</h1><p>{safe(cards[4]["supporting"])}</p></section><small class="meta">{safe(cards[4]["footer"])}</small>', str(cards[4]["composition"])).replace('class="scene"','class="scene monitor"'))
-    condition_rows = "".join(
-        f'<div><span>{label}</span>{value}</div>'
-        for label, value in (
-            ("같은 행 좌석", "연속 2석"),
-            ("허용 열", "D–J열"),
-            ("좌석 위치", "양끝 20% 제외"),
-            ("당일 회차", "3시간 이상"),
-        )
-    )
-    result.append(cinematic_page(
-        f'{number(6)}<section class="copy"><h1>{safe(cards[5]["headline"])}</h1></section>'
-        f'<div class="form-focus"><img src="{sources[5]}"></div>'
-        f'<div class="condition-list">{condition_rows}</div>'
-        f'<small class="meta">{safe(cards[5]["footer"])}</small>',
-        str(cards[5]["composition"]),
-    ).replace('class="scene"','class="scene condition-focus"'))
-    outcome_rows = "".join(
-        f'<div><b>0{idx}</b>{label}</div>'
-        for idx, label in enumerate(("조건 일치", "안전검증", "최종 제출 1회", "결과 이메일"), 1)
-    )
-    result.append(cinematic_page(f'{number(7)}<section class="copy"><h1>{safe(cards[6]["headline"])}</h1><p>{safe(cards[6]["supporting"])}</p></section><div class="outcome-list">{outcome_rows}</div><small class="meta">{safe(cards[6]["footer"])}</small>', str(cards[6]["composition"])).replace('class="scene"','class="scene outcome"'))
-    result.append(cinematic_page(f'{number(8)}<section class="copy"><h1>{safe(cards[7]["headline"])}</h1><p>{safe(cards[7]["supporting"])}</p></section><small class="meta">{safe(cards[7]["footer"])}</small>', str(cards[7]["composition"])).replace('class="scene"','class="scene note"'))
+    result.append(cinematic_page(f'{number(6)}<section class="copy"><h1>{safe(cards[5]["headline"])}</h1><p>{safe(cards[5]["supporting"])}</p></section><small class="meta">{safe(cards[5]["footer"])}</small>', str(cards[5]["composition"])).replace('class="scene"','class="scene note"'))
     return result
 
 
@@ -640,8 +616,8 @@ def render_video_carousel_cards(
 def verify_video_carousel(
     cards: list[dict[str, object]], covers: list[Path], media: list[Path]
 ) -> dict[str, object]:
-    if len(cards) != 8 or len(covers) != 8 or len(media) != 8:
-        raise ValueError("eight cards, eight covers, and eight publishable media files are required")
+    if len(cards) != 6 or len(covers) != 6 or len(media) != 6:
+        raise ValueError("six cards, six covers, and six publishable media files are required")
     for expected, (card, cover, published) in enumerate(zip(cards, covers, media), 1):
         suffix = ".mp4" if card["media_type"] == "mp4" else ".png"
         if cover.name != f"{expected:02d}.png" or published.name != f"{expected:02d}{suffix}":
@@ -678,7 +654,7 @@ def verify_video_carousel(
         if abs(float(probe["format"]["duration"]) - float(card["duration"])) > 0.1:
             raise ValueError(f"card {expected} duration mismatch")
     return {
-        "covers": 8,
+        "covers": 6,
         "png_cards": sum(card["media_type"] == "png" for card in cards),
         "video_cards": sum(card["media_type"] == "mp4" for card in cards),
         "verified": True,
