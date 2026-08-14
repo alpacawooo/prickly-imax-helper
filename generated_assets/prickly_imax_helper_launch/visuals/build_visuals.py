@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import html as html_module
 import json
 import os
@@ -330,6 +331,70 @@ def render_video_carousel_cards(
     return outputs
 
 
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def package_video_carousel(
+    cards: list[dict[str, object]],
+    covers: list[Path],
+    videos: list[Path],
+) -> Path:
+    if len(cards) != 8 or len(covers) != 8 or len(videos) != 8:
+        raise ValueError("publishable package requires eight cards and eight covers")
+    contact = VIDEO_CAROUSEL / "contact-sheet.png"
+    checksummed = [*covers, *videos, contact]
+    sums = "".join(f"{sha256(path)}  {path.relative_to(VIDEO_CAROUSEL)}\n" for path in checksummed)
+    (VIDEO_CAROUSEL / "SHA256SUMS").write_text(sums, encoding="utf-8")
+    readme = """# Prickly IMAX Helper 영상 캐러셀
+
+- 업로드 순서: `cards/01.mp4`부터 `cards/08.mp4`
+- 표지 확인: `covers/01.png`부터 `covers/08.png`
+- 모든 카드는 1080×1350, H.264, yuv420p, 30fps, 무음입니다.
+- 댓글 키워드: `아이맥스`
+- 음악은 인스타그램 게시 단계에서 별도로 추가하세요.
+- Card 7은 공개 Notion을 캡처한 것이 아니라 개인정보 없는 로컬 설치 안내 미리보기입니다.
+"""
+    (VIDEO_CAROUSEL / "README.md").write_text(readme, encoding="utf-8")
+    qa = """# 영상 캐러셀 최종 QA
+
+- 카드 MP4: 8개
+- PNG 표지: 8개
+- 해상도: 전부 1080×1350
+- 비디오: H.264 · yuv420p · 30fps · 무음
+- 길이: 6 / 6 / 7 / 9 / 8 / 7 / 9 / 6초
+- 오디세이 스틸: 사용자 사용 허용 게시물의 UI 없는 원본 2장
+- 제품 설정 화면: 실제 로컬 Helper UI를 오프라인 렌더링
+- 설치 안내: 개인정보 없는 로컬 미리보기
+- 벤치마킹 계정 화면 녹화: 최종 결과물에서 제외
+- CGV 접속·회차·좌석·관람권·결제 조작: 없음
+- 예매 완료·좌석 보장·CGV 제휴 주장: 없음
+- 카드 결제 자동화 주장: 없음
+- 금지 문구: 미사용
+"""
+    (VIDEO_CAROUSEL / "qa-report.md").write_text(qa, encoding="utf-8")
+    archive_base = HERE / "prickly-imax-helper-video-carousel"
+    archive = archive_base.with_suffix(".zip")
+    if archive.exists():
+        archive.unlink()
+    with tempfile.TemporaryDirectory(prefix="prickly-video-carousel-") as tmp:
+        package = Path(tmp) / "prickly-imax-helper-video-carousel"
+        shutil.copytree(VIDEO_CARDS, package / "cards")
+        shutil.copytree(VIDEO_COVERS, package / "covers")
+        shutil.copy2(contact, package / "contact-sheet.png")
+        shutil.copy2(VIDEO_CAROUSEL / "README.md", package / "README.md")
+        shutil.copy2(VIDEO_CAROUSEL / "qa-report.md", package / "qa-report.md")
+        shutil.copy2(VIDEO_CAROUSEL / "SHA256SUMS", package / "SHA256SUMS")
+        shutil.copy2(HERE / "sources-and-claim-notes.md", package / "sources-and-claim-notes.md")
+        shutil.copy2(MANIFEST, package / "carousel_manifest.json")
+        shutil.make_archive(str(archive_base), "zip", package)
+    return archive
+
+
 def carousel_slides(setup_png: Path) -> list[str]:
     bg = img_uri(ASSETS / "cinema-background.png")
     common = """
@@ -522,9 +587,14 @@ def main() -> None:
         cards = load_carousel_manifest()
         covers = render_video_carousel_covers(cards)
         videos = render_video_carousel_cards(cards, covers)
+        archive = package_video_carousel(cards, covers, videos)
         print(
             json.dumps(
-                {"video_carousel_covers": len(covers), "video_carousel_cards": len(videos)},
+                {
+                    "video_carousel_covers": len(covers),
+                    "video_carousel_cards": len(videos),
+                    "archive": str(archive),
+                },
                 ensure_ascii=False,
             )
         )
