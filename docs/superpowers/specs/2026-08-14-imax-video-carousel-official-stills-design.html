@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prickly IMAX Helper · 8-Card Video Carousel</title>
+  <style>
+    :root {
+      --bg:#08090b; --panel:#111318; --panel2:#171a20; --line:#292d34;
+      --text:#f5f5f1; --muted:#969aa3; --red:#ef382f; --green:#5dde94;
+      --shadow:0 30px 80px rgba(0,0,0,.36);
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+    a{color:inherit}
+    .topline{position:fixed;z-index:50;inset:0 0 auto;height:5px;background:var(--red)}
+    .nav{position:sticky;z-index:40;top:5px;display:flex;justify-content:space-between;align-items:center;padding:24px 5vw;background:rgba(8,9,11,.84);backdrop-filter:blur(18px);border-bottom:1px solid rgba(255,255,255,.06)}
+    .brand{font-size:22px;font-weight:900;letter-spacing:-1px}
+    .navlinks{display:flex;gap:22px;color:var(--muted);font-size:13px;font-weight:750}
+    .navlinks a{text-decoration:none}
+    main{width:min(1460px,92vw);margin:auto;padding-bottom:120px}
+    .hero{min-height:650px;display:grid;grid-template-columns:1.15fr .85fr;gap:80px;align-items:center;padding:90px 0 70px}
+    .kicker{display:flex;align-items:center;gap:12px;color:#c8cbd1;font-size:14px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+    .kicker:before{content:"";width:34px;height:4px;background:var(--red)}
+    h1{margin:28px 0 0;font-size:clamp(58px,6.4vw,104px);line-height:1.02;letter-spacing:-.065em}
+    h1 .red,.red{color:var(--red)}
+    .lede{margin:34px 0 0;max-width:780px;color:#c7cad0;font-size:23px;line-height:1.65;letter-spacing:-.025em}
+    .hero-meta{display:flex;gap:12px;flex-wrap:wrap;margin-top:34px}
+    .pill{padding:12px 16px;border:1px solid var(--line);border-radius:999px;background:#121419;color:#d6d8dd;font-size:13px;font-weight:760}
+    .hero-art{aspect-ratio:4/5;position:relative;overflow:hidden;border:1px solid var(--line);border-radius:30px;box-shadow:var(--shadow);background:url("https://www.motionpictures.org/wp-content/uploads/2026/05/CT-02725_MSGR-1024x590.jpg") center/cover}
+    .hero-art:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05),rgba(0,0,0,.28) 42%,rgba(7,8,10,.98))}
+    .hero-art-copy{position:absolute;z-index:2;left:38px;right:38px;bottom:44px}
+    .hero-art-copy span{font-size:14px;color:#d9dbe0;font-weight:800}
+    .hero-art-copy strong{display:block;margin-top:14px;font-size:42px;line-height:1.08;letter-spacing:-.05em}
+    section{padding:72px 0;border-top:1px solid #1c1f24}
+    .section-head{display:flex;justify-content:space-between;gap:40px;align-items:flex-end;margin-bottom:38px}
+    h2{margin:0;font-size:44px;line-height:1.12;letter-spacing:-.045em}
+    .section-note{max-width:560px;color:var(--muted);font-size:16px;line-height:1.65}
+    .flow{display:grid;grid-template-columns:repeat(8,1fr);gap:10px}
+    .flow-step{position:relative;padding:24px 16px 22px;min-height:126px;border:1px solid var(--line);border-radius:18px;background:var(--panel)}
+    .flow-step b{display:block;color:var(--red);font:800 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace}
+    .flow-step strong{display:block;margin-top:18px;font-size:18px;letter-spacing:-.03em}
+    .flow-step:not(:last-child):after{content:"→";position:absolute;z-index:2;right:-12px;top:48px;color:#5d6169;font-size:16px}
+    .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:22px}
+    .card{position:relative;aspect-ratio:4/5;overflow:hidden;border:1px solid var(--line);border-radius:22px;background:linear-gradient(145deg,#16191e,#0b0d10);box-shadow:var(--shadow)}
+    .card .photo{position:absolute;inset:0;background-size:cover;background-position:center;filter:saturate(.72) contrast(1.05)}
+    .card .scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,6,8,.1),rgba(5,6,8,.7) 58%,rgba(5,6,8,.98))}
+    .chrome{position:absolute;z-index:5;left:22px;right:22px;top:22px;display:flex;justify-content:space-between;align-items:center;font-size:10px;font-weight:850}
+    .chrome .num{color:#8d929b;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .card-copy{position:absolute;z-index:4;left:26px;right:26px;bottom:28px}
+    .tag{display:flex;align-items:center;gap:9px;color:#d0d2d7;font-size:10px;font-weight:850;letter-spacing:.06em;text-transform:uppercase}
+    .tag:before{content:"";width:25px;height:3px;background:var(--red)}
+    .card h3{margin:14px 0 0;font-size:30px;line-height:1.14;letter-spacing:-.055em}
+    .card p{margin:13px 0 0;color:#b4b7be;font-size:12px;line-height:1.55}
+    .duration{position:absolute;z-index:6;right:18px;bottom:18px;padding:7px 9px;border-radius:999px;background:rgba(0,0,0,.66);font:800 10px ui-monospace,SFMono-Regular,Menlo,monospace;color:#d5d7dc}
+    .comments{display:grid;gap:7px;margin-top:13px}
+    .comment{padding:9px 11px;border:1px solid #30343b;border-radius:9px;background:rgba(22,25,30,.88);font-size:9px;color:#d9dbe0}
+    .labels{display:flex;gap:7px;flex-wrap:wrap;margin-top:16px}
+    .label{padding:8px 10px;border-radius:8px;background:#191c22;border:1px solid #2b2f36;font-size:10px;font-weight:780}
+    .browser{margin-top:16px;border:1px solid #363a42;border-radius:10px;overflow:hidden;background:#fff;color:#111}
+    .browserbar{height:18px;background:#24272d;display:flex;align-items:center;padding:0 8px;gap:4px}
+    .browserbar i{width:4px;height:4px;border-radius:50%;background:#777}.browserbar i:first-child{background:var(--red)}
+    .browserbody{height:120px;padding:12px;background:linear-gradient(#fff,#f7f7f7)}
+    .browserbody b{font-size:8px}.field{height:12px;margin-top:7px;border:1px solid #d9d9d9;border-radius:2px;background:#fff}.field.short{width:58%}
+    .status{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:16px}
+    .status div{padding:10px;border:1px solid #2b2f36;border-radius:8px;background:#111319}
+    .status span{display:block;color:#818691;font:700 7px ui-monospace,monospace}.status strong{display:block;margin-top:6px;font:850 16px ui-monospace,monospace}
+    .status .armed{color:var(--green)}
+    .safety{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
+    .safe{padding:11px;border:1px solid #2d3138;border-radius:9px;background:#171a1f;font-size:9px;font-weight:780}.safe i{color:var(--red);font-style:normal;margin-right:5px}
+    .notion{margin-top:14px;padding:14px;background:#fbfbfb;border-radius:9px;color:#151515}
+    .notion .title{font-size:11px;font-weight:900}.notion .line{height:6px;margin-top:7px;background:#e7e7e7;border-radius:4px}.notion .line:nth-child(3){width:78%}.notion .toggle{margin-top:9px;padding:7px;background:#f1f1f1;border-radius:5px;font-size:7px;font-weight:750}
+    .cta-card{background:radial-gradient(circle at 80% 15%,rgba(239,56,47,.13),transparent 35%),linear-gradient(145deg,#16191e,#090a0c)}
+    .cta-card .card-copy{bottom:82px}
+    .cta-card h3{font-size:34px}
+    .matrix{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+    .panel{padding:30px;border:1px solid var(--line);border-radius:22px;background:var(--panel)}
+    .panel h3{margin:0;font-size:24px;letter-spacing:-.04em}.panel ul{margin:22px 0 0;padding:0;list-style:none;display:grid;gap:13px}.panel li{display:flex;gap:10px;color:#c6c8ce;font-size:15px;line-height:1.5}.panel li:before{content:"✓";color:var(--red);font-weight:900}.panel.no li:before{content:"×";color:#727780}
+    .proof{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+    .proof-card{padding:28px;border:1px solid var(--line);border-radius:20px;background:var(--panel)}
+    .proof-card .icon{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:rgba(239,56,47,.13);color:var(--red);font-weight:900}
+    .proof-card h3{margin:20px 0 0;font-size:22px}.proof-card p{color:var(--muted);font-size:14px;line-height:1.6}
+    .source-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+    .source{overflow:hidden;border:1px solid var(--line);border-radius:18px;background:var(--panel)}
+    .source img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover}.source div{padding:16px}.source b{font-size:14px}.source span{display:block;margin-top:6px;color:var(--muted);font-size:11px}
+    .approval{display:flex;justify-content:space-between;align-items:center;gap:32px;padding:42px;border:1px solid rgba(239,56,47,.32);border-radius:24px;background:linear-gradient(135deg,rgba(239,56,47,.09),#111318)}
+    .approval h2{font-size:38px}.approval p{margin:12px 0 0;color:#b8bbc2}
+    .badge{white-space:nowrap;padding:14px 18px;border-radius:999px;background:var(--red);font-weight:850}
+    footer{padding:40px 0;color:#71757d;font-size:12px;display:flex;justify-content:space-between}
+    @media(max-width:1050px){.hero{grid-template-columns:1fr}.hero-art{max-width:560px}.cards{grid-template-columns:repeat(2,1fr)}.flow{grid-template-columns:repeat(4,1fr)}.matrix,.proof,.source-row{grid-template-columns:1fr}.navlinks{display:none}}
+    @media(max-width:640px){main{width:90vw}.hero{padding-top:60px}.cards{grid-template-columns:1fr}.flow{grid-template-columns:repeat(2,1fr)}.approval{align-items:flex-start;flex-direction:column}h2{font-size:34px}}
+  </style>
+</head>
+<body>
+  <div class="topline"></div>
+  <nav class="nav"><div class="brand">prickly.ai</div><div class="navlinks"><a href="#flow">FLOW</a><a href="#cards">8 CARDS</a><a href="#proof">PROOF</a><a href="#safety">SAFETY</a></div></nav>
+  <main>
+    <header class="hero">
+      <div>
+        <div class="kicker">Video carousel design · 2026.08.14</div>
+        <h1>문제를 건드리고,<br><span class="red">작동하는 결과</span>를<br>보여준다.</h1>
+        <p class="lede">오디세이 공식 스틸과 실제 Prickly 화면을 섞은 8개 영상 카드. 썸네일의 불편에서 시작해 Helper와 Notion을 직접 보여준 뒤 댓글 CTA로 이어진다.</p>
+        <div class="hero-meta"><span class="pill">8 × MP4</span><span class="pill">1080 × 1350</span><span class="pill">6–9 sec</span><span class="pill">Muted-first</span></div>
+      </div>
+      <div class="hero-art"><div class="hero-art-copy"><span>일부 리셀 게시물 사례</span><strong>용아맥 한 자리 보는데<br><span class="red">30만 원?</span></strong></div></div>
+    </header>
+
+    <section id="flow">
+      <div class="section-head"><h2>전환 흐름</h2><div class="section-note">벤치마킹하는 것은 겉모습이 아니라 독자가 문제를 느끼고, 결과물을 확인하고, 행동하게 되는 순서다.</div></div>
+      <div class="flow">
+        <div class="flow-step"><b>01</b><strong>페르소나 문제</strong></div><div class="flow-step"><b>02</b><strong>공감</strong></div><div class="flow-step"><b>03</b><strong>기존 선택지</strong></div><div class="flow-step"><b>04</b><strong>해결책</strong></div><div class="flow-step"><b>05</b><strong>작동 증명</strong></div><div class="flow-step"><b>06</b><strong>안전성</strong></div><div class="flow-step"><b>07</b><strong>Notion 미리보기</strong></div><div class="flow-step"><b>08</b><strong>댓글 CTA</strong></div>
+      </div>
+    </section>
+
+    <section id="cards">
+      <div class="section-head"><h2>8개 영상 카드</h2><div class="section-note">모든 장을 MP4로 출력한다. 영화 스틸에는 느린 확대를, 실제 화면에는 읽을 수 있는 속도의 스크롤과 상태 전환을 넣는다.</div></div>
+      <div class="cards">
+        <article class="card"><div class="photo" style="background-image:url('https://www.motionpictures.org/wp-content/uploads/2026/05/CT-02725_MSGR-1024x590.jpg')"></div><div class="scrim"></div><div class="chrome"><span>prickly.ai</span><span class="num">01 / 08</span></div><div class="card-copy"><div class="tag">Persona pain</div><h3>용아맥 한 자리 보는데<br><span class="red">30만 원?</span></h3><p>일부 리셀 게시물 사례</p></div><div class="duration">06s</div></article>
+        <article class="card"><div class="photo" style="background-image:url('https://www.motionpictures.org/wp-content/uploads/2026/05/CT-32577CC_MSG-1024x611.jpg')"></div><div class="scrim"></div><div class="chrome"><span>prickly.ai</span><span class="num">02 / 08</span></div><div class="card-copy"><div class="tag">Recognition</div><h3>보고 싶은 사람은 많은데<br>원하는 날짜는 <span class="red">매진.</span></h3><div class="comments"><div class="comment">아직 IMAX로 못 봤어요</div><div class="comment">취소표는 보여도 금방 사라져요</div><div class="comment">용아맥은 그냥 포기했어요</div></div></div><div class="duration">06s</div></article>
+        <article class="card"><div class="photo" style="background-image:url('https://www.motionpictures.org/wp-content/uploads/2026/05/CT-03414-1-1024x636.jpg')"></div><div class="scrim"></div><div class="chrome"><span>prickly.ai</span><span class="num">03 / 08</span></div><div class="card-copy"><div class="tag">Old choices</div><h3>셋 다 내가 원한<br>해결은 아니었다.</h3><div class="labels"><span class="label">새로고침</span><span class="label">포기</span><span class="label">비싼 리셀</span></div></div><div class="duration">07s</div></article>
+        <article class="card"><div class="chrome"><span>prickly.ai</span><span class="num">04 / 08</span></div><div class="card-copy"><div class="tag">Real setup</div><h3>설치 → 직접 로그인 →<br><span class="red">원하는 조건 설정</span></h3><div class="browser"><div class="browserbar"><i></i><i></i><i></i></div><div class="browserbody"><b>Prickly IMAX Helper 설정</b><div class="field"></div><div class="field short"></div><div class="field"></div><div class="field short"></div></div></div><p>실제 로컬 설정 화면 · 데모 값</p></div><div class="duration">09s</div></article>
+        <article class="card"><div class="chrome"><span>prickly.ai</span><span class="num">05 / 08</span></div><div class="card-copy"><div class="tag">Real monitor</div><h3>지금 열린 날짜부터<br><span class="red">새로 열릴 날짜까지.</span></h3><div class="status"><div><span>STATE</span><strong class="armed">armed</strong></div><div><span>OPEN DATES</span><strong>12</strong></div><div><span>MATCH</span><strong>null</strong></div><div><span>ERRORS</span><strong>0</strong></div></div><p>개인정보를 제거한 실제 상태만 사용</p></div><div class="duration">08s</div></article>
+        <article class="card"><div class="chrome"><span>prickly.ai</span><span class="num">06 / 08</span></div><div class="card-copy"><div class="tag">Safety</div><h3>빠르기 전에<br><span class="red">틀리지 않는 게 먼저.</span></h3><div class="safety"><div class="safe"><i>✓</i>중복 예매 차단</div><div class="safe"><i>✓</i>관람권 수 확인</div><div class="safe"><i>✓</i>남은 금액 0원</div><div class="safe"><i>✓</i>최종 제출 1회</div></div><p>카드 결제 자동화 없음</p></div><div class="duration">07s</div></article>
+        <article class="card"><div class="chrome"><span>prickly.ai</span><span class="num">07 / 08</span></div><div class="card-copy"><div class="tag">What you receive</div><h3>댓글을 남기면<br><span class="red">이 설치 안내</span>를 보낸다.</h3><div class="notion"><div class="title">Prickly IMAX Helper 설치</div><div class="line"></div><div class="line"></div><div class="toggle">▸ macOS 설치 방법</div><div class="toggle">▸ Windows 설치 방법</div><div class="toggle">▸ IMAX 관람권 안내</div></div><p>실제 공개 Notion · 로그아웃 화면</p></div><div class="duration">09s</div></article>
+        <article class="card cta-card"><div class="chrome"><span>prickly.ai</span><span class="num">08 / 08</span></div><div class="card-copy"><div class="tag">Comment → DM</div><h3>댓글에 <span class="red">“아이맥스”</span>라고 남기면<br>설치 방법을 보내줄게.</h3><p style="margin-top:26px">Mac · Windows<br>내 컴퓨터 · 내 CGV 계정 · 내 IMAX 관람권</p></div><div class="duration">06s</div></article>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head"><h2>벤치마킹 범위</h2><div class="section-note">전환을 만드는 구조는 배우고, 상대 계정의 시각적 자산과 고유 표현은 가져오지 않는다.</div></div>
+      <div class="matrix"><div class="panel"><h3>가져오는 것</h3><ul><li>썸네일에서 페르소나의 문제를 직접 건드리는 방식</li><li>한 장에 한 가지 메시지만 두는 구성</li><li>실제 결과물과 전달 자료를 영상으로 증명하는 순서</li><li>정적인 장면도 짧은 MP4로 만드는 체류시간 전략</li><li>마지막 댓글 키워드 하나로 끝내는 CTA</li></ul></div><div class="panel no"><h3>가져오지 않는 것</h3><ul><li>AI Freaks의 이름·마스코트·캐릭터·로고</li><li>흰색 격자 배경과 분홍·파랑 색상 체계</li><li>캐릭터 시트라는 주제와 상품 구조</li><li>상대 계정의 문구·레이아웃·소셜 증거</li><li>팔로워 수·참여 수·계정 UI</li></ul></div></div>
+    </section>
+
+    <section id="proof">
+      <div class="section-head"><h2>신뢰를 만드는 세 장</h2><div class="section-note">설명보다 실제 화면이 먼저다. 단, 개인정보와 실제 예매 상태를 노출하지 않는다.</div></div>
+      <div class="proof"><div class="proof-card"><div class="icon">04</div><h3>설정 화면</h3><p>영화·극장·시간·인원·좌석 조건을 실제 로컬 UI에서 보여준다.</p></div><div class="proof-card"><div class="icon">05</div><h3>감시 상태</h3><p>현재 redacted diagnose가 증명하는 값만 사용하고 예매 성공을 꾸미지 않는다.</p></div><div class="proof-card"><div class="icon">07</div><h3>공개 Notion</h3><p>댓글 후 받는 실제 설치 안내를 로그아웃 상태에서 스크롤해 보여준다.</p></div></div>
+    </section>
+
+    <section>
+      <div class="section-head"><h2>공식 스틸 소스</h2><div class="section-note">Universal 배포 스틸을 Motion Picture Association 페이지에서 확인했다. 유료 광고 전환 시에는 별도 권리 확인이 필요하다.</div></div>
+      <div class="source-row"><div class="source"><img src="https://www.motionpictures.org/wp-content/uploads/2026/05/CT-02725_MSGR-1024x590.jpg" alt="Trojan Horse"><div><b>Trojan Horse</b><span>Card 01 · cover</span></div></div><div class="source"><img src="https://www.motionpictures.org/wp-content/uploads/2026/05/CT-32577CC_MSG-1024x611.jpg" alt="Antinous"><div><b>Antinous</b><span>Card 02 · recognition</span></div></div><div class="source"><img src="https://www.motionpictures.org/wp-content/uploads/2026/05/CT-03414-1-1024x636.jpg" alt="Odysseus"><div><b>Odysseus</b><span>Card 03 · old choices</span></div></div></div>
+    </section>
+
+    <section id="safety">
+      <div class="section-head"><h2>완료 기준</h2><div class="section-note">시각적 완성도와 제품 안전 경계를 동시에 통과해야 게시 가능한 결과물이다.</div></div>
+      <div class="matrix"><div class="panel"><h3>출력 QA</h3><ul><li>8개 MP4와 8개 PNG 커버</li><li>전부 1080×1350 · 30fps · H.264 · yuv420p</li><li>장면별 6–9초, 무음으로도 의미 전달</li><li>모바일 썸네일에서 문구가 한 번에 읽힘</li><li>게시 순서와 SHA-256 체크섬 포함</li></ul></div><div class="panel"><h3>안전 QA</h3><ul><li>30만 원은 일부 리셀 사례로만 표현</li><li>표 보장·CGV 제휴·암표상보다 빠르다는 주장 없음</li><li>계정·쿠키·관람권 번호·이메일·비공개 Notion 미노출</li><li>CGV 조회·좌석·관람권·결제 조작 없이 제작</li><li>가짜 티켓이나 가짜 예매 성공 화면 없음</li></ul></div></div>
+    </section>
+
+    <section><div class="approval"><div><h2>승인된 설계</h2><p>다음 단계: 구현 계획 → 공식 스틸 확보 → 실제 화면 캡처 → 8개 카드 렌더링 → QA.</p></div><div class="badge">READY FOR PLAN</div></div></section>
+    <footer><span>PRICKLY IMAX HELPER · DESIGN BOARD</span><span>Detailed spec: Markdown companion</span></footer>
+  </main>
+</body>
+</html>

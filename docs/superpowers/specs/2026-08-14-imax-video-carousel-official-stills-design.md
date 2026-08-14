@@ -1,5 +1,7 @@
 # Prickly IMAX Helper Official-Still Video Carousel Design
 
+> Visual review: open `2026-08-14-imax-video-carousel-official-stills-design.html`. This Markdown file remains the detailed text record.
+
 ## Status and relationship to the earlier design
 
 This design replaces only the static nine-slide carousel section of `2026-08-14-imax-reels-carousel-hook-design.md`. The approved hook, value proposition, CTA, product claims, privacy rules, and standalone Reel remain unchanged.
