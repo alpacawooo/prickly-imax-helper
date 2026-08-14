@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
+import html as html_module
 import json
 import os
 import shutil
@@ -139,6 +141,29 @@ def img_uri(path: Path) -> str:
     return path.resolve().as_uri()
 
 
+def install_guide_preview() -> Path:
+    path = HTML / "install-guide-preview.html"
+    source = """<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>
+    *{box-sizing:border-box}html,body{margin:0;width:900px;height:1600px;overflow:hidden;background:#f7f7f5}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;color:#191919}
+    main{padding:72px 70px 100px}.mark{font-size:18px;font-weight:850;letter-spacing:-.4px;color:#ef382f}
+    h1{font-size:48px;line-height:1.16;letter-spacing:-2.5px;margin:22px 0 18px}p{font-size:21px;line-height:1.58;color:#555;margin:0}
+    .callout{margin-top:32px;padding:24px 26px;background:#fff3f2;border-left:5px solid #ef382f;border-radius:10px;font-size:20px;line-height:1.5}
+    h2{font-size:29px;letter-spacing:-1px;margin:45px 0 18px}.os{display:grid;grid-template-columns:1fr 1fr;gap:16px}.os div{background:white;border:1px solid #dfdfdc;border-radius:14px;padding:22px;font-size:22px;font-weight:800}.os small{display:block;margin-top:8px;color:#777;font-size:15px;font-weight:650}
+    .steps{display:grid;gap:14px}.step{display:grid;grid-template-columns:42px 1fr;gap:14px;align-items:start;background:white;border:1px solid #e0e0dd;border-radius:14px;padding:20px}.num{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#ef382f;color:white;font-weight:900}.step b{display:block;font-size:21px}.step span{display:block;margin-top:6px;color:#666;font-size:17px;line-height:1.45}
+    .toggle{margin-top:14px;padding:18px 20px;background:#ececea;border-radius:10px;font-size:18px;font-weight:760}.footer{margin-top:34px;padding-top:26px;border-top:1px solid #d8d8d4;color:#777;font-size:16px;line-height:1.55}
+    </style></head><body><main><div class="mark">prickly.ai</div><h1>Prickly IMAX Helper<br>3분 설치 안내</h1><p>개발 지식 없이 내 컴퓨터에서 설치하고, 전용 Chrome에서 본인이 직접 CGV에 로그인합니다.</p>
+    <div class="callout"><b>비밀번호와 결제정보는 입력하지 않습니다.</b><br>카드 결제는 자동화하지 않으며, 등록된 IMAX 영화관람권과 잔액 0원 조건만 사용합니다.</div>
+    <h2>내 운영체제 선택</h2><div class="os"><div>🍎 macOS 전용<small>설치 파일 1개 · 체크섬 검증</small></div><div>🪟 Windows 전용<small>설치 파일 1개 · 관리자 권한 불필요</small></div></div>
+    <h2>설치 후 세 단계</h2><div class="steps"><div class="step"><i class="num">1</i><div><b>전용 Chrome 열기</b><span>새 창에서 본인의 CGV 계정으로 직접 로그인</span></div></div><div class="step"><i class="num">2</i><div><b>원하는 조건 설정</b><span>영화 · 극장 · 시간 · 인원 · 허용 열 · 중앙 우선</span></div></div><div class="step"><i class="num">3</i><div><b>감시 시작</b><span>지금 열린 날짜와 앞으로 열리는 날짜를 내 컴퓨터에서 확인</span></div></div></div>
+    <h2>더 알아보기</h2><div class="toggle">▸ IMAX 영화관람권 구매·등록 방법</div><div class="toggle">▸ 조건 다시 설정하기</div><div class="toggle">▸ 업데이트·삭제 방법</div>
+    <div class="footer">설치 안내 미리보기 · 개인정보 없는 로컬 재현<br>Mac · Windows / 내 컴퓨터 · 내 CGV 계정 · 내 IMAX 관람권</div></main></body></html>"""
+    path.write_text(source, encoding="utf-8")
+    out = ASSETS / "install-guide-preview.png"
+    capture(path, out, 900, 1600)
+    return out
+
+
 def setup_preview() -> Path:
     path = HTML / "setup-preview.html"
     env = os.environ.copy()
@@ -195,6 +220,60 @@ def seat_diagram() -> str:
         seats = "".join(f'<i class="seat {"target" if r=="G" and n in (6,7) else ""}"></i>' for n in range(1,13))
         rows.append(f'<div class="seatrow"><b>{r}</b>{seats}</div>')
     return '<div class="screen">SCREEN</div><div class="seats">' + "".join(rows) + '</div>'
+
+
+def video_carousel_covers(
+    setup_png: Path,
+    guide_png: Path,
+    cards: list[dict[str, object]],
+) -> list[str]:
+    orange = img_uri(ROOT / str(cards[0]["source"]))
+    giants = img_uri(ROOT / str(cards[1]["source"]))
+    setup = img_uri(setup_png)
+    guide = img_uri(guide_png)
+    common = """
+    .content{top:170px}.photo-scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,6,8,.10),rgba(5,6,8,.58) 50%,rgba(5,6,8,.95) 100%)}
+    .proof-window{margin-top:38px;overflow:hidden;border:1px solid rgba(255,255,255,.15);border-radius:28px;background:#fff;box-shadow:0 26px 80px rgba(0,0,0,.42)}
+    .proof-window img{display:block;width:100%}.browserbar{height:54px;background:#202329;border-bottom:1px solid #343840;display:flex;align-items:center;gap:9px;padding:0 18px}.browserbar i{width:11px;height:11px;border-radius:50%;background:#59606a}.browserbar i:first-child{background:#ef5f57}.browserbar span{margin-left:10px;color:#9da2aa;font:600 13px ui-monospace,monospace}
+    .loop{display:grid;gap:16px;margin-top:58px}.loop .card{display:flex;align-items:center;gap:20px;padding:25px 28px}.loop strong{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;background:#24272d;color:#ef382f;font-size:21px}.loop b{font-size:30px}.loop span{margin-left:auto;color:#8f949c;font-size:19px}
+    .status{margin-top:45px;padding:36px}.status-head{display:flex;align-items:center;gap:18px}.status-head b{font:800 36px ui-monospace,monospace;color:#66db98}.status-head em{margin-left:auto;color:#777;font:600 15px ui-monospace,monospace}.status-grid{display:grid;grid-template-columns:1fr 1fr;gap:17px;margin-top:31px}.status-grid div{padding:25px;background:#111319;border:1px solid #2a2d34;border-radius:18px}.status-grid span{display:block;color:#8f949d;font:600 16px ui-monospace,monospace}.status-grid strong{display:block;margin-top:9px;font:800 40px ui-monospace,monospace}.status p{font-size:22px;color:#aaa;margin:28px 0 0}
+    .safety{display:grid;grid-template-columns:1fr 1fr;gap:17px;margin-top:45px}.safety .card{padding:28px}.safety b{display:block;margin-top:18px;font-size:26px}.safety p{font-size:18px;line-height:1.45;color:#aeb2b8}
+    .guide-window{height:620px}.guide-window img{width:100%;transform:translateY(-40px)}
+    .mini-foot{position:absolute;left:72px;right:72px;bottom:92px;color:#aaa;font-size:18px;line-height:1.45}
+    """
+    safe = lambda value: html_module.escape(str(value))
+    result: list[str] = []
+    result.append(page(f"""<div class="bg-photo" style="background-image:url('{orange}');background-position:center"></div><div class="photo-scrim"></div>{header(1,8)}
+      <div class="content" style="top:250px"><div class="eyebrow">{safe(cards[0]['eyebrow'])}</div><h1>용아맥 한 자리 보는데<br><span class="red">30만 원?</span></h1><p class="sub">{safe(cards[0]['supporting'])}</p></div><div class="mini-foot">{safe(cards[0]['footer'])}</div>{footer('THE PROBLEM')}""",width=1080,height=1350,extra_css=common))
+    result.append(page(f"""<div class="bg-photo" style="background-image:url('{giants}');background-position:center"></div><div class="photo-scrim"></div>{header(2,8)}
+      <div class="content" style="top:685px"><div class="eyebrow">{safe(cards[1]['eyebrow'])}</div><h2 style="font-size:57px">보고 싶은 사람은 많은데<br>원하는 날짜는 이미<br><span class="red">매진.</span></h2><p class="sub">{safe(cards[1]['supporting'])}</p></div>{footer('AUDIENCE SIGNAL')}""",width=1080,height=1350,extra_css=common))
+    result.append(page(f"""{header(3,8)}<div class="content"><div class="eyebrow">{safe(cards[2]['eyebrow'])}</div><h2>취소표를 기다리는 동안<br>남는 선택은 세 가지였다.</h2><div class="loop"><div class="card"><strong>01</strong><b>새로고침</b><span>계속 앱 확인</span></div><div class="card"><strong>02</strong><b>포기</b><span>다음 기회로</span></div><div class="card" style="border-color:#68302e"><strong>03</strong><b>비싼 리셀</b><span>정가보다 비싸게</span></div></div><p class="sub">{safe(cards[2]['supporting'])}</p></div>{footer('THE LOOP')}""",width=1080,height=1350,extra_css=common))
+    result.append(page(f"""{header(4,8)}<div class="content"><div class="eyebrow">{safe(cards[3]['eyebrow'])}</div><h2 style="font-size:54px">설치 → 직접 로그인 →<br><span class="red">원하는 조건 설정</span></h2><div class="proof-window"><div class="browserbar"><i></i><i></i><i></i><span>localhost · Prickly IMAX Helper</span></div><div style="height:590px;overflow:hidden"><img src="{setup}" style="transform:translateY(-30px)"></div></div><p class="small" style="margin-top:22px">{safe(cards[3]['footer'])}</p></div>{footer('YOUR ACCOUNT · YOUR RULES')}""",width=1080,height=1350,extra_css=common))
+    result.append(page(f"""{header(5,8)}<div class="content"><div class="eyebrow">{safe(cards[4]['eyebrow'])}</div><h2 style="font-size:55px">지금 열린 날짜부터<br><span class="red">새로 열릴 날짜까지.</span></h2>{status_card()}<p class="sub" style="font-size:25px">{safe(cards[4]['supporting'])}</p></div>{footer('WAITING · NOT FAILED')}""",width=1080,height=1350,extra_css=common))
+    safety_items = [("중복 예매 차단","이미 잡아둔 표가 있으면 멈춤"),("관람권 수 확인","인원수와 같은 수량만 허용"),("남은 금액 0원","추가 결제금액이 남으면 중단"),("최종 제출 1회","결과 불명 시 자동 재시도 금지")]
+    safety_html = "".join(f'<div class="card"><span class="check">✓</span><b>{a}</b><p>{b}</p></div>' for a,b in safety_items)
+    result.append(page(f"""{header(6,8)}<div class="content"><div class="eyebrow">{safe(cards[5]['eyebrow'])}</div><h2>빠르기 전에<br><span class="red">틀리지 않는 게 먼저.</span></h2><div class="safety">{safety_html}</div><p class="small" style="margin-top:24px">{safe(cards[5]['footer'])}</p></div>{footer('VERIFY · THEN SUBMIT')}""",width=1080,height=1350,extra_css=common))
+    result.append(page(f"""{header(7,8)}<div class="content"><div class="eyebrow">{safe(cards[6]['eyebrow'])}</div><h2 style="font-size:52px">댓글을 남기면<br><span class="red">이 설치 안내</span>를 보낸다.</h2><div class="proof-window guide-window"><img src="{guide}"></div><p class="small" style="margin-top:20px">{safe(cards[6]['footer'])}</p></div>{footer('INSTALL GUIDE PREVIEW')}""",width=1080,height=1350,extra_css=common))
+    result.append(page(f"""{header(8,8)}<div class="content" style="top:315px"><div class="eyebrow">{safe(cards[7]['eyebrow'])}</div><h1 style="font-size:66px;max-width:880px;line-height:1.18">댓글에 <span class="red">‘아이맥스’</span>라고 남기면<br>설치 방법을 보내줄게.</h1><p class="sub" style="margin-top:68px">Mac · Windows<br>내 컴퓨터 · 내 CGV 계정 · 내 IMAX 관람권</p><div class="rule" style="margin-top:235px"></div><div style="margin-top:34px;font-size:38px;font-weight:850">prickly.ai</div></div>{footer('COMMENT → DM')}""",width=1080,height=1350,extra_css=common))
+    return result
+
+
+def render_video_carousel_covers(cards: list[dict[str, object]]) -> list[Path]:
+    for directory in (ASSETS, BUILD, HTML, VIDEO_CAROUSEL, VIDEO_COVERS, VIDEO_CARDS):
+        directory.mkdir(parents=True, exist_ok=True)
+    setup_png = ASSETS / "helper-setup-preview.png"
+    if not setup_png.is_file():
+        setup_png = setup_preview()
+    guide_png = install_guide_preview()
+    paths: list[Path] = []
+    for idx, source in enumerate(video_carousel_covers(setup_png, guide_png, cards), 1):
+        html = HTML / f"video-carousel-{idx:02d}.html"
+        png = VIDEO_COVERS / f"{idx:02d}.png"
+        html.write_text(source, encoding="utf-8")
+        capture(html, png, 1080, 1350)
+        paths.append(png)
+    contact_sheet(paths, VIDEO_CAROUSEL / "contact-sheet.png", 4, (216, 270))
+    return paths
 
 
 def carousel_slides(setup_png: Path) -> list[str]:
@@ -335,7 +414,7 @@ def verify(carousel: list[Path], frames: list[Path], video: Path) -> dict[str, o
     return {"carousel_count":9,"carousel_size":"1080x1350","reel_frame_count":7,"reel_size":"1080x1920","reel_duration_seconds":duration}
 
 
-def main() -> None:
+def build_legacy_assets() -> None:
     for directory in (ASSETS,BUILD,HTML,CAROUSEL,REEL,FRAMES):
         directory.mkdir(parents=True,exist_ok=True)
     setup_png = setup_preview()
@@ -375,6 +454,22 @@ def main() -> None:
             shutil.copy2(HERE / note, package / note)
         shutil.make_archive(str(archive_base),"zip",Path(tmp),package.name)
     print(json.dumps(report,ensure_ascii=False))
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--video-carousel",
+        action="store_true",
+        help="build the approved eight-card Instagram video carousel",
+    )
+    args = parser.parse_args()
+    if args.video_carousel:
+        cards = load_carousel_manifest()
+        covers = render_video_carousel_covers(cards)
+        print(json.dumps({"video_carousel_covers": len(covers)}, ensure_ascii=False))
+        return
+    build_legacy_assets()
 
 
 if __name__ == "__main__":
