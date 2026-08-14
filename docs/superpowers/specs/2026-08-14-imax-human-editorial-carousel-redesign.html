@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prickly IMAX Helper · Human Editorial Carousel Redesign</title>
+  <style>
+    :root{
+      --paper:#e9e5dd;--ink:#151515;--muted:#6d6a65;--line:#c9c3b9;
+      --orange:#bb5e24;--coal:#121212;--warm:#f5f1e9;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--paper);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+    header{padding:72px 5vw 58px;border-bottom:1px solid var(--line)}
+    .overline{font:700 12px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;color:var(--muted)}
+    h1{max-width:1050px;margin:24px 0 0;font-size:clamp(46px,6vw,90px);line-height:1.02;letter-spacing:-.065em}
+    .lede{max-width:840px;margin:28px 0 0;font-size:20px;line-height:1.7;color:#47443f}
+    .rule{display:flex;gap:14px;flex-wrap:wrap;margin-top:30px}
+    .rule span{padding:9px 12px;border:1px solid var(--ink);font-size:12px;font-weight:750}
+    main{width:min(1500px,94vw);margin:auto;padding:64px 0 110px}
+    .section-head{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:end;margin:0 0 30px}
+    h2{margin:0;font-size:38px;line-height:1.1;letter-spacing:-.045em}
+    .section-head p{margin:0;color:var(--muted);line-height:1.65}
+    .board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:22px}
+    .slide{position:relative;aspect-ratio:4/5;overflow:hidden;background:#151515;color:#f5f2eb;box-shadow:0 15px 35px rgba(32,29,24,.16)}
+    .slide img{position:absolute;width:100%;height:100%;object-fit:cover}
+    .scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.02),rgba(0,0,0,.12) 42%,rgba(0,0,0,.86))}
+    .copy{position:absolute;z-index:4}
+    .copy h3{margin:0;font-size:clamp(22px,2.15vw,35px);line-height:1.16;letter-spacing:-.055em;font-weight:820}
+    .copy p{margin:14px 0 0;font-size:12px;line-height:1.55;color:rgba(255,255,255,.76)}
+    .tiny{font-size:9px;line-height:1.45;color:rgba(255,255,255,.62)}
+    .mark{position:absolute;z-index:6;font-family:"Nanum Pen Script","Comic Sans MS",cursive;font-size:15px;transform:rotate(-5deg)}
+    .one img{object-position:50% 43%;filter:saturate(.9) contrast(1.03)}
+    .one .scrim{background:linear-gradient(180deg,rgba(0,0,0,.06),rgba(0,0,0,.05) 45%,rgba(0,0,0,.91))}
+    .one .copy{left:26px;right:22px;bottom:36px}
+    .one .copy h3{max-width:280px}
+    .one .aside{position:absolute;z-index:5;right:20px;top:24px;width:1px;height:110px;background:rgba(255,255,255,.58)}
+    .one .aside:after{content:"01";position:absolute;top:119px;right:-8px;font:700 9px ui-monospace;color:#fff}
+    .two img{object-position:54% center;filter:saturate(.62) contrast(1.12)}
+    .two .copy{left:22px;right:38px;top:45px}
+    .two .scrim{background:linear-gradient(110deg,rgba(0,0,0,.72),rgba(0,0,0,.04) 70%)}
+    .soldout{position:absolute;z-index:5;left:48px;right:-28px;bottom:30px;padding:12px 14px;background:#f4f0e7;color:#111;transform:rotate(-2.5deg);box-shadow:0 8px 18px rgba(0,0,0,.35);font-size:11px}
+    .soldout b{color:#ad2f24}
+    .three{background:#e7e0d4;color:#161616}
+    .three .paper{position:absolute;inset:28px 24px 30px;background:#f5f0e7;transform:rotate(-1deg);box-shadow:0 10px 24px rgba(0,0,0,.17)}
+    .three .copy{left:46px;right:38px;top:62px;color:#171717}
+    .three .copy h3{font-size:29px;line-height:1.35;font-weight:720}
+    .strike{position:relative;display:inline-block;margin-bottom:8px}
+    .strike:after{content:"";position:absolute;left:-4px;right:-8px;top:52%;height:3px;background:#8c3124;transform:rotate(-3deg)}
+    .three .note{position:absolute;z-index:5;left:48px;bottom:58px;color:#5f574f;font:600 16px/1.45 "Nanum Pen Script","Comic Sans MS",cursive;transform:rotate(2deg)}
+    .four{background:#1b1b1b}
+    .four .setup{position:absolute;z-index:2;left:-9%;top:10%;width:118%;height:auto;object-fit:contain;filter:none;transform:rotate(-1deg);box-shadow:0 18px 40px rgba(0,0,0,.36)}
+    .four .copy{left:24px;bottom:25px;padding:15px 17px;background:#eee9df;color:#111;width:76%;transform:rotate(.6deg)}
+    .four .copy h3{font-size:25px}
+    .four .mark.a{left:26px;top:66px;color:#e6d6b8}.four .mark.b{right:25px;top:160px;color:#e6d6b8}.four .mark.c{right:22px;top:260px;color:#e6d6b8}
+    .five{background:#d8d5ce;color:#111}
+    .five .window{position:absolute;left:24px;right:17px;top:46px;bottom:30px;background:#f8f7f4;border:1px solid #1f1f1f;box-shadow:9px 11px 0 #5c615f;transform:rotate(.5deg)}
+    .five .bar{height:24px;border-bottom:1px solid #bbb;background:#ebe9e4}
+    .five .state{padding:20px;font:700 11px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;color:#333}
+    .five .state strong{display:block;margin:18px 0 3px;font-size:34px;color:#15774d}
+    .five .copy{left:42px;right:32px;bottom:55px;color:#111}
+    .five .copy h3{font-size:25px}
+    .five .mark{right:27px;top:50px;color:#8a2d23}
+    .six{background:#eee9df;color:#141414}
+    .six .crop{position:absolute;background:#faf8f3;border:1px solid #b9b2a8;box-shadow:0 9px 20px rgba(48,42,33,.12);padding:12px;font-size:10px;color:#313131}
+    .six .crop b{display:block;margin-top:7px;font-size:18px;letter-spacing:-.04em}
+    .six .a{left:-8px;top:54px;width:65%;transform:rotate(-2deg)}
+    .six .b{right:-14px;top:136px;width:61%;transform:rotate(2.2deg)}
+    .six .c{left:18px;top:236px;width:58%;transform:rotate(.8deg)}
+    .six .d{right:20px;bottom:58px;width:57%;transform:rotate(-1.7deg)}
+    .six .caption{position:absolute;left:23px;top:22px;font-size:13px;font-weight:800}
+    .seven{background:#cbc8c0}
+    .seven .guide{position:absolute;left:20px;right:20px;top:-5%;height:auto;object-fit:contain;box-shadow:0 14px 30px rgba(0,0,0,.24);transform:rotate(-.5deg)}
+    .seven .copy{left:20px;right:50px;bottom:25px;padding:14px 15px;background:rgba(20,20,20,.93)}
+    .seven .copy h3{font-size:24px}
+    .seven .cursor{position:absolute;z-index:6;right:55px;top:202px;width:0;height:0;border-left:11px solid #111;border-top:17px solid transparent;transform:rotate(-18deg)}
+    .eight{background:#151515}
+    .eight:before{content:"";position:absolute;left:25px;top:28px;width:38px;height:1px;background:#777}
+    .eight .copy{left:28px;right:40px;top:37%;transform:translateY(-50%)}
+    .eight .copy h3{font-size:31px;line-height:1.28;font-weight:760}
+    .eight .keyword{display:inline-block;margin-top:25px;padding-bottom:4px;border-bottom:2px solid #ebe6dc;font-size:24px;font-weight:820}
+    .eight .brand{position:absolute;left:28px;bottom:25px;font-size:10px;color:#aaa}
+    .notes{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:54px}
+    .panel{padding:28px;border-top:2px solid var(--ink);background:rgba(255,255,255,.2)}
+    .panel h3{margin:0;font-size:20px}
+    .panel ul{margin:20px 0 0;padding-left:18px;color:#4f4b45;line-height:1.8}
+    .locked{margin-top:56px;padding:34px;background:var(--coal);color:#f2eee6;display:grid;grid-template-columns:1.1fr .9fr;gap:48px}
+    .locked h2{font-size:34px}.locked p{color:#aaa49a;line-height:1.7}
+    .locked ol{margin:0;padding-left:20px;line-height:1.9;color:#ddd7ce}
+    footer{padding:30px 5vw;border-top:1px solid var(--line);display:flex;justify-content:space-between;color:var(--muted);font-size:11px}
+    @media(max-width:1100px){.board{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:640px){header{padding:50px 5vw}.section-head,.locked{grid-template-columns:1fr}.board{grid-template-columns:1fr}.notes{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="overline">PRICKLY.AI / IMAX HELPER / REDESIGN SPEC / 2026.08.14</div>
+    <h1>이야기는 유지하고,<br>AI처럼 보이는 틀만 걷어낸다.</h1>
+    <p class="lede">사용자가 승인한 8장 구조는 그대로 쓴다. 반복되는 검정 템플릿, 빨간 번호 박스, 기능 카드, 대칭 그리드를 제거하고 영화 스틸과 실제 화면이 주인공이 되는 에디토리얼 캐러셀로 다시 구성한다.</p>
+    <div class="rule"><span>구조 고정</span><span>문구 톤 절제</span><span>비대칭 구도</span><span>실제 화면 확대</span><span>과장된 제품 목업 금지</span></div>
+  </header>
+
+  <main>
+    <div class="section-head">
+      <h2>8장 시각 초안</h2>
+      <p>카드마다 같은 틀을 씌우지 않는다. 장면의 역할에 따라 영화 포스터, 실제 캡처, 메모, 편집 지면의 문법을 다르게 사용한다. 일관성은 레이아웃 반복이 아니라 서체와 절제된 주석 방식으로 만든다.</p>
+    </div>
+
+    <section class="board">
+      <article class="slide one">
+        <img src="../../../content/assets/odyssey-clean/odyssey-agamemnon-fullbody-1080x1350.jpg" alt="오디세이 갑옷 스틸">
+        <div class="scrim"></div><div class="aside"></div>
+        <div class="copy"><h3>용아맥 표를 구하려고<br>며칠째 새로고침하고 있다면.</h3><p>나 역시 같은 문제를 겪었다.</p></div>
+      </article>
+
+      <article class="slide two">
+        <img src="../../../content/assets/odyssey-clean/odyssey-giants-forest-1080x1350.jpg" alt="안개 속 병사 스틸">
+        <div class="scrim"></div>
+        <div class="copy"><h3>오디세이는 보고 싶은데<br>접속할 때마다 전석 매진.</h3></div>
+        <div class="soldout"><b>SOLD OUT</b>&nbsp;&nbsp; 중고 거래에는 10만 원 넘는 표까지 올라왔다.</div>
+      </article>
+
+      <article class="slide three">
+        <div class="paper"></div>
+        <div class="copy"><h3><span class="strike">새로고침</span><br><span class="strike">자리 발견</span><br>들어가면 이미 끝.</h3></div>
+        <div class="note">이걸 하루 종일<br>반복할 수는 없었다.</div>
+      </article>
+
+      <article class="slide four">
+        <img class="setup" src="../../../generated_assets/prickly_imax_helper_launch/visuals/assets/helper-setup-preview.png" alt="Helper 설정 화면">
+        <div class="mark a">영화</div><div class="mark b">극장 · 시간</div><div class="mark c">붙어 있는 좌석</div>
+        <div class="copy"><h3>그래서 직접 만들었다.</h3><p>원하는 조건을 설정하는 로컬 Helper.</p></div>
+      </article>
+
+      <article class="slide five">
+        <div class="window"><div class="bar"></div><div class="state">PRICKLY MONITOR<strong>armed</strong>match: null<br>local profile: active<br>monitor: 1</div></div>
+        <div class="mark">실제 상태만 표시</div>
+        <div class="copy"><h3>조건을 저장하면<br>새 날짜와 취소표를 확인한다.</h3></div>
+      </article>
+
+      <article class="slide six">
+        <div class="caption">원하는 좌석 조건</div>
+        <div class="crop a">인원 <b>같은 행 연속 2석</b></div>
+        <div class="crop b">허용 열 <b>D · E · F · G · H · I · J</b></div>
+        <div class="crop c">좌석 우선순위 <b>가운데에 가까운 자리</b></div>
+        <div class="crop d">최소 여유 시간 <b>상영 3시간 전</b></div>
+      </article>
+
+      <article class="slide seven">
+        <img class="guide" src="../../../generated_assets/prickly_imax_helper_launch/visuals/assets/install-guide-preview.png" alt="설치 안내 미리보기">
+        <div class="cursor"></div>
+        <div class="copy"><h3>이제 CGV 화면을<br>계속 지켜볼 필요가 없다.</h3><p>설정 완료 → 감시 중 → 설치 안내</p></div>
+      </article>
+
+      <article class="slide eight">
+        <div class="copy"><h3>용아맥 취소표 감시가 필요하다면</h3><div class="keyword">댓글에 아이맥스</div><p>설치 안내를 전송합니다.</p></div>
+        <div class="brand">prickly.ai</div>
+      </article>
+    </section>
+
+    <section class="notes">
+      <div class="panel"><h3>없애는 요소</h3><ul><li>모든 장의 빨간 번호 박스와 상단 브랜드 바</li><li>기능을 네 칸으로 나누는 둥근 SaaS 카드</li><li>매 장 같은 위치에 놓인 제목과 설명</li><li>가짜 브라우저·휴대폰 프레임과 완벽한 대칭</li><li>검정·빨강을 강제로 반복하는 색상 규칙</li></ul></div>
+      <div class="panel"><h3>남기는 연결감</h3><ul><li>같은 서체 계열과 절제된 크기 대비</li><li>영화 스틸의 원래 오렌지·안개색·검정</li><li>한 장에 한 문장만 읽히는 정보 밀도</li><li>실제 캡처를 증거로 사용하는 편집 방식</li><li>마지막 장에만 등장하는 작은 브랜드 표기</li></ul></div>
+    </section>
+
+    <section class="locked">
+      <div><h2>고정된 이야기 구조</h2><p>표지 → 매진 문제 → 반복 실패 → 직접 만든 Helper → 감시 모습 → 좌석 조건 → 시간을 되찾은 결과 → 댓글 CTA. 구조와 핵심 메시지는 변경하지 않는다.</p></div>
+      <ol><li>갑옷 스틸 표지</li><li>매진과 리셀 문제</li><li>새로고침 실패</li><li>실제 Helper 설정</li><li>실제 감시 상태</li><li>사용자 좌석 조건</li><li>감시 결과와 설치 안내</li><li>댓글 ‘아이맥스’</li></ol>
+    </section>
+  </main>
+  <footer><span>PRICKLY IMAX HELPER · HUMAN EDITORIAL REDESIGN</span><span>SPEC STATUS · READY FOR USER REVIEW</span></footer>
+</body>
+</html>
