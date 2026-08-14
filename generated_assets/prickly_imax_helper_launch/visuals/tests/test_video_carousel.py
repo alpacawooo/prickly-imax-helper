@@ -11,6 +11,7 @@ from pathlib import Path
 VISUALS = Path(__file__).resolve().parents[1]
 MANIFEST = VISUALS / "carousel_manifest.json"
 OUTPUT = VISUALS / "video-carousel"
+BUILD_HTML = VISUALS / "build" / "html"
 BANNED_COPY = "Prickly AI는 사람이 반복하던 일을 실제로 작동하는 자동화로 바꾼다."
 
 
@@ -29,9 +30,31 @@ class VideoCarouselManifestTests(unittest.TestCase):
     def test_manifest_has_eight_ordered_cards_and_exact_durations(self) -> None:
         cards = self.load_cards()
         self.assertEqual([card["number"] for card in cards], list(range(1, 9)))
-        self.assertEqual([card["duration"] for card in cards], [6, 6, 7, 9, 8, 7, 9, 6])
+        self.assertEqual(
+            [card["media_type"] for card in cards],
+            ["png", "png", "png", "mp4", "mp4", "png", "mp4", "png"],
+        )
+        self.assertEqual([card["duration"] for card in cards], [None, None, None, 7, 8, None, 8, None])
         self.assertTrue(all(str(card["headline"]).strip() for card in cards))
-        self.assertTrue(all(card["motion"] in {"ken-burns", "red-drift", "proof-pan"} for card in cards))
+        allowed = {"none", "setup-scroll", "workflow-sequence", "outcome-sequence"}
+        self.assertTrue(all(card["motion"] in allowed for card in cards))
+        self.assertGreaterEqual(len({card["composition"] for card in cards}), 6)
+
+    def test_card_seven_copy_describes_outcome_flow_without_fake_transaction(self) -> None:
+        card = self.load_cards()[6]
+        self.assertIn("결과 알림", str(card["headline"]) + str(card["supporting"]))
+        raw = json.dumps(card, ensure_ascii=False).lower()
+        for banned in ("모바일티켓", "예매번호", "qr", "barcode", "실제 예매 완료"):
+            self.assertNotIn(banned, raw)
+
+    def test_card_two_explains_why_the_odyssey_belongs_on_yongsan_imax(self) -> None:
+        card = self.load_cards()[1]
+        self.assertEqual(card["headline"], "오디세이를\n용산 IMAX에서 꼭 봐야 하는 이유.")
+        self.assertEqual(
+            card["supporting"],
+            "IMAX를 위해 촬영한 장면을\n이 압도적인 화면으로 보고 싶으니까.",
+        )
+        self.assertNotIn("여기서만", str(card["headline"]) + str(card["supporting"]))
 
     def test_manifest_excludes_benchmark_and_banned_copy(self) -> None:
         raw = MANIFEST.read_text(encoding="utf-8")
@@ -41,17 +64,28 @@ class VideoCarouselManifestTests(unittest.TestCase):
 
 
 class VideoCarouselOutputTests(unittest.TestCase):
+    def test_condition_slide_uses_the_shared_dark_product_background(self) -> None:
+        source = (BUILD_HTML / "video-carousel-06.html").read_text(encoding="utf-8")
+        self.assertIn(".condition-focus{background:#090909;color:#f7f7f4}", source)
+        self.assertNotIn(".condition-focus{background:#f2f0eb", source)
+
     def test_eight_png_covers_are_exact_instagram_dimensions(self) -> None:
         covers = sorted((OUTPUT / "covers").glob("*.png"))
         self.assertEqual(len(covers), 8)
         for cover in covers:
             self.assertEqual(png_size(cover), (1080, 1350), cover)
 
-    def test_eight_mp4_cards_match_media_contract(self) -> None:
+    def test_publishable_sequence_has_five_pngs_and_three_mp4s(self) -> None:
         cards = self.load_cards()
-        videos = sorted((OUTPUT / "cards").glob("*.mp4"))
-        self.assertEqual(len(videos), 8)
-        for video, card in zip(videos, cards):
+        media = sorted((OUTPUT / "cards").glob("*"))
+        self.assertEqual(
+            [path.name for path in media],
+            ["01.png", "02.png", "03.png", "04.mp4", "05.mp4", "06.png", "07.mp4", "08.png"],
+        )
+        for image in [path for path in media if path.suffix == ".png"]:
+            self.assertEqual(png_size(image), (1080, 1350), image)
+        for video in [path for path in media if path.suffix == ".mp4"]:
+            card = cards[int(video.stem) - 1]
             probe = subprocess.check_output(
                 [
                     "ffprobe",
@@ -80,8 +114,9 @@ class VideoCarouselOutputTests(unittest.TestCase):
         archive = VISUALS / "prickly-imax-helper-video-carousel.zip"
         with zipfile.ZipFile(archive) as bundle:
             names = bundle.namelist()
-        self.assertEqual(sum(name.startswith("cards/") and name.endswith(".mp4") for name in names), 8)
-        self.assertEqual(sum(name.startswith("covers/") and name.endswith(".png") for name in names), 8)
+        self.assertEqual(sum(name.startswith("cards/") and name.endswith(".mp4") for name in names), 3)
+        self.assertEqual(sum(name.startswith("cards/") and name.endswith(".png") for name in names), 5)
+        self.assertEqual(sum(name.startswith("covers/") for name in names), 0)
         self.assertNotIn("ScreenRecording_08-14-2026 17-39-23_1.MP4", names)
 
 
