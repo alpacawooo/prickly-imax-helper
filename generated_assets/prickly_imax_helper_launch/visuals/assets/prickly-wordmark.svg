@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
+  <rect width="1080" height="1080" fill="#f4f4f4"/>
+  <circle cx="540" cy="540" r="370" fill="#050505"/>
+  <text x="540" y="560"
+        text-anchor="middle"
+        dominant-baseline="middle"
+        fill="#ffffff"
+        font-family="Avenir Next Condensed, Avenir Next, Helvetica Neue, Arial, sans-serif"
+        font-size="142"
+        font-weight="800"
+        letter-spacing="-1">prickly.mag</text>
+</svg>
