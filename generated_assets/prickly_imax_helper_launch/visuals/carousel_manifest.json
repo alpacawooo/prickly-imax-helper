@@ -1,0 +1,92 @@
+{
+  "cards": [
+    {
+      "number": 1,
+      "duration": 6,
+      "source_type": "odyssey-still",
+      "source": "content/assets/odyssey-clean/odyssey-agamemnon-fullbody-1080x1350.jpg",
+      "eyebrow": "일부 리셀 게시물 사례",
+      "headline": "용아맥 한 자리 보는데 30만 원?",
+      "supporting": "정가를 훌쩍 넘긴 리셀 게시물까지 나왔다.",
+      "footer": "일반적인 거래 가격을 뜻하지 않습니다.",
+      "motion": "ken-burns"
+    },
+    {
+      "number": 2,
+      "duration": 6,
+      "source_type": "odyssey-still",
+      "source": "content/assets/odyssey-clean/odyssey-giants-forest-1080x1350.jpg",
+      "eyebrow": "전석 매진",
+      "headline": "보고 싶은 사람은 많은데 원하는 날짜는 이미 매진.",
+      "supporting": "취소표가 보여도 몇 초 만에 사라진다.",
+      "footer": "ODYSSEY · YONGSAN IMAX",
+      "motion": "ken-burns"
+    },
+    {
+      "number": 3,
+      "duration": 7,
+      "source_type": "editorial",
+      "source": "",
+      "eyebrow": "THE LOOP",
+      "headline": "새로고침 · 포기 · 비싼 리셀",
+      "supporting": "셋 다 내가 원한 해결은 아니었다.",
+      "footer": "취소표는 기다려주지 않는다.",
+      "motion": "red-drift"
+    },
+    {
+      "number": 4,
+      "duration": 9,
+      "source_type": "helper-setup",
+      "source": "generated_assets/prickly_imax_helper_launch/visuals/assets/helper-setup-preview.png",
+      "eyebrow": "REAL LOCAL SETUP",
+      "headline": "설치 → 직접 로그인 → 원하는 조건 설정",
+      "supporting": "영화 · 극장 · 시간 · 인원 · 좌석 조건을 내가 바꾼다.",
+      "footer": "비밀번호와 결제정보는 입력하지 않습니다.",
+      "motion": "proof-pan"
+    },
+    {
+      "number": 5,
+      "duration": 8,
+      "source_type": "status-proof",
+      "source": "",
+      "eyebrow": "LOCAL MONITOR",
+      "headline": "지금 열린 날짜부터 새로 열릴 날짜까지.",
+      "supporting": "match:null은 실패가 아니라 조건에 맞는 좌석을 기다리는 중.",
+      "footer": "실제 예매 완료를 꾸며내지 않습니다.",
+      "motion": "red-drift"
+    },
+    {
+      "number": 6,
+      "duration": 7,
+      "source_type": "safety-proof",
+      "source": "",
+      "eyebrow": "SAFETY BEFORE SPEED",
+      "headline": "빠르기 전에 틀리지 않는 게 먼저.",
+      "supporting": "중복 차단 · 관람권 수 확인 · 잔액 0원 · 최종 제출 1회",
+      "footer": "카드 결제 자동화 없음",
+      "motion": "red-drift"
+    },
+    {
+      "number": 7,
+      "duration": 9,
+      "source_type": "guide-preview",
+      "source": "docs/notion-quick-start.md",
+      "eyebrow": "WHAT YOU RECEIVE",
+      "headline": "댓글을 남기면 이 설치 안내를 보낸다.",
+      "supporting": "Mac · Windows 설치, 전용 Chrome 로그인, 조건 설정, 관람권 안내",
+      "footer": "설치 안내 미리보기 · 개인정보 없는 로컬 재현",
+      "motion": "proof-pan"
+    },
+    {
+      "number": 8,
+      "duration": 6,
+      "source_type": "cta",
+      "source": "",
+      "eyebrow": "COMMENT → DM",
+      "headline": "댓글에 ‘아이맥스’라고 남기면 설치 방법을 보내줄게.",
+      "supporting": "Mac · Windows / 내 컴퓨터 · 내 CGV 계정 · 내 IMAX 관람권",
+      "footer": "prickly.ai",
+      "motion": "red-drift"
+    }
+  ]
+}

@@ -23,6 +23,36 @@ CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 FFMPEG = shutil.which("ffmpeg") or "/opt/homebrew/bin/ffmpeg"
 FFPROBE = shutil.which("ffprobe") or "/opt/homebrew/bin/ffprobe"
 PRODUCT_PYTHON = Path("/Users/woojinyoung/.prickly-imax-helper/venv/bin/python")
+MANIFEST = HERE / "carousel_manifest.json"
+VIDEO_CAROUSEL = HERE / "video-carousel"
+VIDEO_COVERS = VIDEO_CAROUSEL / "covers"
+VIDEO_CARDS = VIDEO_CAROUSEL / "cards"
+ALLOWED_MOTIONS = {"ken-burns", "red-drift", "proof-pan"}
+BANNED_COPY = "Prickly AI는 사람이 반복하던 일을 실제로 작동하는 자동화로 바꾼다."
+
+
+def validate_manifest(cards: list[dict[str, object]]) -> None:
+    if [card.get("number") for card in cards] != list(range(1, 9)):
+        raise ValueError("video carousel must contain cards 1 through 8 in order")
+    if [card.get("duration") for card in cards] != [6, 6, 7, 9, 8, 7, 9, 6]:
+        raise ValueError("video carousel durations do not match the approved design")
+    for card in cards:
+        if not str(card.get("headline", "")).strip():
+            raise ValueError(f"card {card.get('number')} has no headline")
+        if card.get("motion") not in ALLOWED_MOTIONS:
+            raise ValueError(f"card {card.get('number')} has unsupported motion")
+        source = str(card.get("source", ""))
+        if source and not (ROOT / source).is_file():
+            raise FileNotFoundError(ROOT / source)
+    raw = json.dumps(cards, ensure_ascii=False)
+    if "ScreenRecording_08-14-2026" in raw or "ai_freaks" in raw.lower() or BANNED_COPY in raw:
+        raise ValueError("manifest contains benchmark material or banned copy")
+
+
+def load_carousel_manifest() -> list[dict[str, object]]:
+    cards = json.loads(MANIFEST.read_text(encoding="utf-8"))["cards"]
+    validate_manifest(cards)
+    return cards
 
 
 def run(*args: str, cwd: Path | None = None) -> None:
