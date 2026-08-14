@@ -3,6 +3,9 @@ from __future__ import annotations
 import importlib.util
 import copy
 import json
+import os
+import subprocess
+import sys
 import unittest
 from datetime import date
 from pathlib import Path
@@ -19,6 +22,19 @@ CONFIG = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 
 
 class PolicyTests(unittest.TestCase):
+    def test_korea_timezone_loads_without_system_timezone_database(self):
+        environment = os.environ.copy()
+        environment["PYTHONTZPATH"] = ""
+        completed = subprocess.run(
+            [sys.executable, "-c", "from prickly_imax_helper.policy import KOREA_TIMEZONE; print(KOREA_TIMEZONE.key)"],
+            capture_output=True,
+            text=True,
+            env=environment,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(completed.stdout.strip(), "Asia/Seoul")
+
     def test_default_config_is_valid(self):
         self.assertEqual(policy.validate(CONFIG), {"ok": True, "errors": []})
 
@@ -32,6 +48,25 @@ class PolicyTests(unittest.TestCase):
         custom["payment"]["voucher_count"] = 3
         custom["time_rules"]["weekday"]["at_or_after"] = "18:00"
         self.assertEqual(policy.validate(custom), {"ok": True, "errors": []})
+
+    def test_plugin_minimum_lead_boundary_and_legacy_default(self):
+        for value in (180, 1440):
+            with self.subTest(valid=value):
+                config = copy.deepcopy(CONFIG)
+                config["minimum_lead_minutes"] = value
+                self.assertEqual(policy.validate(config), {"ok": True, "errors": []})
+
+        legacy = copy.deepcopy(CONFIG)
+        legacy.pop("minimum_lead_minutes", None)
+        self.assertEqual(policy.validate(legacy), {"ok": True, "errors": []})
+
+        for value in (179, True, 1441):
+            with self.subTest(invalid=value):
+                config = copy.deepcopy(CONFIG)
+                config["minimum_lead_minutes"] = value
+                result = policy.validate(config)
+                self.assertFalse(result["ok"])
+                self.assertTrue(any("minimum_lead_minutes" in error for error in result["errors"]))
 
     def test_center_adjacent_pair_wins(self):
         seats = [f"H{i}" for i in range(1, 31)]

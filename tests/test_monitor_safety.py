@@ -8,7 +8,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from prickly_imax_helper.checkout import TicketCheckUnavailable
+from prickly_imax_helper.checkout import DuplicateBlocked, PaymentBlocked, TicketCheckUnavailable, UnknownAfterSubmit
+from prickly_imax_helper.checkout_attempt import CheckoutAttemptRecorder
 from prickly_imax_helper.config import write_config
 from prickly_imax_helper.cli import main as cli_main
 from prickly_imax_helper.monitor import CHECKOUT_GUARD_RETRY_SECONDS, OPEN_DATE_REFRESH_SECONDS, _checkout, rate_limit_backoff_seconds, run
@@ -18,6 +19,206 @@ from test_runtime_core import VALID_CONFIG
 
 
 class MonitorRestartSafetyTests(unittest.TestCase):
+    def test_resident_uses_four_fair_hot_probes_before_schedule_discovery(self):
+        calls = []
+
+        class FakeSession:
+            page = object()
+
+            def __init__(self, *args, **kwargs):
+                pass
+
+            @contextlib.contextmanager
+            def locked(self):
+                yield self
+
+            def require_login(self):
+                return None
+
+            def open_dates(self):
+                calls.append(("open_dates", None))
+                return ["20260820"]
+
+            def schedules(self, ymd):
+                calls.append(("schedule", ymd))
+                return [
+                    {"movkndDsplNm": "IMAX", "scnsrtTm": "1900", "scnsNo": "18", "scnSseq": "1"},
+                    {"movkndDsplNm": "IMAX", "scnsrtTm": "2200", "scnsNo": "18", "scnSseq": "2"},
+                ]
+
+            def seats(self, ymd, screen_no, sequence):
+                calls.append(("seats", sequence))
+                return {"all": ["H15", "H16"], "available": []}
+
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            write_config(paths.config, copy.deepcopy(VALID_CONFIG))
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+
+            with patch("prickly_imax_helper.monitor.launch_browser"), patch(
+                "prickly_imax_helper.monitor.CgvSession", FakeSession
+            ):
+                self.assertEqual(run(paths, max_cycles=7, allow_checkout=False), 0)
+
+            self.assertEqual(
+                calls,
+                [
+                    ("open_dates", None),
+                    ("schedule", "20260820"),
+                    ("seats", "1"),
+                    ("seats", "2"),
+                    ("seats", "1"),
+                    ("seats", "2"),
+                    ("schedule", "20260820"),
+                ],
+            )
+            state = read_state(paths.heartbeat)
+            self.assertEqual(state["last_scan_lane"], "discovery")
+            self.assertEqual(state["hot_target_count"], 2)
+            self.assertLessEqual(state["estimated_hot_revisit_seconds"], 3.0)
+
+    def test_hot_target_is_pruned_when_it_no_longer_meets_time_policy(self):
+        seat_calls = []
+        cached_show = {
+            "ymd": "20260820",
+            "movkndDsplNm": "IMAX",
+            "scnsrtTm": "1900",
+            "scnsNo": "18",
+            "scnSseq": "1",
+            "time": "19:00",
+        }
+
+        class FakeSession:
+            page = object()
+
+            def __init__(self, *args, **kwargs):
+                pass
+
+            @contextlib.contextmanager
+            def locked(self):
+                yield self
+
+            def require_login(self):
+                return None
+
+            def open_dates(self):
+                return ["20260820"]
+
+            def schedules(self, _ymd):
+                return [cached_show]
+
+            def seats(self, *_args):
+                seat_calls.append(True)
+                return {"all": [], "available": []}
+
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            write_config(paths.config, copy.deepcopy(VALID_CONFIG))
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+
+            with patch("prickly_imax_helper.monitor.launch_browser"), patch(
+                "prickly_imax_helper.monitor.CgvSession", FakeSession
+            ), patch(
+                "prickly_imax_helper.monitor.eligible_shows",
+                side_effect=[[cached_show], []],
+            ):
+                self.assertEqual(run(paths, max_cycles=3, allow_checkout=False), 0)
+
+            self.assertEqual(seat_calls, [])
+            self.assertEqual(read_state(paths.heartbeat)["hot_target_count"], 0)
+
+    def test_empty_seat_map_prunes_target_and_prioritizes_schedule_refresh(self):
+        calls = []
+
+        class FakeSession:
+            page = object()
+
+            def __init__(self, *args, **kwargs):
+                pass
+
+            @contextlib.contextmanager
+            def locked(self):
+                yield self
+
+            def require_login(self):
+                return None
+
+            def open_dates(self):
+                calls.append(("open_dates", None))
+                return ["20260820"]
+
+            def schedules(self, ymd):
+                calls.append(("schedule", ymd))
+                return [{"movkndDsplNm": "IMAX", "scnsrtTm": "1900", "scnsNo": "18", "scnSseq": "1"}]
+
+            def seats(self, _ymd, _screen_no, sequence):
+                calls.append(("seats", sequence))
+                return {"all": [], "available": []}
+
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            write_config(paths.config, copy.deepcopy(VALID_CONFIG))
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+
+            with patch("prickly_imax_helper.monitor.launch_browser"), patch(
+                "prickly_imax_helper.monitor.CgvSession", FakeSession
+            ):
+                self.assertEqual(run(paths, max_cycles=4, allow_checkout=False), 0)
+
+            self.assertEqual(
+                calls,
+                [
+                    ("open_dates", None),
+                    ("schedule", "20260820"),
+                    ("seats", "1"),
+                    ("schedule", "20260820"),
+                ],
+            )
+
+    def test_first_matching_seat_map_stops_scanning_after_one_checkout(self):
+        class FakeSession:
+            page = object()
+
+            def __init__(self, *args, **kwargs):
+                pass
+
+            @contextlib.contextmanager
+            def locked(self):
+                yield self
+
+            def require_login(self):
+                return None
+
+            def open_dates(self):
+                return ["20260820"]
+
+            def schedules(self, _ymd):
+                return [{"movkndDsplNm": "IMAX", "scnsrtTm": "1900", "scnsNo": "18", "scnSseq": "1"}]
+
+            def seats(self, *_args):
+                return {
+                    "all": [f"H{number}" for number in range(1, 11)],
+                    "available": ["H5", "H6"],
+                }
+
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            write_config(paths.config, copy.deepcopy(VALID_CONFIG))
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+
+            with patch("prickly_imax_helper.monitor.launch_browser"), patch(
+                "prickly_imax_helper.monitor.CgvSession", FakeSession
+            ), patch(
+                "prickly_imax_helper.monitor._checkout", return_value=Status.COMPLETED.value
+            ) as checkout:
+                self.assertEqual(run(paths, max_cycles=20, allow_checkout=True), 0)
+
+            checkout.assert_called_once()
+
     def test_new_booking_dates_are_refreshed_within_thirty_seconds(self):
         self.assertLessEqual(OPEN_DATE_REFRESH_SECONDS, 30.0)
 
@@ -46,8 +247,292 @@ class MonitorRestartSafetyTests(unittest.TestCase):
             with patch("prickly_imax_helper.monitor.CheckoutFlow", GuardUnavailableFlow), patch(
                 "prickly_imax_helper.monitor._notify"
             ):
-                self.assertEqual(_checkout(paths, copy.deepcopy(VALID_CONFIG), session, match), Status.RECOVERING.value)
+                recorder = CheckoutAttemptRecorder.start(paths.logs, match)
+                self.assertEqual(
+                    _checkout(paths, copy.deepcopy(VALID_CONFIG), session, match, recorder),
+                    Status.RECOVERING.value,
+                )
             self.assertEqual(read_state(paths.heartbeat)["status"], Status.RECOVERING.value)
+
+    def test_checkout_records_ordered_stages_and_one_terminal_outcome(self):
+        actions = []
+        timeline = []
+
+        class SuccessfulFlow:
+            def __init__(self, *_args, **_kwargs):
+                pass
+
+            def ensure_no_existing_ticket(self, *_args, **_kwargs):
+                actions.append("duplicate")
+
+            def open_movie_and_theater(self):
+                actions.append("theater")
+
+            def _require_match_date(self, _match):
+                actions.append("date")
+
+            def _open_match_showtime(self, _match):
+                actions.append("showtime")
+
+            def _select_general_party(self, party):
+                actions.append(f"party:{party}")
+
+            def _select_seats(self, _match):
+                actions.append("seats")
+
+            def open_payment_and_apply_vouchers(self):
+                actions.append("vouchers")
+
+            def prove_ready(self, _match):
+                actions.append("zero_balance")
+
+            def submit_once(self):
+                actions.append("submission")
+
+            def verify_mobile_ticket(self, _match):
+                actions.append("mobile_ticket")
+                return type("CheckoutResult", (), {"proof": {"ticket_count": 1}})()
+
+        class RecorderSpy:
+            attempt_id = "attempt-a"
+
+            def __init__(self):
+                self.stages = []
+                self.terminals = []
+
+            @contextlib.contextmanager
+            def stage(self, name):
+                self.stages.append((name, "started"))
+                yield
+                self.stages.append((name, "passed"))
+
+            def mark(self, name, outcome="passed"):
+                self.stages.append((name, outcome))
+
+            def terminal(self, name, *, error=None):
+                self.terminals.append((name, error))
+                timeline.append(("terminal", name))
+
+        def notify(_paths, _config, subject, _body, *, attempt_id=None):
+            timeline.append(("notify", subject, attempt_id))
+
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+            transition(paths.heartbeat, Status.ARMED)
+            match = {"date": "2026-08-21", "time": "24:30", "seats": ["G13", "G14"], "pair": "G13-G14"}
+            session = type(
+                "Session",
+                (),
+                {
+                    "page": object(),
+                    "booking_target_from_page": lambda _self: {"company_code": "A420", "site_no": "0013", "movie_no": "30001323"},
+                },
+            )()
+            recorder = RecorderSpy()
+            with patch("prickly_imax_helper.monitor.CheckoutFlow", SuccessfulFlow), patch(
+                "prickly_imax_helper.monitor._notify", side_effect=notify
+            ):
+                result = _checkout(paths, copy.deepcopy(VALID_CONFIG), session, match, recorder)
+
+        self.assertEqual(result, Status.COMPLETED.value)
+        self.assertEqual(
+            actions,
+            [
+                "duplicate",
+                "theater",
+                "date",
+                "showtime",
+                "party:2",
+                "seats",
+                "vouchers",
+                "zero_balance",
+                "duplicate",
+                "submission",
+                "mobile_ticket",
+            ],
+        )
+        passed = [name for name, outcome in recorder.stages if outcome == "passed"]
+        self.assertEqual(
+            passed,
+            [
+                "duplicate_guard_before",
+                "theater",
+                "date",
+                "showtime",
+                "party",
+                "seats",
+                "vouchers",
+                "zero_balance",
+                "duplicate_guard_final",
+                "submission_ready",
+                "submission",
+                "mobile_ticket",
+            ],
+        )
+        self.assertEqual(recorder.terminals, [("completed", None)])
+        self.assertEqual(
+            timeline,
+            [
+                ("terminal", "completed"),
+                ("notify", "Prickly IMAX 예매 완료", "attempt-a"),
+            ],
+        )
+
+    def test_terminal_block_and_unknown_notifications_follow_correlated_terminal_outcomes(self):
+        cases = (
+            (
+                "blocked_duplicate",
+                DuplicateBlocked("existing ticket"),
+                Status.BLOCKED_DUPLICATE.value,
+                "Prickly IMAX 예매 중단",
+            ),
+            (
+                "blocked_payment",
+                PaymentBlocked("voucher proof failed"),
+                Status.BLOCKED_PAYMENT.value,
+                "Prickly IMAX 결제 중단",
+            ),
+            (
+                "unknown_after_submit",
+                UnknownAfterSubmit("mobile ticket unavailable"),
+                Status.UNKNOWN_AFTER_SUBMIT.value,
+                "Prickly IMAX 결과 확인 필요",
+            ),
+        )
+
+        for terminal, failure, expected_status, expected_subject in cases:
+            with self.subTest(terminal=terminal):
+                timeline = []
+
+                class TerminalFlow:
+                    def __init__(self, *_args, **_kwargs):
+                        pass
+
+                    def ensure_no_existing_ticket(self, *_args, **_kwargs):
+                        if terminal == "blocked_duplicate":
+                            raise failure
+
+                    def open_movie_and_theater(self):
+                        pass
+
+                    def _require_match_date(self, _match):
+                        pass
+
+                    def _open_match_showtime(self, _match):
+                        pass
+
+                    def _select_general_party(self, _party):
+                        pass
+
+                    def _select_seats(self, _match):
+                        pass
+
+                    def open_payment_and_apply_vouchers(self):
+                        if terminal == "blocked_payment":
+                            raise failure
+
+                    def prove_ready(self, _match):
+                        pass
+
+                    def submit_once(self):
+                        if terminal == "unknown_after_submit":
+                            raise failure
+
+                    def verify_mobile_ticket(self, _match):
+                        raise AssertionError("unknown-after-submit must stop before ticket verification")
+
+                class RecorderSpy:
+                    attempt_id = "attempt-a"
+
+                    @contextlib.contextmanager
+                    def stage(self, _name):
+                        yield
+
+                    def mark(self, _name, outcome="passed"):
+                        self.outcome = outcome
+
+                    def terminal(self, name, *, error=None):
+                        timeline.append(("terminal", name, error))
+
+                def notify(_paths, _config, subject, _body, *, attempt_id=None):
+                    timeline.append(("notify", subject, attempt_id))
+
+                with tempfile.TemporaryDirectory() as temp:
+                    paths = RuntimePaths(Path(temp))
+                    paths.prepare()
+                    transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+                    transition(paths.heartbeat, Status.ARMED)
+                    match = {
+                        "date": "2026-08-21",
+                        "time": "24:30",
+                        "seats": ["G13", "G14"],
+                        "pair": "G13-G14",
+                    }
+                    session = type(
+                        "Session",
+                        (),
+                        {
+                            "page": object(),
+                            "booking_target_from_page": lambda _self: {
+                                "company_code": "A420",
+                                "site_no": "0013",
+                                "movie_no": "30001323",
+                            },
+                        },
+                    )()
+                    with patch("prickly_imax_helper.monitor.CheckoutFlow", TerminalFlow), patch(
+                        "prickly_imax_helper.monitor._notify", side_effect=notify
+                    ):
+                        result = _checkout(paths, copy.deepcopy(VALID_CONFIG), session, match, RecorderSpy())
+
+                self.assertEqual(result, expected_status)
+                self.assertEqual(
+                    timeline,
+                    [
+                        ("terminal", terminal, str(failure)),
+                        ("notify", expected_subject, "attempt-a"),
+                    ],
+                )
+
+    def test_recorder_failure_stops_before_next_booking_action(self):
+        actions = []
+
+        class Flow:
+            def __init__(self, *_args, **_kwargs):
+                pass
+
+            def ensure_no_existing_ticket(self, *_args, **_kwargs):
+                actions.append("duplicate")
+
+            def open_movie_and_theater(self):
+                actions.append("theater")
+
+        class FailingRecorder:
+            attempt_id = "attempt-a"
+
+            @contextlib.contextmanager
+            def stage(self, name):
+                if name == "theater":
+                    raise OSError("log unavailable")
+                yield
+
+            def terminal(self, *_args, **_kwargs):
+                raise AssertionError("a recorder write failure must propagate")
+
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+            transition(paths.heartbeat, Status.ARMED)
+            match = {"date": "2026-08-21", "time": "24:30", "seats": ["G13", "G14"], "pair": "G13-G14"}
+            session = type("Session", (), {"page": object()})()
+            with patch("prickly_imax_helper.monitor.CheckoutFlow", Flow):
+                with self.assertRaisesRegex(OSError, "log unavailable"):
+                    _checkout(paths, copy.deepcopy(VALID_CONFIG), session, match, FailingRecorder())
+
+        self.assertEqual(actions, ["duplicate"])
 
     def test_checkout_guard_retry_is_not_a_fast_loop(self):
         self.assertGreaterEqual(CHECKOUT_GUARD_RETRY_SECONDS, 300)
@@ -89,6 +574,53 @@ class MonitorRestartSafetyTests(unittest.TestCase):
                 self.assertEqual(run(paths), 2)
             launch.assert_not_called()
             self.assertEqual(read_state(paths.heartbeat)["status"], "unknown_after_submit")
+
+    def test_restart_before_submission_records_correlated_interruption_first(self):
+        timeline = []
+        match = {"date": "2026-08-21", "time": "24:30", "seats": ["G13", "G14"], "pair": "G13-G14"}
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            write_config(paths.config, copy.deepcopy(VALID_CONFIG))
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+            transition(paths.heartbeat, Status.ARMED)
+            transition(paths.heartbeat, Status.STAGING, attempt_id="attempt-a", match=match)
+
+            def record_event(_log_dir, event, **fields):
+                timeline.append(("event", event, fields))
+
+            def record_heartbeat(_paths, status, detail="", **fields):
+                timeline.append(("heartbeat", status.value, fields))
+
+            with patch("prickly_imax_helper.monitor.write_event", side_effect=record_event), patch(
+                "prickly_imax_helper.monitor._heartbeat", side_effect=record_heartbeat
+            ), patch("prickly_imax_helper.monitor.launch_browser", side_effect=RuntimeError("stop after recovery")):
+                with self.assertRaisesRegex(RuntimeError, "stop after recovery"):
+                    run(paths)
+
+        self.assertEqual(
+            timeline[:2],
+            [
+                ("event", "checkout_attempt_interrupted", {"attempt_id": "attempt-a", "match": match}),
+                ("heartbeat", "recovering", {}),
+            ],
+        )
+
+    def test_submission_restart_never_records_pre_submit_interruption(self):
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            write_config(paths.config, copy.deepcopy(VALID_CONFIG))
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+            transition(paths.heartbeat, Status.ARMED)
+            transition(paths.heartbeat, Status.STAGING, attempt_id="attempt-a", match={"pair": "G13-G14"})
+            transition(paths.heartbeat, Status.SUBMITTING)
+            with patch("prickly_imax_helper.monitor.write_event") as write, patch(
+                "prickly_imax_helper.monitor.launch_browser"
+            ) as launch, patch("prickly_imax_helper.monitor._notify"):
+                self.assertEqual(run(paths), 2)
+            launch.assert_not_called()
+            self.assertFalse(any(call.args[1] == "checkout_attempt_interrupted" for call in write.call_args_list))
 
     def test_dry_run_scans_without_checkout(self):
         class FakeSession:
@@ -155,6 +687,40 @@ class MonitorRestartSafetyTests(unittest.TestCase):
             state = read_state(paths.heartbeat)
             self.assertEqual(state["status"], "armed")
             self.assertEqual(state["open_dates"], 0)
+
+    def test_successful_scan_clears_stale_consecutive_error_count(self):
+        class FakeSession:
+            page = object()
+
+            def __init__(self, *args, **kwargs):
+                pass
+
+            @contextlib.contextmanager
+            def locked(self):
+                yield self
+
+            def require_login(self):
+                return None
+
+            def open_dates(self):
+                return []
+
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            write_config(paths.config, copy.deepcopy(VALID_CONFIG))
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+            transition(paths.heartbeat, Status.ARMED)
+            transition(paths.heartbeat, Status.RECOVERING, errors=116)
+
+            with patch("prickly_imax_helper.monitor.launch_browser"), patch(
+                "prickly_imax_helper.monitor.CgvSession", FakeSession
+            ):
+                self.assertEqual(run(paths, max_cycles=1, allow_checkout=False), 0)
+
+            state = read_state(paths.heartbeat)
+            self.assertEqual(state["status"], "armed")
+            self.assertEqual(state["errors"], 0)
 
     def test_stop_sentinel_prevents_browser_launch(self):
         with tempfile.TemporaryDirectory() as temp:

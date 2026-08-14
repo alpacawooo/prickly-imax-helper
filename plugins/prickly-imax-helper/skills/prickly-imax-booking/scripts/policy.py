@@ -47,6 +47,9 @@ def validate(config: dict) -> dict:
     party = config.get("party_size")
     if not isinstance(party, int) or party < 1 or party > 8:
         errors.append("party_size must be an integer from 1 to 8")
+    minimum_lead = config.get("minimum_lead_minutes", 180)
+    if isinstance(minimum_lead, bool) or not isinstance(minimum_lead, int) or not 180 <= minimum_lead <= 1440:
+        errors.append("minimum_lead_minutes must be an integer from 180 through 1440")
     rows = config.get("rows")
     if not isinstance(rows, list) or not rows or any(not re.fullmatch(r"[A-Z]+", str(row)) for row in rows):
         errors.append("rows must be a non-empty array of uppercase row labels")

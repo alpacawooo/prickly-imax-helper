@@ -1,0 +1,27 @@
+{"at":"2026-08-01T10:00:00+09:00","event":"seat_match","match":{"date":"2026-08-10","time":"19:00","pair":"D20-D21","seats":["D20","D21"]}}
+{"at":"2026-08-01T10:00:01+09:00","event":"checkout_pre_submit_error","match":{"date":"2026-08-10","time":"19:00","pair":"D20-D21","seats":["D20","D21"]},"error":"theater picker launcher not found"}
+{"at":"2026-08-01T10:01:00+09:00","event":"seat_match","match":{"date":"2026-08-10","time":"20:00","pair":"E20-E21","seats":["E20","E21"]}}
+{"at":"2026-08-01T10:01:01+09:00","event":"checkout_pre_submit_error","match":{"date":"2026-08-10","time":"20:00","pair":"E20-E21","seats":["E20","E21"]},"error":"theater picker launcher not found"}
+{"at":"2026-08-01T10:02:00+09:00","event":"seat_match","match":{"date":"2026-08-11","time":"19:10","pair":"F20-F21","seats":["F20","F21"]}}
+{"at":"2026-08-01T10:02:01+09:00","event":"checkout_pre_submit_error","match":{"date":"2026-08-11","time":"19:10","pair":"F20-F21","seats":["F20","F21"]},"error":"theater picker launcher not found"}
+{"at":"2026-08-01T10:03:00+09:00","event":"seat_match","match":{"date":"2026-08-11","time":"20:10","pair":"G20-G21","seats":["G20","G21"]}}
+{"at":"2026-08-01T10:03:01+09:00","event":"checkout_pre_submit_error","match":{"date":"2026-08-11","time":"20:10","pair":"G20-G21","seats":["G20","G21"]},"error":"theater picker launcher not found"}
+{"at":"2026-08-01T10:04:00+09:00","event":"seat_match","match":{"date":"2026-08-12","time":"19:20","pair":"H20-H21","seats":["H20","H21"]}}
+{"at":"2026-08-01T10:04:01+09:00","event":"checkout_pre_submit_error","match":{"date":"2026-08-12","time":"19:20","pair":"H20-H21","seats":["H20","H21"]},"error":"theater picker launcher not found"}
+{"at":"2026-08-01T10:05:00+09:00","event":"seat_match","match":{"date":"2026-08-12","time":"20:20","pair":"I20-I21","seats":["I20","I21"]}}
+{"at":"2026-08-01T10:05:01+09:00","event":"checkout_pre_submit_error","match":{"date":"2026-08-12","time":"20:20","pair":"I20-I21","seats":["I20","I21"]},"error":"theater picker launcher not found"}
+{"at":"2026-08-01T10:06:00+09:00","event":"seat_match","match":{"date":"2026-08-13","time":"19:30","pair":"J20-J21","seats":["J20","J21"]}}
+{"at":"2026-08-01T10:06:01+09:00","event":"checkout_pre_submit_error","match":{"date":"2026-08-13","time":"19:30","pair":"J20-J21","seats":["J20","J21"]},"error":"theater picker launcher not found"}
+{"at":"2026-08-01T10:07:00+09:00","event":"seat_match","match":{"date":"2026-08-13","time":"20:30","pair":"D22-D23","seats":["D22","D23"]}}
+{"at":"2026-08-01T10:07:01+09:00","event":"checkout_pre_submit_error","match":{"date":"2026-08-13","time":"20:30","pair":"D22-D23","seats":["D22","D23"]},"error":"theater picker launcher not found"}
+{"at":"2026-08-01T10:08:00+09:00","event":"seat_match","match":{"date":"2026-08-14","time":"19:40","pair":"E22-E23","seats":["E22","E23"]}}
+{"at":"2026-08-01T10:08:01+09:00","event":"checkout_pre_submit_error","match":{"date":"2026-08-14","time":"19:40","pair":"E22-E23","seats":["E22","E23"]},"error":"theater picker launcher not found"}
+{"at":"2026-08-01T10:09:00+09:00","event":"seat_match","match":{"date":"2026-08-14","time":"20:40","pair":"F22-F23","seats":["F22","F23"]}}
+{"at":"2026-08-01T10:09:01+09:00","event":"checkout_pre_submit_error","match":{"date":"2026-08-14","time":"20:40","pair":"F22-F23","seats":["F22","F23"]},"error":"theater picker launcher not found"}
+{"at":"2026-08-01T10:10:00+09:00","event":"seat_match","match":{"date":"2026-08-15","time":"20:30","pair":"E25-E26","seats":["E25","E26"]}}
+{"at":"2026-08-01T10:10:01+09:00","event":"seat_vanished","match":{"date":"2026-08-15","time":"20:30","pair":"E25-E26","seats":["E25","E26"]},"error":"target date is no longer open"}
+{"at":"2026-08-01T10:11:00+09:00","event":"seat_match","match":{"date":"2026-08-16","time":"21:00","pair":"F25-F26","seats":["F25","F26"]}}
+{"at":"2026-08-01T10:11:01+09:00","event":"seat_vanished","match":{"date":"2026-08-16","time":"21:00","pair":"F25-F26","seats":["F25","F26"]},"error":"target date is no longer open"}
+{"at":"2026-08-01T10:12:00+09:00","event":"seat_match","match":{"date":"2026-08-17","time":"19:50","pair":"G25-G26","seats":["G25","G26"]}}
+{"at":"2026-08-01T10:12:01+09:00","event":"checkout_pre_submit_error","match":{"date":"2026-08-17","time":"19:50","pair":"G25-G26","seats":["G25","G26"]},"error":"general admission count control not found"}
+{"at":"2026-08-01T10:13:00+09:00","event":"seat_match","match":{"date":"2026-08-18","time":"20:00","pair":"D28-D29","seats":["D28","D29"]}}

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import datetime as dt
 import unittest
 
 from prickly_imax_helper.browser import CHROME
-from prickly_imax_helper.checkout import CheckoutFlow, PaymentBlocked, UnknownAfterSubmit
+from prickly_imax_helper.checkout import CheckoutError, CheckoutFlow, PaymentBlocked, UnknownAfterSubmit
 from prickly_imax_helper.presets import odyssey
 
 
@@ -60,6 +61,227 @@ class CheckoutBrowserTests(unittest.TestCase):
         with self.assertRaises(PaymentBlocked):
             self.flow.prove_ready(self.match)
         self.assertIsNone(self.page.evaluate("() => window.clicked"))
+
+    def test_configured_theater_showtime_and_format_are_ready(self):
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8>
+            <button aria-pressed=true>용산아이파크몰</button>
+            <button>21:00-23:45 8 / 624석</button><h3>IMAX관</h3>"""
+        )
+        self.assertEqual(
+            self.flow._booking_page_state("용산아이파크몰", "IMAX"),
+            {"picker": False, "target_ready": True},
+        )
+
+    def test_different_theater_is_not_ready(self):
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8>
+            <button aria-pressed=true>왕십리</button>
+            <button>21:00-23:45 8 / 624석</button><h3>IMAX관</h3>"""
+        )
+        self.assertEqual(
+            self.flow._booking_page_state("용산아이파크몰", "IMAX"),
+            {"picker": False, "target_ready": False},
+        )
+
+    def test_legacy_theater_picker_launcher_is_clicked(self):
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8>
+            <button onclick="window.pickerOpened=true"><span class=voice-only>자주가는 CGV 목록 수정</span></button>"""
+        )
+        self.assertTrue(self.flow._open_theater_picker())
+        self.assertTrue(self.page.evaluate("() => window.pickerOpened"))
+
+    def test_semantic_theater_picker_launcher_is_clicked(self):
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8>
+            <button aria-label="극장 선택" onclick="window.pickerOpened=true">극장 선택</button>"""
+        )
+        self.assertTrue(self.flow._open_theater_picker())
+        self.assertTrue(self.page.evaluate("() => window.pickerOpened"))
+
+    def test_waits_for_delayed_theater_picker_render(self):
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8>
+            <script>
+            setTimeout(() => document.body.insertAdjacentHTML(
+              'beforeend', '<input placeholder="지역을 입력해주세요">'), 100);
+            </script>"""
+        )
+
+        state = self.flow._wait_for_booking_page_state("용산아이파크몰", "IMAX", timeout_ms=2_000)
+
+        self.assertEqual(state, {"picker": True, "target_ready": False})
+
+    def test_selects_search_suggestion_then_actual_theater_row_and_confirms(self):
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8>
+            <input placeholder="지역을 입력해주세요">
+            <button id="suggestion" type="button">용산아이파크몰</button>
+            <ul id="theaters"><li><button id="actual" type="button">용산아이파크몰</button></li></ul>
+            <script>
+              suggestion.onclick = () => suggestion.remove();
+              actual.onclick = () => document.body.insertAdjacentHTML(
+                'beforeend', '<button id="confirm" type="button">극장선택</button>');
+              document.addEventListener('click', event => {
+                if (event.target.id !== 'confirm') return;
+                document.querySelector('input').remove();
+                document.body.insertAdjacentHTML('beforeend',
+                  '<button>용산아이파크몰</button><button>21:00-23:45 8 / 624석</button><h3>IMAX관</h3>');
+              });
+            </script>"""
+        )
+
+        self.flow._select_theater_from_picker("용산아이파크몰", "IMAX")
+
+        self.assertEqual(
+            self.flow._booking_page_state("용산아이파크몰", "IMAX"),
+            {"picker": False, "target_ready": True},
+        )
+
+    def test_retries_actual_theater_row_only_when_selection_did_not_register(self):
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8>
+            <input placeholder="지역을 입력해주세요">
+            <ul><li><button id="actual" type="button">용산아이파크몰</button></li></ul>
+            <script>
+              window.actualClicks = 0;
+              actual.onclick = () => {
+                window.actualClicks += 1;
+                if (window.actualClicks !== 2) return;
+                document.body.insertAdjacentHTML('beforeend',
+                  '<button id="selected">용산아이파크몰 닫기</button>' +
+                  '<button id="confirm" type="button">극장선택</button>');
+              };
+              document.addEventListener('click', event => {
+                if (event.target.id !== 'confirm') return;
+                document.querySelector('input').remove();
+                document.body.insertAdjacentHTML('beforeend',
+                  '<button>용산아이파크몰</button><button>21:00-23:45 8 / 624석</button><h3>IMAX관</h3>');
+              });
+            </script>"""
+        )
+
+        self.flow._select_theater_from_picker("용산아이파크몰", "IMAX")
+
+        self.assertEqual(self.page.evaluate("() => window.actualClicks"), 2)
+        self.assertTrue(self.flow._booking_page_state("용산아이파크몰", "IMAX")["target_ready"])
+
+    def test_waits_for_transient_duplicate_actual_theater_rows(self):
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8>
+            <input placeholder="지역을 입력해주세요">
+            <div class="search-result active"><ul>
+              <li><button id="suggestion" type="button">용산아이파크몰</button></li>
+            </ul></div>
+            <script>
+              window.suggestionClicks = 0;
+              window.actualClicks = 0;
+              suggestion.onclick = () => {
+                window.suggestionClicks += 1;
+                document.querySelector('.search-result').remove();
+                document.body.insertAdjacentHTML('beforeend', `<ul>
+                  <li><button id="actual" type="button">용산아이파크몰</button></li>
+                  <li id="stale"><button type="button">용산아이파크몰</button></li>
+                </ul>`);
+                actual.onclick = () => {
+                  window.actualClicks += 1;
+                  document.body.insertAdjacentHTML(
+                    'beforeend', '<button id="confirm" type="button">극장선택</button>');
+                };
+                setTimeout(() => stale.remove(), 700);
+              };
+              document.addEventListener('click', event => {
+                if (event.target.id !== 'confirm') return;
+                document.querySelector('input').remove();
+                document.body.insertAdjacentHTML('beforeend',
+                  '<button>용산아이파크몰</button><button>21:00-23:45 8 / 624석</button><h3>IMAX관</h3>');
+              });
+            </script>"""
+        )
+
+        self.flow._select_theater_from_picker("용산아이파크몰", "IMAX")
+
+        self.assertEqual(self.page.evaluate("() => window.suggestionClicks"), 1)
+        self.assertEqual(self.page.evaluate("() => window.actualClicks"), 1)
+        self.assertTrue(self.flow._booking_page_state("용산아이파크몰", "IMAX")["target_ready"])
+
+    def test_current_date_accepts_cgv_today_label(self):
+        today = dt.date.today()
+        self.page.set_content(
+            f"""<!doctype html><meta charset=utf-8>
+            <button onclick="window.dateClicked=true">
+              <span class="dayScroll_txt__test">오늘</span>
+              <span class="dayScroll_number__test">{today.day:02d}</span>
+            </button>"""
+        )
+
+        self.assertTrue(self.flow._click_match_date(today.isoformat()))
+        self.assertTrue(self.page.evaluate("() => window.dateClicked"))
+
+    def test_waits_for_delayed_general_party_control(self):
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8>
+            <script>
+              setTimeout(() => document.body.insertAdjacentHTML('beforeend', `
+                <div role="group"><div>일반</div>
+                  <button aria-label="1 선택" aria-pressed="false">1</button>
+                  <button aria-label="2 선택" aria-pressed="false"
+                    onclick="this.setAttribute('aria-pressed','true')">2</button>
+                </div>`), 500);
+            </script>"""
+        )
+
+        self.flow._select_general_party(2, timeout_ms=2_000)
+
+        self.assertEqual(
+            self.page.locator('[role=group]').get_by_role("button", name="2 선택").get_attribute("aria-pressed"),
+            "true",
+        )
+
+    def test_selects_two_only_inside_exact_general_group(self):
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8>
+            <div role=group><div>일반</div><button aria-label="2 선택" aria-pressed=false
+              onclick="window.general=(window.general||0)+1;this.setAttribute('aria-pressed','true')">2</button></div>
+            <div role=group><div>청소년</div><button aria-label="2 선택" aria-pressed=false
+              onclick="window.youth=(window.youth||0)+1;this.setAttribute('aria-pressed','true')">2</button></div>
+            <div role=group><div>우대</div><button aria-label="2 선택" aria-pressed=false
+              onclick="window.priority=(window.priority||0)+1;this.setAttribute('aria-pressed','true')">2</button></div>"""
+        )
+
+        self.flow._select_general_party(2, timeout_ms=500)
+
+        self.assertEqual(self.page.evaluate("() => window.general"), 1)
+        self.assertIsNone(self.page.evaluate("() => window.youth"))
+        self.assertIsNone(self.page.evaluate("() => window.priority"))
+
+    def test_missing_general_party_control_times_out_without_click(self):
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8>
+            <div role=group><div>청소년</div><button aria-label="2 선택"
+              onclick="window.youth=(window.youth||0)+1">2</button></div>
+            <div role=group><div>우대</div><button aria-label="2 선택"
+              onclick="window.priority=(window.priority||0)+1">2</button></div>"""
+        )
+
+        with self.assertRaises(CheckoutError):
+            self.flow._select_general_party(2, timeout_ms=100)
+
+        self.assertIsNone(self.page.evaluate("() => window.youth"))
+        self.assertIsNone(self.page.evaluate("() => window.priority"))
+
+    def test_unproven_general_selection_is_not_clicked_twice(self):
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8>
+            <div role=group><div>일반</div><button aria-label="2 선택" aria-pressed=false
+              onclick="window.general=(window.general||0)+1">2</button></div>"""
+        )
+
+        with self.assertRaises(CheckoutError):
+            self.flow._select_general_party(2, timeout_ms=100)
+
+        self.assertEqual(self.page.evaluate("() => window.general"), 1)
 
 
 if __name__ == "__main__":

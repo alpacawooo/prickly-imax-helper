@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import datetime as dt
 import re
 import time
 from dataclasses import dataclass
 from typing import Any
+
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from .browser import CGV_BOOKING_URL
 
@@ -186,6 +189,159 @@ class CheckoutFlow:
         if status != "clear":
             raise DuplicateBlocked(f"existing matching ticket status is {status}")
 
+    def _booking_page_state(self, theater: str, format_name: str) -> dict[str, bool]:
+        return self.page.evaluate(
+            r"""target => {
+              const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+              const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+              const picker = [...document.querySelectorAll('input')]
+                .some(element => visible(element) && element.placeholder === '지역을 입력해주세요');
+              const theaterVisible = [...document.querySelectorAll('button,[role="button"]')]
+                .some(element => visible(element) && compact(element.textContent) === target.theater);
+              const schedules = [...document.querySelectorAll('button')]
+                .some(element => visible(element) && /\d{2}:\d{2}-\d{2}:\d{2}/.test(compact(element.textContent)));
+              const formatVisible = compact(document.body.innerText)
+                .toLocaleLowerCase()
+                .includes(target.formatName.toLocaleLowerCase());
+              return {picker, target_ready: !picker && theaterVisible && schedules && formatVisible};
+            }""",
+            {"theater": theater, "formatName": format_name},
+        )
+
+    def _wait_for_booking_page_state(
+        self, theater: str, format_name: str, *, timeout_ms: int = 10_000
+    ) -> dict[str, bool]:
+        deadline = time.monotonic() + timeout_ms / 1000
+        while True:
+            state = self._booking_page_state(theater, format_name)
+            if state["picker"] or state["target_ready"]:
+                return state
+            remaining_ms = int((deadline - time.monotonic()) * 1000)
+            if remaining_ms <= 0:
+                return state
+            self.page.wait_for_timeout(min(100, remaining_ms))
+
+    def _open_theater_picker(self) -> bool:
+        return bool(
+            self.page.evaluate(
+                r"""() => {
+                  const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+                  const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+                  const buttons = [...document.querySelectorAll('button')]
+                    .filter(element => visible(element) && !element.disabled);
+                  const legacy = buttons.find(element =>
+                    compact(element.querySelector('.voice-only')?.textContent) === '자주가는 CGV 목록 수정');
+                  const exact = buttons.find(element => compact(element.innerText) === '극장 선택');
+                  const semantic = buttons.find(element => {
+                    const label = compact(element.getAttribute('aria-label') || element.getAttribute('title'));
+                    return label.includes('극장') && (label.includes('선택') || label.includes('수정'));
+                  });
+                  const launcher = legacy || exact || semantic;
+                  if (!launcher) return false;
+                  launcher.click();
+                  return true;
+                }"""
+            )
+        )
+
+    def _theater_selection_registered(self, theater: str) -> bool:
+        return bool(
+            self.page.evaluate(
+                r"""theater => {
+                  const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+                  const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+                  const buttons = [...document.querySelectorAll('button')].filter(visible);
+                  return buttons.some(button => !button.disabled && compact(button.textContent) === '극장선택') ||
+                    buttons.some(button => compact(button.textContent) === `${theater} 닫기`);
+                }""",
+                theater,
+            )
+        )
+
+    def _select_theater_from_picker(self, theater: str, format_name: str) -> None:
+        search = self.page.locator('input[placeholder="지역을 입력해주세요"]:visible')
+        search.fill(theater)
+        exact = self.page.get_by_role("button", name=theater, exact=True)
+        self._wait(
+            "theater => [...document.querySelectorAll('button')].some(b => "
+            "b.offsetParent && !b.disabled && b.textContent.trim() === theater)",
+            20_000,
+            theater,
+        )
+        suggestion_index = int(
+            exact.evaluate_all(
+                "values => values.findIndex(value => "
+                "value.offsetParent && !value.disabled && "
+                "(value.closest('.search-result') || !value.closest('li')))"
+            )
+        )
+        if suggestion_index >= 0:
+            exact.nth(suggestion_index).click()
+            self._wait(
+                "theater => ![...document.querySelectorAll('button')].some(b => "
+                "b.offsetParent && !b.disabled && b.textContent.trim() === theater && "
+                "(b.closest('.search-result') || !b.closest('li')))",
+                10_000,
+                theater,
+            )
+        try:
+            self._wait(
+                r"""theater => {
+                  const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+                  const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+                  return [...document.querySelectorAll('button')].filter(button =>
+                    visible(button) && !button.disabled && button.closest('li') && !button.closest('.search-result') &&
+                    compact(button.textContent) === theater).length === 1;
+                }""",
+                10_000,
+                theater,
+            )
+        except PlaywrightTimeoutError as exc:
+            raise CheckoutError(f"actual theater row not found: {theater}") from exc
+        actual_clicked = self.page.evaluate(
+            r"""theater => {
+              const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+              const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+              const rows = [...document.querySelectorAll('button')].filter(button =>
+                visible(button) && !button.disabled && button.closest('li') && !button.closest('.search-result') &&
+                compact(button.textContent) === theater);
+              if (rows.length !== 1) return false;
+              rows[0].click();
+              return true;
+            }""",
+            theater,
+        )
+        if not actual_clicked:
+            raise CheckoutError(f"actual theater row not found: {theater}")
+        selection_registered = self._theater_selection_registered(theater)
+        if not selection_registered:
+            self.page.wait_for_timeout(500)
+            selection_registered = self._theater_selection_registered(theater)
+        if not selection_registered:
+            retried = self.page.evaluate(
+                r"""theater => {
+                  const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+                  const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+                  const rows = [...document.querySelectorAll('button')].filter(button =>
+                    visible(button) && !button.disabled && button.closest('li') && !button.closest('.search-result') &&
+                    compact(button.textContent) === theater);
+                  if (rows.length !== 1) return false;
+                  rows[0].click();
+                  return true;
+                }""",
+                theater,
+            )
+            if not retried:
+                raise CheckoutError(f"actual theater row retry was not safe: {theater}")
+        self._wait(
+            "() => [...document.querySelectorAll('button')].some(b => "
+            "b.offsetParent && !b.disabled && b.textContent.trim() === '극장선택')"
+        )
+        self.page.get_by_role("button", name="극장선택", exact=True).click()
+        ready = self._wait_for_booking_page_state(theater, format_name, timeout_ms=20_000)
+        if not ready["target_ready"]:
+            raise CheckoutError(f"configured theater did not become ready: {theater}")
+
     def open_movie_and_theater(self) -> None:
         movie = str(self.config["movie"])
         theater = str(self.config["theater"])
@@ -200,57 +356,38 @@ class CheckoutFlow:
         if not clicked:
             raise CheckoutError(f"movie button not found: {movie}")
         self._wait("() => location.pathname === '/cnm/movieBook/movie'")
-        ready = self.page.evaluate(
-            r"""() => ({
-              picker: !![...document.querySelectorAll('input')].find(x => x.offsetParent && x.placeholder === '지역을 입력해주세요')
-            })"""
-        )
+        ready = self._wait_for_booking_page_state(theater, format_name)
+        if ready["target_ready"]:
+            return
         if not ready["picker"]:
-            opened = self.page.evaluate(
-                r"""() => { const b = [...document.querySelectorAll('button')].find(x =>
-                x.querySelector('.voice-only')?.textContent.trim() === '자주가는 CGV 목록 수정' && x.offsetParent);
-                if (!b) return false; b.click(); return true; }"""
-            )
-            if not opened:
+            if not self._open_theater_picker():
                 raise CheckoutError("theater picker launcher not found")
         self._wait("() => !![...document.querySelectorAll('input')].find(x => x.offsetParent && x.placeholder === '지역을 입력해주세요')")
-        self.page.locator('input[placeholder="지역을 입력해주세요"]:visible').fill(theater)
-        self._wait(
-            "theater => [...document.querySelectorAll('button')].some(b => b.offsetParent && b.textContent.trim() === theater)",
-            20_000,
-            theater,
-        )
-        selected = self.page.evaluate(
-            r"""theater => { const values = [...document.querySelectorAll('button')].filter(b =>
-            b.offsetParent && !b.disabled && b.textContent.trim() === theater);
-            if (!values.length) return false; values[values.length - 1].click(); return true; }""",
-            theater,
-        )
-        if not selected:
-            raise CheckoutError(f"actual theater row not found: {theater}")
-        self._wait("() => [...document.querySelectorAll('button')].some(b => b.offsetParent && !b.disabled && b.textContent.trim() === '극장선택')")
-        self.page.get_by_role("button", name="극장선택", exact=True).click()
-        self._wait(
-            "formatName => document.body.innerText.toLocaleLowerCase().includes(formatName.toLocaleLowerCase())",
-            20_000,
-            format_name,
+        self._select_theater_from_picker(theater, format_name)
+
+    def _click_match_date(self, date_value: str) -> bool:
+        year, month, day = map(int, date_value.split("-"))
+        target_date = dt.date(year, month, day)
+        weekday = KOREAN_WEEKDAYS[target_date.weekday()]
+        return bool(
+            self.page.evaluate(
+                r"""target => { const buttons = [...document.querySelectorAll('button')].filter(b =>
+                b.offsetParent && !b.disabled && b.querySelector('[class*=dayScroll_txt]') && b.querySelector('[class*=dayScroll_number]'));
+                const button = buttons.find(x => {
+                const label = x.querySelector('[class*=dayScroll_txt]').textContent.trim();
+                return (label === target.weekday || (target.today && label === '오늘')) &&
+                x.querySelector('[class*=dayScroll_number]').textContent.trim() === target.day; });
+                if (!button) return false; button.click(); return true; }""",
+                {"weekday": weekday, "day": f"{day:02d}", "today": target_date == dt.date.today()},
+            )
         )
 
-    def open_match(self, match: dict[str, Any]) -> None:
-        year, month, day = map(int, match["date"].split("-"))
-        import datetime as dt
-
-        weekday = KOREAN_WEEKDAYS[dt.date(year, month, day).weekday()]
-        clicked = self.page.evaluate(
-            r"""target => { const buttons = [...document.querySelectorAll('button')].filter(b =>
-            b.offsetParent && !b.disabled && b.querySelector('[class*=dayScroll_txt]') && b.querySelector('[class*=dayScroll_number]'));
-            const button = buttons.find(x => x.querySelector('[class*=dayScroll_txt]').textContent.trim() === target.weekday &&
-            x.querySelector('[class*=dayScroll_number]').textContent.trim() === target.day);
-            if (!button) return false; button.click(); return true; }""",
-            {"weekday": weekday, "day": f"{day:02d}"},
-        )
+    def _require_match_date(self, match: dict[str, Any]) -> None:
+        clicked = self._click_match_date(str(match["date"]))
         if not clicked:
             raise SeatVanished("target date is no longer open")
+
+    def _open_match_showtime(self, match: dict[str, Any]) -> None:
         self._wait(
             r"""target => [...document.querySelectorAll('button')].some(b => b.offsetParent && !b.disabled &&
             b.textContent.replace(/\s+/g, ' ').trim().startsWith(target + '-'))""",
@@ -267,17 +404,70 @@ class CheckoutFlow:
             raise SeatVanished("target showtime disappeared")
         self._wait("() => location.pathname === '/cnm/selectVisitorCnt'")
 
-    def select_party_and_seats(self, match: dict[str, Any]) -> None:
-        party = int(self.config["party_size"])
+    def open_match(self, match: dict[str, Any]) -> None:
+        self._require_match_date(match)
+        self._open_match_showtime(match)
+
+    def _wait_for_general_party_control(self, party: int, timeout_ms: int = 10_000) -> bool:
+        try:
+            self.page.wait_for_function(
+                r"""party => {
+                  const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+                  const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+                  const groups = [...document.querySelectorAll('[role=group]')].filter(visible);
+                  const group = groups.find(element => [...element.children].some(child =>
+                    visible(child) && compact(child.textContent) === '일반'));
+                  if (!group) return false;
+                  return [...group.querySelectorAll('button')].some(button =>
+                    visible(button) && !button.disabled && button.getAttribute('aria-label') === `${party} 선택`);
+                }""",
+                arg=party,
+                timeout=timeout_ms,
+            )
+        except PlaywrightTimeoutError:
+            return False
+        return True
+
+    def _select_general_party(self, party: int, timeout_ms: int = 10_000) -> None:
+        if not self._wait_for_general_party_control(party, timeout_ms=timeout_ms):
+            raise CheckoutError("general admission count control not ready")
         selected = self.page.evaluate(
-            r"""party => { const groups = [...document.querySelectorAll('[role=group]')].filter(g =>
-            g.offsetParent && [...g.children].some(c => c.textContent.trim() === '일반'));
-            const b = groups[0]?.querySelector(`button[aria-label="${party} 선택"]`);
-            if (!b) return false; if (b.getAttribute('aria-pressed') !== 'true') b.click(); return true; }""",
+            r"""party => {
+              const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+              const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+              const groups = [...document.querySelectorAll('[role=group]')].filter(visible);
+              const group = groups.find(element => [...element.children].some(child =>
+                visible(child) && compact(child.textContent) === '일반'));
+              const button = [...(group?.querySelectorAll('button') || [])].find(element =>
+                visible(element) && !element.disabled && element.getAttribute('aria-label') === `${party} 선택`);
+              if (!button) return false;
+              if (button.getAttribute('aria-pressed') !== 'true') button.click();
+              return true;
+            }""",
             party,
         )
         if not selected:
-            raise CheckoutError("general admission count control not found")
+            raise CheckoutError("general admission count control not ready")
+        try:
+            self.page.wait_for_function(
+                r"""party => {
+                  const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+                  const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+                  const groups = [...document.querySelectorAll('[role=group]')].filter(visible);
+                  const group = groups.find(element => [...element.children].some(child =>
+                    visible(child) && compact(child.textContent) === '일반'));
+                  const button = [...(group?.querySelectorAll('button') || [])].find(element =>
+                    visible(element) && !element.disabled && element.getAttribute('aria-label') === `${party} 선택`);
+                  return button?.getAttribute('aria-pressed') === 'true';
+                }""",
+                arg=party,
+                timeout=timeout_ms,
+            )
+        except PlaywrightTimeoutError as exc:
+            raise CheckoutError("general admission count selection not proven") from exc
+
+    def _select_seats(self, match: dict[str, Any]) -> None:
+        party = int(self.config["party_size"])
         seats = match["seats"]
         result = self.page.evaluate(
             r"""wanted => { const found = []; for (const seat of wanted) {
@@ -289,6 +479,10 @@ class CheckoutFlow:
         )
         if not result.get("ok") or int(result.get("count", 0)) != party:
             raise SeatVanished(f"target seat vanished: {result.get('missing')}")
+
+    def select_party_and_seats(self, match: dict[str, Any]) -> None:
+        self._select_general_party(int(self.config["party_size"]))
+        self._select_seats(match)
 
     def open_payment_and_apply_vouchers(self) -> None:
         clicked = self.page.evaluate(

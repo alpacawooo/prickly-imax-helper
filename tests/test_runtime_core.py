@@ -16,6 +16,7 @@ VALID_CONFIG = {
     "movie": "오디세이",
     "theater": "용산아이파크몰",
     "format": "IMAX",
+    "minimum_lead_minutes": 180,
     "party_size": 2,
     "dates": "all_open",
     "time_rules": {
@@ -51,6 +52,23 @@ VALID_CONFIG = {
 
 
 class ConfigTests(unittest.TestCase):
+    def test_legacy_config_without_minimum_lead_remains_valid(self):
+        legacy = copy.deepcopy(VALID_CONFIG)
+        legacy.pop("minimum_lead_minutes", None)
+        self.assertEqual(validate_config(legacy), [])
+
+    def test_minimum_lead_accepts_180_to_1440_only(self):
+        for value in (180, 181, 1440):
+            with self.subTest(valid=value):
+                config = copy.deepcopy(VALID_CONFIG)
+                config["minimum_lead_minutes"] = value
+                self.assertEqual(validate_config(config), [])
+        for value in (179, 1441, True, 180.5, "180"):
+            with self.subTest(invalid=value):
+                config = copy.deepcopy(VALID_CONFIG)
+                config["minimum_lead_minutes"] = value
+                self.assertTrue(any("minimum_lead_minutes" in error for error in validate_config(config)))
+
     def test_valid_config_round_trip_uses_private_permissions(self):
         with tempfile.TemporaryDirectory() as temp:
             target = Path(temp) / "private" / "config.json"
