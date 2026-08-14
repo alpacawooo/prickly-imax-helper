@@ -47,6 +47,15 @@ class VideoCarouselManifestTests(unittest.TestCase):
         for banned in ("모바일티켓", "예매번호", "qr", "barcode", "실제 예매 완료"):
             self.assertNotIn(banned, raw)
 
+    def test_card_two_explains_why_the_odyssey_belongs_on_yongsan_imax(self) -> None:
+        card = self.load_cards()[1]
+        self.assertEqual(card["headline"], "오디세이를\n용산 IMAX에서 꼭 봐야 하는 이유.")
+        self.assertEqual(
+            card["supporting"],
+            "IMAX를 위해 촬영한 장면을\n이 압도적인 화면으로 보고 싶으니까.",
+        )
+        self.assertNotIn("여기서만", str(card["headline"]) + str(card["supporting"]))
+
     def test_manifest_excludes_benchmark_and_banned_copy(self) -> None:
         raw = MANIFEST.read_text(encoding="utf-8")
         self.assertNotIn("ScreenRecording_08-14-2026", raw)
