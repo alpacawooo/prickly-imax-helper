@@ -31,7 +31,12 @@ class VideoCarouselManifestTests(unittest.TestCase):
         self.assertEqual([card["number"] for card in cards], list(range(1, 9)))
         self.assertEqual([card["duration"] for card in cards], [6, 6, 7, 9, 8, 7, 9, 6])
         self.assertTrue(all(str(card["headline"]).strip() for card in cards))
-        self.assertTrue(all(card["motion"] in {"ken-burns", "red-drift", "proof-pan"} for card in cards))
+        allowed = {
+            "slow-push", "evidence-pan", "guided-focus", "proof-pan",
+            "guided-scroll", "three-scene-sequence", "text-reveal",
+        }
+        self.assertTrue(all(card["motion"] in allowed for card in cards))
+        self.assertGreaterEqual(len({card["composition"] for card in cards}), 6)
 
     def test_manifest_excludes_benchmark_and_banned_copy(self) -> None:
         raw = MANIFEST.read_text(encoding="utf-8")

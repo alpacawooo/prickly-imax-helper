@@ -6,6 +6,7 @@ import hashlib
 import html as html_module
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -30,7 +31,18 @@ MANIFEST = HERE / "carousel_manifest.json"
 VIDEO_CAROUSEL = HERE / "video-carousel"
 VIDEO_COVERS = VIDEO_CAROUSEL / "covers"
 VIDEO_CARDS = VIDEO_CAROUSEL / "cards"
-ALLOWED_MOTIONS = {"ken-burns", "red-drift", "proof-pan"}
+SCENE_FRAMES = BUILD / "scene-frames"
+ALLOWED_MOTIONS = {
+    "slow-push",
+    "evidence-pan",
+    "guided-focus",
+    "proof-pan",
+    "guided-scroll",
+    "three-scene-sequence",
+    "text-reveal",
+}
+ALLOWED_ANCHORS = {"bottom-left", "top-left", "bottom", "right", "center-left"}
+FORBIDDEN_SOURCE_TYPES = {"fake-browser", "fake-terminal", "phone-mockup", "fake-ticket"}
 BANNED_COPY = "Prickly AI는 사람이 반복하던 일을 실제로 작동하는 자동화로 바꾼다."
 
 
@@ -39,14 +51,28 @@ def validate_manifest(cards: list[dict[str, object]]) -> None:
         raise ValueError("video carousel must contain cards 1 through 8 in order")
     if [card.get("duration") for card in cards] != [6, 6, 7, 9, 8, 7, 9, 6]:
         raise ValueError("video carousel durations do not match the approved design")
+    required = {
+        "number", "duration", "source_type", "source", "headline", "supporting",
+        "footer", "composition", "text_anchor", "motion",
+    }
     for card in cards:
+        number = card.get("number")
+        missing = sorted(required - set(card))
+        if missing:
+            raise ValueError(f"card {number} is missing {', '.join(missing)}")
         if not str(card.get("headline", "")).strip():
-            raise ValueError(f"card {card.get('number')} has no headline")
+            raise ValueError(f"card {number} has no headline")
         if card.get("motion") not in ALLOWED_MOTIONS:
-            raise ValueError(f"card {card.get('number')} has unsupported motion")
+            raise ValueError(f"card {number} has unsupported motion")
+        if card.get("text_anchor") not in ALLOWED_ANCHORS:
+            raise ValueError(f"card {number} has unsupported text anchor")
+        if card.get("source_type") in FORBIDDEN_SOURCE_TYPES:
+            raise ValueError(f"card {number} uses forbidden fake UI")
         source = str(card.get("source", ""))
         if source and not (ROOT / source).is_file():
             raise FileNotFoundError(ROOT / source)
+    if len({str(card["composition"]) for card in cards}) < 6:
+        raise ValueError("video carousel requires at least six distinct compositions")
     raw = json.dumps(cards, ensure_ascii=False)
     if "ScreenRecording_08-14-2026" in raw or "ai_freaks" in raw.lower() or BANNED_COPY in raw:
         raise ValueError("manifest contains benchmark material or banned copy")
@@ -56,6 +82,25 @@ def load_carousel_manifest() -> list[dict[str, object]]:
     cards = json.loads(MANIFEST.read_text(encoding="utf-8"))["cards"]
     validate_manifest(cards)
     return cards
+
+
+def motion_recipes() -> dict[str, dict[str, float | int]]:
+    return {
+        "slow-push": {"max_scale": 1.04, "transition_ms": 0},
+        "evidence-pan": {"max_scale": 1.02, "transition_ms": 220},
+        "guided-focus": {"max_scale": 1.02, "transition_ms": 220},
+        "proof-pan": {"max_scale": 1.01, "transition_ms": 0},
+        "guided-scroll": {"max_scale": 1.00, "transition_ms": 240},
+        "three-scene-sequence": {"max_scale": 1.00, "transition_ms": 220},
+        "text-reveal": {"max_scale": 1.00, "transition_ms": 200},
+    }
+
+
+def redact_visual_evidence(value: str) -> str:
+    value = re.sub(r"[\w.+-]+@[\w.-]+", "[redacted-email]", value)
+    value = re.sub(r"(?i)(cookie|voucher|profile)\s*[=:]\s*\S+", r"\1=[redacted]", value)
+    value = re.sub(r"/Users/[^\s]+", "[redacted-path]", value)
+    return value
 
 
 def run(*args: str, cwd: Path | None = None) -> None:
@@ -181,6 +226,75 @@ def setup_preview() -> Path:
     return out
 
 
+def redacted_monitor_preview() -> Path:
+    command = Path("/Users/woojinyoung/.local/bin/prickly-imax")
+    data: dict[str, object] = {}
+    if command.exists():
+        completed = subprocess.run(
+            [str(command), "diagnose"], capture_output=True, text=True, check=True, timeout=20
+        )
+        payload = json.loads(redact_visual_evidence(completed.stdout))
+        status = payload.get("status", {})
+        if isinstance(status, dict):
+            for key in ("status", "detail", "open_dates", "eligible_shows", "match", "errors", "last_scan_lane"):
+                data[key] = status.get(key)
+    rows = "".join(
+        f"<div><span>{html_module.escape(str(key))}</span><b>{html_module.escape(json.dumps(value, ensure_ascii=False))}</b></div>"
+        for key, value in data.items()
+    )
+    source = f"""<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>
+    *{{box-sizing:border-box}}html,body{{margin:0;width:1080px;height:1350px;overflow:hidden;background:#0a0a0a}}
+    body{{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#efefea;padding:110px 86px}}
+    h1{{font:750 42px/1.2 -apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;margin:0 0 64px}}
+    p{{color:#777;font-size:17px;margin:0 0 70px}}.rows{{border-top:1px solid #333}}
+    .rows div{{display:grid;grid-template-columns:320px 1fr;padding:27px 0;border-bottom:1px solid #252525}}
+    span{{color:#8b8b88;font-size:22px}}b{{font-size:27px;font-weight:650}}.armed{{color:#55d78b}}
+    </style></head><body><h1>Prickly IMAX Helper · redacted diagnose</h1><p>로컬 상태에서 개인정보 필드를 제외한 실제 값</p><section class="rows">{rows}</section></body></html>"""
+    path = HTML / "monitor-preview.html"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(source, encoding="utf-8")
+    out = ASSETS / "helper-monitor-preview.png"
+    capture(path, out, 1080, 1350)
+    return out
+
+
+def cinematic_page(body: str, composition: str) -> str:
+    css = """
+    :root{--red:#ef382f;--paper:#f4f2ed}*{box-sizing:border-box}html,body{margin:0;width:1080px;height:1350px;overflow:hidden;background:#080808}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;color:#f7f7f4}
+    .scene{position:relative;width:1080px;height:1350px;overflow:hidden;background:#080808}.media{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+    .shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.08) 20%,rgba(0,0,0,.18) 46%,rgba(0,0,0,.92) 100%)}
+    .copy{position:absolute;z-index:3;left:66px;right:66px}.copy h1{white-space:pre-line;margin:0;font-size:68px;line-height:1.13;letter-spacing:-4.4px;font-weight:850}
+    .copy p{white-space:pre-line;margin:24px 0 0;font-size:27px;line-height:1.42;letter-spacing:-1px;color:#d4d4d0;font-weight:620}.meta{position:absolute;z-index:4;left:66px;bottom:38px;color:#858580;font-size:15px;letter-spacing:.03em}
+    .page-no{position:absolute;z-index:4;right:48px;top:42px;font-size:17px;color:#d7d7d2}.red{color:var(--red)}
+    .full .copy{bottom:105px}.top .copy{top:80px;max-width:830px}.top .shade{background:linear-gradient(180deg,rgba(0,0,0,.82),rgba(0,0,0,.10) 50%,rgba(0,0,0,.82))}
+    .evidence .media{object-fit:cover;object-position:50% 44%}.evidence:after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,.18) 65%,rgba(0,0,0,.96))}.evidence .copy{bottom:88px}.evidence .copy h1{font-size:58px}
+    .screenfill{background:#eee}.screenfill .media{object-fit:cover;object-position:50% 20%;filter:saturate(.82)}.screenfill .shade{background:linear-gradient(180deg,rgba(0,0,0,.08),rgba(0,0,0,.02) 54%,rgba(0,0,0,.94))}.screenfill .copy{bottom:82px}
+    .screenfill .copy h1{font-size:61px}.monitor .media{object-position:center}.monitor .shade{background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.15) 56%,rgba(0,0,0,.93))}.monitor .copy{bottom:80px}.monitor .copy h1{font-size:57px}
+    .asym{background:#f2f0eb;color:#121212}.asym .media{left:0;right:auto;width:61%;object-fit:cover;object-position:33% 15%}.asym .copy{left:650px;right:54px;top:155px}.asym .copy h1{font-size:58px;letter-spacing:-3.5px}.asym .copy p{color:#3f3f3d;font-size:26px;line-height:1.7}.asym .meta{left:650px;color:#767672}
+    .guide{background:#111}.guide .media{left:360px;width:720px;object-fit:cover;object-position:50% 10%;filter:saturate(.8)}.guide .shade{background:linear-gradient(90deg,rgba(0,0,0,.98) 0%,rgba(0,0,0,.92) 30%,rgba(0,0,0,.12) 78%)}.guide .copy{left:64px;right:430px;top:170px}.guide .copy h1{font-size:55px}.guide .copy p{font-size:23px;margin-top:40px}
+    .note{background:#090909}.note .copy{left:74px;right:74px;top:240px}.note .copy h1{font-size:60px;line-height:1.22}.note .copy p{margin-top:150px;font-size:42px;line-height:1.38;color:#f1f1ec}.note .meta{bottom:72px;font-size:21px;color:#aaa}
+    """
+    return f'<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>{css}</style></head><body><main class="scene" data-composition="{html_module.escape(composition)}">{body}</main></body></html>'
+
+
+def card_seven_scene_htmls(setup_png: Path, monitor_png: Path, guide_png: Path) -> list[str]:
+    stages = [
+        (setup_png, "설정 완료", "영화 · 극장 · 시간 · 붙어 있는 좌석"),
+        (monitor_png, "감시 중", "armed · match:null"),
+        (guide_png, "설치 안내", "Mac · Windows · 3분 설치"),
+    ]
+    pages: list[str] = []
+    for index, (source, title, detail) in enumerate(stages, 1):
+        body = (
+            f'<img class="media" src="{img_uri(source)}"><div class="shade"></div>'
+            f'<span class="page-no">7/8 · {index}/3</span>'
+            f'<section class="copy"><h1>{title}</h1><p>{detail}</p></section>'
+        )
+        pages.append(cinematic_page(body, "setup-monitor-guide-stage").replace('class="scene"', 'class="scene screenfill"'))
+    return pages
+
+
 def comment_cards() -> str:
     comments = [
         ("아직 IMAX로 못 봤어요", "원하는 날짜는 늘 매진"),
@@ -225,54 +339,47 @@ def seat_diagram() -> str:
 
 def video_carousel_covers(
     setup_png: Path,
+    monitor_png: Path,
     guide_png: Path,
     cards: list[dict[str, object]],
 ) -> list[str]:
-    orange = img_uri(ROOT / str(cards[0]["source"]))
-    giants = img_uri(ROOT / str(cards[1]["source"]))
-    setup = img_uri(setup_png)
-    guide = img_uri(guide_png)
-    common = """
-    .content{top:170px}.photo-scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,6,8,.10),rgba(5,6,8,.58) 50%,rgba(5,6,8,.95) 100%)}
-    .proof-window{margin-top:38px;overflow:hidden;border:1px solid rgba(255,255,255,.15);border-radius:28px;background:#fff;box-shadow:0 26px 80px rgba(0,0,0,.42)}
-    .proof-window img{display:block;width:100%}.browserbar{height:54px;background:#202329;border-bottom:1px solid #343840;display:flex;align-items:center;gap:9px;padding:0 18px}.browserbar i{width:11px;height:11px;border-radius:50%;background:#59606a}.browserbar i:first-child{background:#ef5f57}.browserbar span{margin-left:10px;color:#9da2aa;font:600 13px ui-monospace,monospace}
-    .loop{display:grid;gap:16px;margin-top:58px}.loop .card{display:flex;align-items:center;gap:20px;padding:25px 28px}.loop strong{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;background:#24272d;color:#ef382f;font-size:21px}.loop b{font-size:30px}.loop span{margin-left:auto;color:#8f949c;font-size:19px}
-    .status{margin-top:45px;padding:36px}.status-head{display:flex;align-items:center;gap:18px}.status-head b{font:800 36px ui-monospace,monospace;color:#66db98}.status-head em{margin-left:auto;color:#777;font:600 15px ui-monospace,monospace}.status-grid{display:grid;grid-template-columns:1fr 1fr;gap:17px;margin-top:31px}.status-grid div{padding:25px;background:#111319;border:1px solid #2a2d34;border-radius:18px}.status-grid span{display:block;color:#8f949d;font:600 16px ui-monospace,monospace}.status-grid strong{display:block;margin-top:9px;font:800 40px ui-monospace,monospace}.status p{font-size:22px;color:#aaa;margin:28px 0 0}
-    .safety{display:grid;grid-template-columns:1fr 1fr;gap:17px;margin-top:45px}.safety .card{padding:28px}.safety b{display:block;margin-top:18px;font-size:26px}.safety p{font-size:18px;line-height:1.45;color:#aeb2b8}
-    .guide-window{height:620px}.guide-window img{width:100%;transform:translateY(-40px)}
-    .mini-foot{position:absolute;left:72px;right:72px;bottom:92px;color:#aaa;font-size:18px;line-height:1.45}
-    """
-    safe = lambda value: html_module.escape(str(value))
+    safe = lambda value: html_module.escape(str(value)).replace("\n", "<br>")
+    sources = [img_uri(ROOT / str(card["source"])) if str(card["source"]) else "" for card in cards]
+    sources[3], sources[4], sources[5], sources[6] = map(img_uri, (setup_png, monitor_png, setup_png, guide_png))
     result: list[str] = []
-    result.append(page(f"""<div class="bg-photo" style="background-image:url('{orange}');background-position:center"></div><div class="photo-scrim"></div>{header(1,8)}
-      <div class="content" style="top:250px"><div class="eyebrow">{safe(cards[0]['eyebrow'])}</div><h1>용아맥 한 자리 보는데<br><span class="red">30만 원?</span></h1><p class="sub">{safe(cards[0]['supporting'])}</p></div><div class="mini-foot">{safe(cards[0]['footer'])}</div>{footer('THE PROBLEM')}""",width=1080,height=1350,extra_css=common))
-    result.append(page(f"""<div class="bg-photo" style="background-image:url('{giants}');background-position:center"></div><div class="photo-scrim"></div>{header(2,8)}
-      <div class="content" style="top:685px"><div class="eyebrow">{safe(cards[1]['eyebrow'])}</div><h2 style="font-size:57px">보고 싶은 사람은 많은데<br>원하는 날짜는 이미<br><span class="red">매진.</span></h2><p class="sub">{safe(cards[1]['supporting'])}</p></div>{footer('AUDIENCE SIGNAL')}""",width=1080,height=1350,extra_css=common))
-    result.append(page(f"""{header(3,8)}<div class="content"><div class="eyebrow">{safe(cards[2]['eyebrow'])}</div><h2>취소표를 기다리는 동안<br>남는 선택은 세 가지였다.</h2><div class="loop"><div class="card"><strong>01</strong><b>새로고침</b><span>계속 앱 확인</span></div><div class="card"><strong>02</strong><b>포기</b><span>다음 기회로</span></div><div class="card" style="border-color:#68302e"><strong>03</strong><b>비싼 리셀</b><span>정가보다 비싸게</span></div></div><p class="sub">{safe(cards[2]['supporting'])}</p></div>{footer('THE LOOP')}""",width=1080,height=1350,extra_css=common))
-    result.append(page(f"""{header(4,8)}<div class="content"><div class="eyebrow">{safe(cards[3]['eyebrow'])}</div><h2 style="font-size:54px">설치 → 직접 로그인 →<br><span class="red">원하는 조건 설정</span></h2><div class="proof-window"><div class="browserbar"><i></i><i></i><i></i><span>localhost · Prickly IMAX Helper</span></div><div style="height:590px;overflow:hidden"><img src="{setup}" style="transform:translateY(-30px)"></div></div><p class="small" style="margin-top:22px">{safe(cards[3]['footer'])}</p></div>{footer('YOUR ACCOUNT · YOUR RULES')}""",width=1080,height=1350,extra_css=common))
-    result.append(page(f"""{header(5,8)}<div class="content"><div class="eyebrow">{safe(cards[4]['eyebrow'])}</div><h2 style="font-size:55px">지금 열린 날짜부터<br><span class="red">새로 열릴 날짜까지.</span></h2>{status_card()}<p class="sub" style="font-size:25px">{safe(cards[4]['supporting'])}</p></div>{footer('WAITING · NOT FAILED')}""",width=1080,height=1350,extra_css=common))
-    safety_items = [("중복 예매 차단","이미 잡아둔 표가 있으면 멈춤"),("관람권 수 확인","인원수와 같은 수량만 허용"),("남은 금액 0원","추가 결제금액이 남으면 중단"),("최종 제출 1회","결과 불명 시 자동 재시도 금지")]
-    safety_html = "".join(f'<div class="card"><span class="check">✓</span><b>{a}</b><p>{b}</p></div>' for a,b in safety_items)
-    result.append(page(f"""{header(6,8)}<div class="content"><div class="eyebrow">{safe(cards[5]['eyebrow'])}</div><h2>빠르기 전에<br><span class="red">틀리지 않는 게 먼저.</span></h2><div class="safety">{safety_html}</div><p class="small" style="margin-top:24px">{safe(cards[5]['footer'])}</p></div>{footer('VERIFY · THEN SUBMIT')}""",width=1080,height=1350,extra_css=common))
-    result.append(page(f"""{header(7,8)}<div class="content"><div class="eyebrow">{safe(cards[6]['eyebrow'])}</div><h2 style="font-size:52px">댓글을 남기면<br><span class="red">이 설치 안내</span>를 보낸다.</h2><div class="proof-window guide-window"><img src="{guide}"></div><p class="small" style="margin-top:20px">{safe(cards[6]['footer'])}</p></div>{footer('INSTALL GUIDE PREVIEW')}""",width=1080,height=1350,extra_css=common))
-    result.append(page(f"""{header(8,8)}<div class="content" style="top:315px"><div class="eyebrow">{safe(cards[7]['eyebrow'])}</div><h1 style="font-size:66px;max-width:880px;line-height:1.18">댓글에 <span class="red">‘아이맥스’</span>라고 남기면<br>설치 방법을 보내줄게.</h1><p class="sub" style="margin-top:68px">Mac · Windows<br>내 컴퓨터 · 내 CGV 계정 · 내 IMAX 관람권</p><div class="rule" style="margin-top:235px"></div><div style="margin-top:34px;font-size:38px;font-weight:850">prickly.ai</div></div>{footer('COMMENT → DM')}""",width=1080,height=1350,extra_css=common))
+    media = lambda src: f'<img class="media" src="{src}">'
+    number = lambda n: f'<span class="page-no">{n}/8</span>'
+    result.append(cinematic_page(f'{media(sources[0])}<div class="shade"></div>{number(1)}<section class="copy"><h1>{safe(cards[0]["headline"])}</h1><p>{safe(cards[0]["supporting"])}</p></section><small class="meta">{safe(cards[0]["footer"])}</small>', str(cards[0]["composition"])).replace('class="scene"','class="scene full"'))
+    result.append(cinematic_page(f'{media(sources[1])}<div class="shade"></div>{number(2)}<section class="copy"><h1>{safe(cards[1]["headline"])}</h1><p>{safe(cards[1]["supporting"])}</p></section><small class="meta">{safe(cards[1]["footer"])}</small>', str(cards[1]["composition"])).replace('class="scene"','class="scene top"'))
+    result.append(cinematic_page(f'{media(sources[2])}{number(3)}<section class="copy"><h1>{safe(cards[2]["headline"])}</h1><p>{safe(cards[2]["supporting"])}</p></section><small class="meta">{safe(cards[2]["footer"])}</small>', str(cards[2]["composition"])).replace('class="scene"','class="scene evidence"'))
+    result.append(cinematic_page(f'{media(sources[3])}<div class="shade"></div>{number(4)}<section class="copy"><h1>{safe(cards[3]["headline"])}</h1><p>{safe(cards[3]["supporting"])}</p></section><small class="meta">{safe(cards[3]["footer"])}</small>', str(cards[3]["composition"])).replace('class="scene"','class="scene screenfill"'))
+    result.append(cinematic_page(f'{media(sources[4])}<div class="shade"></div>{number(5)}<section class="copy"><h1>{safe(cards[4]["headline"])}</h1><p>{safe(cards[4]["supporting"])}</p></section><small class="meta">{safe(cards[4]["footer"])}</small>', str(cards[4]["composition"])).replace('class="scene"','class="scene monitor"'))
+    result.append(cinematic_page(f'{media(sources[5])}{number(6)}<section class="copy"><h1>{safe(cards[5]["headline"])}</h1><p>{safe(cards[5]["supporting"])}</p></section><small class="meta">{safe(cards[5]["footer"])}</small>', str(cards[5]["composition"])).replace('class="scene"','class="scene asym"'))
+    result.append(cinematic_page(f'{media(sources[6])}<div class="shade"></div>{number(7)}<section class="copy"><h1>{safe(cards[6]["headline"])}</h1><p>{safe(cards[6]["supporting"])}</p></section><small class="meta">{safe(cards[6]["footer"])}</small>', str(cards[6]["composition"])).replace('class="scene"','class="scene guide"'))
+    result.append(cinematic_page(f'{number(8)}<section class="copy"><h1>{safe(cards[7]["headline"])}</h1><p>{safe(cards[7]["supporting"])}</p></section><small class="meta">{safe(cards[7]["footer"])}</small>', str(cards[7]["composition"])).replace('class="scene"','class="scene note"'))
     return result
 
 
 def render_video_carousel_covers(cards: list[dict[str, object]]) -> list[Path]:
-    for directory in (ASSETS, BUILD, HTML, VIDEO_CAROUSEL, VIDEO_COVERS, VIDEO_CARDS):
+    for directory in (ASSETS, BUILD, HTML, SCENE_FRAMES, VIDEO_CAROUSEL, VIDEO_COVERS, VIDEO_CARDS):
         directory.mkdir(parents=True, exist_ok=True)
     setup_png = ASSETS / "helper-setup-preview.png"
     if not setup_png.is_file():
         setup_png = setup_preview()
+    monitor_png = redacted_monitor_preview()
     guide_png = install_guide_preview()
     paths: list[Path] = []
-    for idx, source in enumerate(video_carousel_covers(setup_png, guide_png, cards), 1):
+    for idx, source in enumerate(video_carousel_covers(setup_png, monitor_png, guide_png, cards), 1):
         html = HTML / f"video-carousel-{idx:02d}.html"
         png = VIDEO_COVERS / f"{idx:02d}.png"
         html.write_text(source, encoding="utf-8")
         capture(html, png, 1080, 1350)
         paths.append(png)
+    for idx, source in enumerate(card_seven_scene_htmls(setup_png, monitor_png, guide_png), 1):
+        html = HTML / f"video-carousel-07-stage-{idx}.html"
+        png = SCENE_FRAMES / f"card07-{idx}.png"
+        html.write_text(source, encoding="utf-8")
+        capture(html, png, 1080, 1350)
     contact_sheet(paths, VIDEO_CAROUSEL / "contact-sheet.png", 4, (216, 270))
     return paths
 
@@ -290,19 +397,39 @@ def render_video_carousel_cards(
         duration = int(card["duration"])
         frame_count = duration * 30
         motion = str(card["motion"])
-        if motion == "ken-burns":
-            zoom = "min(zoom+0.00014,1.025)"
+        recipe = motion_recipes()[motion]
+        max_scale = float(recipe["max_scale"])
+        output = VIDEO_CARDS / f"{number:02d}.mp4"
+        if motion == "three-scene-sequence":
+            frames = [SCENE_FRAMES / f"card07-{idx}.png" for idx in range(1, 4)]
+            if not all(frame.is_file() for frame in frames):
+                raise FileNotFoundError("card 7 scene frames are missing")
+            run(
+                FFMPEG, "-loglevel", "error", "-y",
+                "-loop", "1", "-t", "3.22", "-i", str(frames[0]),
+                "-loop", "1", "-t", "3.22", "-i", str(frames[1]),
+                "-loop", "1", "-t", "3.00", "-i", str(frames[2]),
+                "-filter_complex",
+                "[0:v][1:v]xfade=transition=fade:duration=0.22:offset=3.0[x1];"
+                "[x1][2:v]xfade=transition=fade:duration=0.22:offset=6.0,"
+                "fps=30,format=yuv420p[v]",
+                "-map", "[v]", "-t", str(duration), "-an", "-c:v", "libx264",
+                "-preset", "medium", "-crf", "18", "-movflags", "+faststart", str(output),
+            )
+            outputs.append(output)
+            continue
+        if motion == "slow-push":
+            zoom = f"min(zoom+0.00014,{max_scale:.3f})"
             x = "iw/2-(iw/zoom/2)"
             y = "ih/2-(ih/zoom/2)"
-        elif motion == "proof-pan":
-            zoom = "1.010"
+        elif motion in {"evidence-pan", "proof-pan", "guided-focus"}:
+            zoom = f"{max_scale:.3f}"
             x = "iw/2-(iw/zoom/2)"
             y = f"(ih-ih/zoom)*on/{frame_count}"
         else:
-            zoom = "min(zoom+0.000035,1.007)"
+            zoom = f"{max_scale:.3f}"
             x = "iw/2-(iw/zoom/2)"
             y = "ih/2-(ih/zoom/2)"
-        output = VIDEO_CARDS / f"{number:02d}.mp4"
         run(
             FFMPEG,
             "-loglevel",
@@ -329,6 +456,43 @@ def render_video_carousel_cards(
         )
         outputs.append(output)
     return outputs
+
+
+def verify_video_carousel(
+    cards: list[dict[str, object]], covers: list[Path], videos: list[Path]
+) -> dict[str, object]:
+    if len(cards) != 8 or len(covers) != 8 or len(videos) != 8:
+        raise ValueError("eight cards, eight covers, and eight videos are required")
+    for expected, (card, cover, video) in enumerate(zip(cards, covers, videos), 1):
+        if cover.name != f"{expected:02d}.png" or video.name != f"{expected:02d}.mp4":
+            raise ValueError(f"card {expected} filenames are out of order")
+        with Image.open(cover) as image:
+            if image.size != (1080, 1350):
+                raise ValueError(f"card {expected} cover has wrong dimensions")
+        probe = json.loads(
+            subprocess.check_output(
+                [
+                    FFPROBE, "-v", "error", "-show_entries",
+                    "stream=codec_type,codec_name,width,height,r_frame_rate,pix_fmt:format=duration",
+                    "-of", "json", str(video),
+                ],
+                text=True,
+            )
+        )
+        video_streams = [s for s in probe["streams"] if s.get("codec_type") == "video"]
+        audio_streams = [s for s in probe["streams"] if s.get("codec_type") == "audio"]
+        if len(video_streams) != 1 or audio_streams:
+            raise ValueError(f"card {expected} must contain one muted video stream")
+        stream = video_streams[0]
+        expected_fields = {
+            "codec_name": "h264", "width": 1080, "height": 1350,
+            "r_frame_rate": "30/1", "pix_fmt": "yuv420p",
+        }
+        if any(stream.get(key) != value for key, value in expected_fields.items()):
+            raise ValueError(f"card {expected} media contract mismatch")
+        if abs(float(probe["format"]["duration"]) - float(card["duration"])) > 0.1:
+            raise ValueError(f"card {expected} duration mismatch")
+    return {"covers": 8, "videos": 8, "verified": True}
 
 
 def sha256(path: Path) -> str:
@@ -358,6 +522,8 @@ def package_video_carousel(
 - 댓글 키워드: `아이맥스`
 - 음악은 인스타그램 게시 단계에서 별도로 추가하세요.
 - Card 7은 공개 Notion을 캡처한 것이 아니라 개인정보 없는 로컬 설치 안내 미리보기입니다.
+
+체크섬 확인: `shasum -a 256 -c SHA256SUMS`
 """
     (VIDEO_CAROUSEL / "README.md").write_text(readme, encoding="utf-8")
     qa = """# 영상 캐러셀 최종 QA
@@ -368,8 +534,11 @@ def package_video_carousel(
 - 비디오: H.264 · yuv420p · 30fps · 무음
 - 길이: 6 / 6 / 7 / 9 / 8 / 7 / 9 / 6초
 - 오디세이 스틸: 사용자 사용 허용 게시물의 UI 없는 원본 2장
+- Card 3: 사용자 제공 실제 CGV 한 자리 화면, `연속 2석 없음` 범위로만 표현
 - 제품 설정 화면: 실제 로컬 Helper UI를 오프라인 렌더링
+- 감시 화면: 개인정보를 제외한 실제 로컬 diagnose 값
 - 설치 안내: 개인정보 없는 로컬 미리보기
+- 반복 템플릿·가짜 브라우저·가짜 터미널·휴대폰 목업: 없음
 - 벤치마킹 계정 화면 녹화: 최종 결과물에서 제외
 - CGV 접속·회차·좌석·관람권·결제 조작: 없음
 - 예매 완료·좌석 보장·CGV 제휴 주장: 없음
@@ -587,6 +756,7 @@ def main() -> None:
         cards = load_carousel_manifest()
         covers = render_video_carousel_covers(cards)
         videos = render_video_carousel_cards(cards, covers)
+        verify_video_carousel(cards, covers, videos)
         archive = package_video_carousel(cards, covers, videos)
         print(
             json.dumps(
