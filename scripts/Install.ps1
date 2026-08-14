@@ -110,8 +110,22 @@ if ($DryRun) {
 
 if (-not $DryRun) {
     Write-Host "좌석과 결제를 누르지 않는 연결 검사를 실행합니다."
-    & $LauncherCmd --home $AppHome dry-run
-    if ($LASTEXITCODE -ne 0) { throw "무클릭 연결 검사에 실패해 상주 감시를 시작하지 않습니다." }
+    $StopRequest = Join-Path $AppHome "state\stop-requested"
+    $StopRequestBackup = Join-Path $AppHome "state\stop-requested.install-backup"
+    Remove-Item -LiteralPath $StopRequestBackup -Force -ErrorAction SilentlyContinue
+    if (Test-Path -LiteralPath $StopRequest) {
+        Move-Item -LiteralPath $StopRequest -Destination $StopRequestBackup -Force
+    }
+    try {
+        & $LauncherCmd --home $AppHome dry-run
+        if ($LASTEXITCODE -ne 0) { throw "무클릭 연결 검사에 실패해 상주 감시를 시작하지 않습니다." }
+    } catch {
+        if (Test-Path -LiteralPath $StopRequestBackup) {
+            Move-Item -LiteralPath $StopRequestBackup -Destination $StopRequest -Force
+        }
+        throw
+    }
+    Remove-Item -LiteralPath $StopRequestBackup -Force -ErrorAction SilentlyContinue
 
     $Action = New-ScheduledTaskAction -Execute $PythonExe -Argument "`"$LauncherPy`" --home `"$AppHome`" run"
     $CurrentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
