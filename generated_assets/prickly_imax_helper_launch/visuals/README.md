@@ -2,15 +2,16 @@
 
 ## 완성본
 
-### 최종 영상 캐러셀
+### 최종 혼합 캐러셀
 
-- `video-carousel/cards/01.mp4`~`08.mp4`: 인스타그램 업로드 순서의 영상 카드 8개
-- `video-carousel/covers/01.png`~`08.png`: 각 영상 카드의 PNG 표지
+- `video-carousel/cards/01.png`, `02.png`, `03.png`, `04.png`, `06.png`, `08.png`: 정지 카드 6개
+- `video-carousel/cards/05.mp4`, `07.mp4`: 작동 과정과 결과 흐름 영상 2개
+- `video-carousel/covers/01.png`~`08.png`: 전체 구도 검수용 PNG 표지
 - `video-carousel/contact-sheet.png`: 8장 전체 검수판
 - `video-carousel/SHA256SUMS`: 카드·표지 체크섬
 - `prickly-imax-helper-video-carousel.zip`: 최종 업로드 묶음
 
-각 영상 카드는 1080×1350, H.264, yuv420p, 30fps, 무음이다. Card 3은 사용자가 제공한 실제 CGV 한 자리 화면을 사용하며 `한 자리는 연속 2석이 아니다`라는 사실만 표현한다. Card 7은 로그인된 Notion 화면을 캡처하지 않고 저장소의 설치 안내를 개인정보 없이 로컬로 재현했다.
+모든 게시 파일은 1080×1350이다. Card 5와 Card 7만 H.264, yuv420p, 30fps, 무음, 각 8초다. Card 3은 사용자가 제공한 실제 CGV 한 자리 화면을 사용하며 `한 자리는 연속 2석이 아니다`라는 사실만 표현한다. Card 7은 CGV 모바일티켓이나 완료 거래 화면을 만들지 않고 Prickly의 결과 흐름만 보여준다.
 
 ### 기존 정적 캐러셀·릴스 마스터
 

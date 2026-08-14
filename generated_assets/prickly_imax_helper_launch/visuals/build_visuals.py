@@ -33,13 +33,9 @@ VIDEO_COVERS = VIDEO_CAROUSEL / "covers"
 VIDEO_CARDS = VIDEO_CAROUSEL / "cards"
 SCENE_FRAMES = BUILD / "scene-frames"
 ALLOWED_MOTIONS = {
-    "slow-push",
-    "evidence-pan",
-    "guided-focus",
-    "proof-pan",
-    "guided-scroll",
-    "three-scene-sequence",
-    "text-reveal",
+    "none",
+    "workflow-sequence",
+    "outcome-sequence",
 }
 ALLOWED_ANCHORS = {"bottom-left", "top-left", "bottom", "right", "center-left"}
 FORBIDDEN_SOURCE_TYPES = {"fake-browser", "fake-terminal", "phone-mockup", "fake-ticket"}
@@ -49,10 +45,13 @@ BANNED_COPY = "Prickly AI는 사람이 반복하던 일을 실제로 작동하�
 def validate_manifest(cards: list[dict[str, object]]) -> None:
     if [card.get("number") for card in cards] != list(range(1, 9)):
         raise ValueError("video carousel must contain cards 1 through 8 in order")
-    if [card.get("duration") for card in cards] != [6, 6, 7, 9, 8, 7, 9, 6]:
-        raise ValueError("video carousel durations do not match the approved design")
+    expected_media = ["png", "png", "png", "png", "mp4", "png", "mp4", "png"]
+    if [card.get("media_type") for card in cards] != expected_media:
+        raise ValueError("publishable sequence must contain six PNGs and MP4 cards 5 and 7")
+    if [card.get("duration") for card in cards] != [None, None, None, None, 8, None, 8, None]:
+        raise ValueError("only cards 5 and 7 may have an eight-second duration")
     required = {
-        "number", "duration", "source_type", "source", "headline", "supporting",
+        "number", "media_type", "duration", "source_type", "source", "headline", "supporting",
         "footer", "composition", "text_anchor", "motion",
     }
     for card in cards:
@@ -64,6 +63,9 @@ def validate_manifest(cards: list[dict[str, object]]) -> None:
             raise ValueError(f"card {number} has no headline")
         if card.get("motion") not in ALLOWED_MOTIONS:
             raise ValueError(f"card {number} has unsupported motion")
+        expected_motion = {5: "workflow-sequence", 7: "outcome-sequence"}.get(int(number), "none")
+        if card.get("motion") != expected_motion:
+            raise ValueError(f"card {number} has motion that does not match its media type")
         if card.get("text_anchor") not in ALLOWED_ANCHORS:
             raise ValueError(f"card {number} has unsupported text anchor")
         if card.get("source_type") in FORBIDDEN_SOURCE_TYPES:
@@ -86,13 +88,8 @@ def load_carousel_manifest() -> list[dict[str, object]]:
 
 def motion_recipes() -> dict[str, dict[str, float | int]]:
     return {
-        "slow-push": {"max_scale": 1.04, "transition_ms": 0},
-        "evidence-pan": {"max_scale": 1.02, "transition_ms": 220},
-        "guided-focus": {"max_scale": 1.02, "transition_ms": 220},
-        "proof-pan": {"max_scale": 1.01, "transition_ms": 0},
-        "guided-scroll": {"max_scale": 1.00, "transition_ms": 240},
-        "three-scene-sequence": {"max_scale": 1.00, "transition_ms": 220},
-        "text-reveal": {"max_scale": 1.00, "transition_ms": 200},
+        "workflow-sequence": {"transition_ms": 180},
+        "outcome-sequence": {"transition_ms": 180},
     }
 
 
@@ -273,6 +270,9 @@ def cinematic_page(body: str, composition: str) -> str:
     .screenfill .copy h1{font-size:61px}.monitor .media{object-position:center}.monitor .shade{background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.15) 56%,rgba(0,0,0,.93))}.monitor .copy{bottom:80px}.monitor .copy h1{font-size:57px}
     .asym{background:#f2f0eb;color:#121212}.asym .media{left:0;right:auto;width:61%;object-fit:cover;object-position:33% 15%}.asym .copy{left:650px;right:54px;top:155px}.asym .copy h1{font-size:58px;letter-spacing:-3.5px}.asym .copy p{color:#3f3f3d;font-size:26px;line-height:1.7}.asym .meta{left:650px;color:#767672}
     .guide{background:#111}.guide .media{left:360px;width:720px;object-fit:cover;object-position:50% 10%;filter:saturate(.8)}.guide .shade{background:linear-gradient(90deg,rgba(0,0,0,.98) 0%,rgba(0,0,0,.92) 30%,rgba(0,0,0,.12) 78%)}.guide .copy{left:64px;right:430px;top:170px}.guide .copy h1{font-size:55px}.guide .copy p{font-size:23px;margin-top:40px}
+    .compare{background:#020202}.compare .media{inset:105px 34px auto;width:1012px;height:570px;object-fit:contain;filter:saturate(.82) contrast(1.04)}.compare .shade{background:linear-gradient(180deg,rgba(0,0,0,.04),rgba(0,0,0,.12) 48%,#050505 73%)}.compare .copy{left:64px;right:64px;bottom:118px}.compare .copy h1{font-size:58px}.compare .copy p{font-size:25px;max-width:850px}
+    .flowstage{background:linear-gradient(150deg,#151515,#070707 70%)}.flowstage .ghost{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.24;filter:blur(4px) grayscale(.72)}.flowstage .stage-index{position:absolute;z-index:2;left:66px;top:96px;color:var(--red);font:800 20px/1 ui-monospace,monospace}.flowstage .copy{z-index:2;left:66px;right:66px;top:250px;text-shadow:0 2px 22px #000}.flowstage .copy h1{font-size:65px}.flowstage .copy p{font-size:28px;max-width:760px}.flowstage .rail{position:absolute;z-index:2;left:66px;right:66px;bottom:90px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.flowstage .rail i{height:5px;background:#333}.flowstage .rail i.on{background:var(--red)}
+    .outcome{background:#090909}.outcome .copy{top:185px}.outcome-list{position:absolute;left:66px;right:66px;top:560px;display:grid;gap:20px}.outcome-list div{padding:22px 0;border-top:1px solid #353535;font-size:27px;color:#aaa}.outcome-list b{display:inline-block;width:48px;color:var(--red);font:800 18px ui-monospace,monospace}
     .note{background:#090909}.note .copy{left:74px;right:74px;top:240px}.note .copy h1{font-size:60px;line-height:1.22}.note .copy p{margin-top:150px;font-size:42px;line-height:1.38;color:#f1f1ec}.note .meta{bottom:72px;font-size:21px;color:#aaa}
     """
     return f'<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>{css}</style></head><body><main class="scene" data-composition="{html_module.escape(composition)}">{body}</main></body></html>'
@@ -299,20 +299,47 @@ def card_three_scene_htmls(evidence_png: Path, headline: str) -> list[str]:
     return pages
 
 
-def card_seven_scene_htmls(setup_png: Path, monitor_png: Path, guide_png: Path) -> list[str]:
+def flow_stage_html(
+    *, number: int, index: int, title: str, detail: str, ghost: Path | None = None
+) -> str:
+    ghost_html = f'<img class="ghost" src="{img_uri(ghost)}">' if ghost else ""
+    rail = "".join(f'<i class="{"on" if step <= index else ""}"></i>' for step in range(1, 5))
+    body = (
+        f'{ghost_html}<span class="stage-index">0{index} / 04</span>'
+        f'<span class="page-no">{number}/8</span>'
+        f'<section class="copy"><h1>{html_module.escape(title)}</h1>'
+        f'<p>{html_module.escape(detail)}</p></section><div class="rail">{rail}</div>'
+    )
+    return cinematic_page(body, f"card-{number}-stage-{index}").replace(
+        'class="scene"', 'class="scene flowstage"'
+    )
+
+
+def card_five_scene_htmls(setup_png: Path, monitor_png: Path) -> list[str]:
     stages = [
-        (setup_png, "설정 완료", "영화 · 극장 · 시간 · 붙어 있는 좌석"),
-        (monitor_png, "감시 중", "armed · match:null"),
-        (guide_png, "설치 안내", "Mac · Windows · 3분 설치"),
+        ("조건 설정", "영화 · 극장 · 시간 · 붙어 있는 좌석", setup_png),
+        ("감시 시작", "새 날짜와 취소표를 로컬에서 확인", monitor_png),
+        ("연속 좌석 후보 발견", "설정한 인원수만큼 같은 행에 붙은 자리", None),
+        ("중복·관람권·잔액 검증", "조건이 하나라도 맞지 않으면 제출하지 않음", None),
+    ]
+    return [
+        flow_stage_html(number=5, index=index, title=title, detail=detail, ghost=ghost)
+        for index, (title, detail, ghost) in enumerate(stages, 1)
+    ]
+
+
+def card_seven_scene_htmls(_monitor_png: Path) -> list[str]:
+    stages = [
+        ("조건 일치", "설정한 회차와 연속 좌석 후보 확인", None),
+        ("안전검증 통과", "중복 예매 없음 · 관람권 수량 일치 · 잔액 0원", None),
+        ("최종 제출 1회", "결과가 불명확하면 자동으로 다시 제출하지 않음", None),
+        ("결과 이메일 전송", "완료 · 결과 확인 필요 · 안전 차단 상태를 알림", None),
     ]
     pages: list[str] = []
-    for index, (source, title, detail) in enumerate(stages, 1):
-        body = (
-            f'<img class="media" src="{img_uri(source)}"><div class="shade"></div>'
-            f'<span class="page-no">7/8 · {index}/3</span>'
-            f'<section class="copy"><h1>{title}</h1><p>{detail}</p></section>'
+    for index, (title, detail, ghost) in enumerate(stages, 1):
+        pages.append(
+            flow_stage_html(number=7, index=index, title=title, detail=detail, ghost=ghost)
         )
-        pages.append(cinematic_page(body, "setup-monitor-guide-stage").replace('class="scene"', 'class="scene screenfill"'))
     return pages
 
 
@@ -366,17 +393,21 @@ def video_carousel_covers(
 ) -> list[str]:
     safe = lambda value: html_module.escape(str(value)).replace("\n", "<br>")
     sources = [img_uri(ROOT / str(card["source"])) if str(card["source"]) else "" for card in cards]
-    sources[3], sources[4], sources[5], sources[6] = map(img_uri, (setup_png, monitor_png, setup_png, guide_png))
+    sources[3], sources[4], sources[5], sources[6] = map(img_uri, (setup_png, monitor_png, setup_png, monitor_png))
     result: list[str] = []
     media = lambda src: f'<img class="media" src="{src}">'
     number = lambda n: f'<span class="page-no">{n}/8</span>'
     result.append(cinematic_page(f'{media(sources[0])}<div class="shade"></div>{number(1)}<section class="copy"><h1>{safe(cards[0]["headline"])}</h1><p>{safe(cards[0]["supporting"])}</p></section><small class="meta">{safe(cards[0]["footer"])}</small>', str(cards[0]["composition"])).replace('class="scene"','class="scene full"'))
-    result.append(cinematic_page(f'{media(sources[1])}<div class="shade"></div>{number(2)}<section class="copy"><h1>{safe(cards[1]["headline"])}</h1><p>{safe(cards[1]["supporting"])}</p></section><small class="meta">{safe(cards[1]["footer"])}</small>', str(cards[1]["composition"])).replace('class="scene"','class="scene top"'))
+    result.append(cinematic_page(f'{media(sources[1])}<div class="shade"></div>{number(2)}<section class="copy"><h1>{safe(cards[1]["headline"])}</h1><p>{safe(cards[1]["supporting"])}</p></section><small class="meta">{safe(cards[1]["footer"])}</small>', str(cards[1]["composition"])).replace('class="scene"','class="scene compare"'))
     result.append(cinematic_page(f'{media(sources[2])}{number(3)}<section class="copy"><h1>{safe(cards[2]["headline"])}</h1><p>{safe(cards[2]["supporting"])}</p></section><small class="meta">{safe(cards[2]["footer"])}</small>', str(cards[2]["composition"])).replace('class="scene"','class="scene evidence"'))
     result.append(cinematic_page(f'{media(sources[3])}<div class="shade"></div>{number(4)}<section class="copy"><h1>{safe(cards[3]["headline"])}</h1><p>{safe(cards[3]["supporting"])}</p></section><small class="meta">{safe(cards[3]["footer"])}</small>', str(cards[3]["composition"])).replace('class="scene"','class="scene screenfill"'))
     result.append(cinematic_page(f'{media(sources[4])}<div class="shade"></div>{number(5)}<section class="copy"><h1>{safe(cards[4]["headline"])}</h1><p>{safe(cards[4]["supporting"])}</p></section><small class="meta">{safe(cards[4]["footer"])}</small>', str(cards[4]["composition"])).replace('class="scene"','class="scene monitor"'))
     result.append(cinematic_page(f'{media(sources[5])}{number(6)}<section class="copy"><h1>{safe(cards[5]["headline"])}</h1><p>{safe(cards[5]["supporting"])}</p></section><small class="meta">{safe(cards[5]["footer"])}</small>', str(cards[5]["composition"])).replace('class="scene"','class="scene asym"'))
-    result.append(cinematic_page(f'{media(sources[6])}<div class="shade"></div>{number(7)}<section class="copy"><h1>{safe(cards[6]["headline"])}</h1><p>{safe(cards[6]["supporting"])}</p></section><small class="meta">{safe(cards[6]["footer"])}</small>', str(cards[6]["composition"])).replace('class="scene"','class="scene guide"'))
+    outcome_rows = "".join(
+        f'<div><b>0{idx}</b>{label}</div>'
+        for idx, label in enumerate(("조건 일치", "안전검증", "최종 제출 1회", "결과 이메일"), 1)
+    )
+    result.append(cinematic_page(f'{number(7)}<section class="copy"><h1>{safe(cards[6]["headline"])}</h1><p>{safe(cards[6]["supporting"])}</p></section><div class="outcome-list">{outcome_rows}</div><small class="meta">{safe(cards[6]["footer"])}</small>', str(cards[6]["composition"])).replace('class="scene"','class="scene outcome"'))
     result.append(cinematic_page(f'{number(8)}<section class="copy"><h1>{safe(cards[7]["headline"])}</h1><p>{safe(cards[7]["supporting"])}</p></section><small class="meta">{safe(cards[7]["footer"])}</small>', str(cards[7]["composition"])).replace('class="scene"','class="scene note"'))
     return result
 
@@ -396,13 +427,12 @@ def render_video_carousel_covers(cards: list[dict[str, object]]) -> list[Path]:
         html.write_text(source, encoding="utf-8")
         capture(html, png, 1080, 1350)
         paths.append(png)
-    evidence = ROOT / str(cards[2]["source"])
-    for idx, source in enumerate(card_three_scene_htmls(evidence, str(cards[2]["headline"])), 1):
-        html = HTML / f"video-carousel-03-stage-{idx}.html"
-        png = SCENE_FRAMES / f"card03-{idx}.png"
+    for idx, source in enumerate(card_five_scene_htmls(setup_png, monitor_png), 1):
+        html = HTML / f"video-carousel-05-stage-{idx}.html"
+        png = SCENE_FRAMES / f"card05-{idx}.png"
         html.write_text(source, encoding="utf-8")
         capture(html, png, 1080, 1350)
-    for idx, source in enumerate(card_seven_scene_htmls(setup_png, monitor_png, guide_png), 1):
+    for idx, source in enumerate(card_seven_scene_htmls(monitor_png), 1):
         html = HTML / f"video-carousel-07-stage-{idx}.html"
         png = SCENE_FRAMES / f"card07-{idx}.png"
         html.write_text(source, encoding="utf-8")
@@ -416,109 +446,65 @@ def render_video_carousel_cards(
     covers: list[Path],
 ) -> list[Path]:
     if len(cards) != len(covers):
-        raise ValueError("every video card requires one cover")
+        raise ValueError("every publishable card requires one cover")
     VIDEO_CARDS.mkdir(parents=True, exist_ok=True)
+    for stale in VIDEO_CARDS.iterdir():
+        if stale.is_file() and stale.suffix.lower() in {".png", ".mp4"}:
+            stale.unlink()
     outputs: list[Path] = []
     for card, cover in zip(cards, covers):
         number = int(card["number"])
+        if card["media_type"] == "png":
+            output = VIDEO_CARDS / f"{number:02d}.png"
+            shutil.copy2(cover, output)
+            outputs.append(output)
+            continue
         duration = int(card["duration"])
-        frame_count = duration * 30
-        motion = str(card["motion"])
-        recipe = motion_recipes()[motion]
-        max_scale = float(recipe["max_scale"])
         output = VIDEO_CARDS / f"{number:02d}.mp4"
-        if motion == "evidence-pan":
-            evidence = ROOT / str(card["source"])
-            run(
-                FFMPEG, "-loglevel", "error", "-y",
-                "-loop", "1", "-t", "5.22", "-i", str(evidence),
-                "-loop", "1", "-t", "2.00", "-i", str(cover),
-                "-filter_complex",
-                "[0:v]scale=1242:1656,crop=1080:1350:0:"
-                "'if(lt(n,60),0,min((n-60)*3.4,306))',fps=30[pan];"
-                "[1:v]fps=30[claim];"
-                "[pan][claim]xfade=transition=fade:duration=0.22:offset=5.0,"
-                "format=yuv420p[v]",
-                "-map", "[v]", "-t", str(duration), "-an", "-c:v", "libx264",
-                "-preset", "medium", "-crf", "18", "-movflags", "+faststart", str(output),
-            )
-            outputs.append(output)
-            continue
-        if motion == "three-scene-sequence":
-            frames = [SCENE_FRAMES / f"card07-{idx}.png" for idx in range(1, 4)]
-            if not all(frame.is_file() for frame in frames):
-                raise FileNotFoundError("card 7 scene frames are missing")
-            run(
-                FFMPEG, "-loglevel", "error", "-y",
-                "-loop", "1", "-t", "3.22", "-i", str(frames[0]),
-                "-loop", "1", "-t", "3.22", "-i", str(frames[1]),
-                "-loop", "1", "-t", "3.00", "-i", str(frames[2]),
-                "-filter_complex",
-                "[0:v][1:v]xfade=transition=fade:duration=0.22:offset=3.0[x1];"
-                "[x1][2:v]xfade=transition=fade:duration=0.22:offset=6.0,"
-                "fps=30,format=yuv420p[v]",
-                "-map", "[v]", "-t", str(duration), "-an", "-c:v", "libx264",
-                "-preset", "medium", "-crf", "18", "-movflags", "+faststart", str(output),
-            )
-            outputs.append(output)
-            continue
-        if motion == "slow-push":
-            zoom = f"min(zoom+0.00014,{max_scale:.3f})"
-            x = "iw/2-(iw/zoom/2)"
-            y = "ih/2-(ih/zoom/2)"
-        elif motion in {"evidence-pan", "proof-pan", "guided-focus"}:
-            zoom = f"{max_scale:.3f}"
-            x = "iw/2-(iw/zoom/2)"
-            y = f"(ih-ih/zoom)*on/{frame_count}"
-        else:
-            zoom = f"{max_scale:.3f}"
-            x = "iw/2-(iw/zoom/2)"
-            y = "ih/2-(ih/zoom/2)"
+        frames = [SCENE_FRAMES / f"card{number:02d}-{idx}.png" for idx in range(1, 5)]
+        if not all(frame.is_file() for frame in frames):
+            raise FileNotFoundError(f"card {number} scene frames are missing")
         run(
-            FFMPEG,
-            "-loglevel",
-            "error",
-            "-y",
-            "-loop",
-            "1",
-            "-i",
-            str(cover),
-            "-t",
-            str(duration),
-            "-vf",
-            f"zoompan=z='{zoom}':x='{x}':y='{y}':d={frame_count}:s=1080x1350:fps=30,format=yuv420p",
-            "-an",
-            "-c:v",
-            "libx264",
-            "-preset",
-            "medium",
-            "-crf",
-            "18",
-            "-movflags",
-            "+faststart",
-            str(output),
+            FFMPEG, "-loglevel", "error", "-y",
+            "-loop", "1", "-t", "2.18", "-i", str(frames[0]),
+            "-loop", "1", "-t", "2.18", "-i", str(frames[1]),
+            "-loop", "1", "-t", "2.18", "-i", str(frames[2]),
+            "-loop", "1", "-t", "2.18", "-i", str(frames[3]),
+            "-filter_complex",
+            "[0:v][1:v]xfade=transition=fade:duration=0.18:offset=2.0[x1];"
+            "[x1][2:v]xfade=transition=fade:duration=0.18:offset=4.0[x2];"
+            "[x2][3:v]xfade=transition=fade:duration=0.18:offset=6.0,"
+            "fps=30,format=yuv420p[v]",
+            "-map", "[v]", "-t", str(duration), "-an", "-c:v", "libx264",
+            "-preset", "medium", "-crf", "18", "-movflags", "+faststart", str(output),
         )
         outputs.append(output)
     return outputs
 
 
 def verify_video_carousel(
-    cards: list[dict[str, object]], covers: list[Path], videos: list[Path]
+    cards: list[dict[str, object]], covers: list[Path], media: list[Path]
 ) -> dict[str, object]:
-    if len(cards) != 8 or len(covers) != 8 or len(videos) != 8:
-        raise ValueError("eight cards, eight covers, and eight videos are required")
-    for expected, (card, cover, video) in enumerate(zip(cards, covers, videos), 1):
-        if cover.name != f"{expected:02d}.png" or video.name != f"{expected:02d}.mp4":
+    if len(cards) != 8 or len(covers) != 8 or len(media) != 8:
+        raise ValueError("eight cards, eight covers, and eight publishable media files are required")
+    for expected, (card, cover, published) in enumerate(zip(cards, covers, media), 1):
+        suffix = ".mp4" if card["media_type"] == "mp4" else ".png"
+        if cover.name != f"{expected:02d}.png" or published.name != f"{expected:02d}{suffix}":
             raise ValueError(f"card {expected} filenames are out of order")
         with Image.open(cover) as image:
             if image.size != (1080, 1350):
                 raise ValueError(f"card {expected} cover has wrong dimensions")
+        if card["media_type"] == "png":
+            with Image.open(published) as image:
+                if image.size != (1080, 1350):
+                    raise ValueError(f"card {expected} PNG has wrong dimensions")
+            continue
         probe = json.loads(
             subprocess.check_output(
                 [
                     FFPROBE, "-v", "error", "-show_entries",
                     "stream=codec_type,codec_name,width,height,r_frame_rate,pix_fmt:format=duration",
-                    "-of", "json", str(video),
+                    "-of", "json", str(published),
                 ],
                 text=True,
             )
@@ -536,7 +522,7 @@ def verify_video_carousel(
             raise ValueError(f"card {expected} media contract mismatch")
         if abs(float(probe["format"]["duration"]) - float(card["duration"])) > 0.1:
             raise ValueError(f"card {expected} duration mismatch")
-    return {"covers": 8, "videos": 8, "verified": True}
+    return {"covers": 8, "png_cards": 6, "video_cards": 2, "verified": True}
 
 
 def sha256(path: Path) -> str:
@@ -550,42 +536,45 @@ def sha256(path: Path) -> str:
 def package_video_carousel(
     cards: list[dict[str, object]],
     covers: list[Path],
-    videos: list[Path],
+    media: list[Path],
 ) -> Path:
-    if len(cards) != 8 or len(covers) != 8 or len(videos) != 8:
-        raise ValueError("publishable package requires eight cards and eight covers")
+    if len(cards) != 8 or len(covers) != 8 or len(media) != 8:
+        raise ValueError("publishable package requires eight ordered media files and eight review covers")
     contact = VIDEO_CAROUSEL / "contact-sheet.png"
-    checksummed = [*covers, *videos, contact]
+    checksummed = [*covers, *media, contact]
     sums = "".join(f"{sha256(path)}  {path.relative_to(VIDEO_CAROUSEL)}\n" for path in checksummed)
     (VIDEO_CAROUSEL / "SHA256SUMS").write_text(sums, encoding="utf-8")
-    readme = """# Prickly IMAX Helper 영상 캐러셀
+    readme = """# Prickly IMAX Helper 혼합 캐러셀
 
-- 업로드 순서: `cards/01.mp4`부터 `cards/08.mp4`
-- 표지 확인: `covers/01.png`부터 `covers/08.png`
-- 모든 카드는 1080×1350, H.264, yuv420p, 30fps, 무음입니다.
+- 업로드 순서: `01.png` · `02.png` · `03.png` · `04.png` · `05.mp4` · `06.png` · `07.mp4` · `08.png`
+- PNG 6개와 MP4 2개는 모두 1080×1350입니다.
+- Card 5와 Card 7은 H.264, yuv420p, 30fps, 무음, 각 8초입니다.
 - 댓글 키워드: `아이맥스`
 - 음악은 인스타그램 게시 단계에서 별도로 추가하세요.
-- Card 7은 공개 Notion을 캡처한 것이 아니라 개인정보 없는 로컬 설치 안내 미리보기입니다.
+- Card 7은 Prickly 결과 흐름이며 CGV 모바일티켓·예매번호·완료 거래 화면을 만들지 않습니다.
 
 체크섬 확인: `shasum -a 256 -c SHA256SUMS`
 """
     (VIDEO_CAROUSEL / "README.md").write_text(readme, encoding="utf-8")
-    qa = """# 영상 캐러셀 최종 QA
+    qa = """# 혼합 캐러셀 최종 QA
 
-- 카드 MP4: 8개
-- PNG 표지: 8개
+- 게시용 PNG: 6개
+- 게시용 MP4: 2개 (Card 5, Card 7)
+- 검수용 PNG 표지: 8개
 - 해상도: 전부 1080×1350
-- 비디오: H.264 · yuv420p · 30fps · 무음
-- 길이: 6 / 6 / 7 / 9 / 8 / 7 / 9 / 6초
+- 비디오: H.264 · yuv420p · 30fps · 무음 · 각 8초
 - 오디세이 스틸: 사용자 사용 허용 게시물의 UI 없는 원본 2장
+- Card 2: 사용자 제공 The Direct 비교 자료 · 워터마크 유지 · IMAX 70mm와 용산 IMAX LASER 2D 형식 차이 표기
 - Card 3: 사용자 제공 실제 CGV 한 자리 화면, `연속 2석 없음` 범위로만 표현
 - 제품 설정 화면: 실제 로컬 Helper UI를 오프라인 렌더링
 - 감시 화면: 개인정보를 제외한 실제 로컬 diagnose 값
-- 설치 안내: 개인정보 없는 로컬 미리보기
+- Card 5: 조건 설정부터 안전검증까지의 작동 과정
+- Card 7: 조건 일치부터 결과 이메일까지의 제품 흐름
 - 반복 템플릿·가짜 브라우저·가짜 터미널·휴대폰 목업: 없음
 - 벤치마킹 계정 화면 녹화: 최종 결과물에서 제외
 - CGV 접속·회차·좌석·관람권·결제 조작: 없음
-- 예매 완료·좌석 보장·CGV 제휴 주장: 없음
+- 가짜 모바일티켓·예매번호·QR·바코드·완료 거래 화면: 없음
+- 좌석 보장·CGV 제휴 주장: 없음
 - 카드 결제 자동화 주장: 없음
 - 금지 문구: 미사용
 """
@@ -597,7 +586,6 @@ def package_video_carousel(
     with tempfile.TemporaryDirectory(prefix="prickly-video-carousel-") as tmp:
         package = Path(tmp) / "prickly-imax-helper-video-carousel"
         shutil.copytree(VIDEO_CARDS, package / "cards")
-        shutil.copytree(VIDEO_COVERS, package / "covers")
         shutil.copy2(contact, package / "contact-sheet.png")
         shutil.copy2(VIDEO_CAROUSEL / "README.md", package / "README.md")
         shutil.copy2(VIDEO_CAROUSEL / "qa-report.md", package / "qa-report.md")

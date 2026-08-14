@@ -29,14 +29,22 @@ class VideoCarouselManifestTests(unittest.TestCase):
     def test_manifest_has_eight_ordered_cards_and_exact_durations(self) -> None:
         cards = self.load_cards()
         self.assertEqual([card["number"] for card in cards], list(range(1, 9)))
-        self.assertEqual([card["duration"] for card in cards], [6, 6, 7, 9, 8, 7, 9, 6])
+        self.assertEqual(
+            [card["media_type"] for card in cards],
+            ["png", "png", "png", "png", "mp4", "png", "mp4", "png"],
+        )
+        self.assertEqual([card["duration"] for card in cards], [None, None, None, None, 8, None, 8, None])
         self.assertTrue(all(str(card["headline"]).strip() for card in cards))
-        allowed = {
-            "slow-push", "evidence-pan", "guided-focus", "proof-pan",
-            "guided-scroll", "three-scene-sequence", "text-reveal",
-        }
+        allowed = {"none", "workflow-sequence", "outcome-sequence"}
         self.assertTrue(all(card["motion"] in allowed for card in cards))
         self.assertGreaterEqual(len({card["composition"] for card in cards}), 6)
+
+    def test_card_seven_copy_describes_outcome_flow_without_fake_transaction(self) -> None:
+        card = self.load_cards()[6]
+        self.assertIn("결과 알림", str(card["headline"]) + str(card["supporting"]))
+        raw = json.dumps(card, ensure_ascii=False).lower()
+        for banned in ("모바일티켓", "예매번호", "qr", "barcode", "실제 예매 완료"):
+            self.assertNotIn(banned, raw)
 
     def test_manifest_excludes_benchmark_and_banned_copy(self) -> None:
         raw = MANIFEST.read_text(encoding="utf-8")
@@ -52,11 +60,17 @@ class VideoCarouselOutputTests(unittest.TestCase):
         for cover in covers:
             self.assertEqual(png_size(cover), (1080, 1350), cover)
 
-    def test_eight_mp4_cards_match_media_contract(self) -> None:
+    def test_publishable_sequence_has_six_pngs_and_two_mp4s(self) -> None:
         cards = self.load_cards()
-        videos = sorted((OUTPUT / "cards").glob("*.mp4"))
-        self.assertEqual(len(videos), 8)
-        for video, card in zip(videos, cards):
+        media = sorted((OUTPUT / "cards").glob("*"))
+        self.assertEqual(
+            [path.name for path in media],
+            ["01.png", "02.png", "03.png", "04.png", "05.mp4", "06.png", "07.mp4", "08.png"],
+        )
+        for image in [path for path in media if path.suffix == ".png"]:
+            self.assertEqual(png_size(image), (1080, 1350), image)
+        for video in [path for path in media if path.suffix == ".mp4"]:
+            card = cards[int(video.stem) - 1]
             probe = subprocess.check_output(
                 [
                     "ffprobe",
@@ -85,8 +99,9 @@ class VideoCarouselOutputTests(unittest.TestCase):
         archive = VISUALS / "prickly-imax-helper-video-carousel.zip"
         with zipfile.ZipFile(archive) as bundle:
             names = bundle.namelist()
-        self.assertEqual(sum(name.startswith("cards/") and name.endswith(".mp4") for name in names), 8)
-        self.assertEqual(sum(name.startswith("covers/") and name.endswith(".png") for name in names), 8)
+        self.assertEqual(sum(name.startswith("cards/") and name.endswith(".mp4") for name in names), 2)
+        self.assertEqual(sum(name.startswith("cards/") and name.endswith(".png") for name in names), 6)
+        self.assertEqual(sum(name.startswith("covers/") for name in names), 0)
         self.assertNotIn("ScreenRecording_08-14-2026 17-39-23_1.MP4", names)
 
 

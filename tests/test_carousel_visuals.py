@@ -19,7 +19,10 @@ def load_builder():
 def test_manifest_locks_eight_distinct_compositions() -> None:
     cards = load_builder().load_carousel_manifest()
     assert [card["number"] for card in cards] == list(range(1, 9))
-    assert [card["duration"] for card in cards] == [6, 6, 7, 9, 8, 7, 9, 6]
+    assert [card["media_type"] for card in cards] == [
+        "png", "png", "png", "png", "mp4", "png", "mp4", "png"
+    ]
+    assert [card["duration"] for card in cards] == [None, None, None, None, 8, None, 8, None]
     assert len({card["composition"] for card in cards}) >= 6
     assert all(
         card["text_anchor"] in {"bottom-left", "top-left", "bottom", "right", "center-left"}
@@ -56,31 +59,31 @@ def test_cover_html_has_eight_distinct_compositions_and_no_fake_chrome(tmp_path:
 
 def test_motion_recipes_are_restrained() -> None:
     recipes = load_builder().motion_recipes()
-    assert recipes["slow-push"]["max_scale"] <= 1.05
-    assert recipes["guided-focus"]["transition_ms"] <= 300
-    assert recipes["guided-scroll"]["transition_ms"] <= 300
-    assert recipes["text-reveal"]["transition_ms"] <= 300
+    assert set(recipes) == {"workflow-sequence", "outcome-sequence"}
+    assert all(recipe["transition_ms"] <= 220 for recipe in recipes.values())
 
 
-def test_card_seven_has_three_real_scene_states(tmp_path: Path) -> None:
+def test_card_five_has_four_ordered_workflow_states(tmp_path: Path) -> None:
     builder = load_builder()
-    html = builder.card_seven_scene_htmls(
-        tmp_path / "setup.png", tmp_path / "monitor.png", tmp_path / "guide.png"
-    )
-    assert len(html) == 3
-    assert "설정 완료" in html[0]
-    assert "armed" in html[1] and "match:null" in html[1]
-    assert "설치 안내" in html[2]
+    html = builder.card_five_scene_htmls(tmp_path / "setup.png", tmp_path / "monitor.png")
+    assert len(html) == 4
+    assert "조건 설정" in html[0]
+    assert "감시 시작" in html[1]
+    assert "연속 좌석 후보 발견" in html[2]
+    assert "중복·관람권·잔액 검증" in html[3]
 
 
-def test_card_three_stages_evidence_before_final_claim(tmp_path: Path) -> None:
+def test_card_seven_has_four_honest_outcome_states(tmp_path: Path) -> None:
     builder = load_builder()
-    html = builder.card_three_scene_htmls(tmp_path / "evidence.png", "최종 문구")
-    assert len(html) == 3
-    assert "1석/624석" in html[0]
-    assert "붙어 있는 2석" not in html[0]
-    assert "외딴 한 자리" in html[1]
-    assert "최종 문구" in html[2]
+    pages = builder.card_seven_scene_htmls(tmp_path / "monitor.png")
+    assert len(pages) == 4
+    assert "조건 일치" in pages[0]
+    assert "안전검증 통과" in pages[1]
+    assert "최종 제출 1회" in pages[2]
+    assert "결과 이메일 전송" in pages[3]
+    raw = "\n".join(pages).lower()
+    for banned in ("모바일티켓", "예매번호", "qr", "barcode", "fake-ticket"):
+        assert banned not in raw
 
 
 def test_redaction_blocks_private_fields() -> None:

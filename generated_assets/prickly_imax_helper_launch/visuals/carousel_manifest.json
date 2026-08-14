@@ -2,7 +2,8 @@
   "cards": [
     {
       "number": 1,
-      "duration": 6,
+      "media_type": "png",
+      "duration": null,
       "source_type": "odyssey-still",
       "source": "content/assets/odyssey-clean/odyssey-agamemnon-fullbody-1080x1350.jpg",
       "headline": "용아맥 표 보려고\n며칠째 새로고침 중인 사람?",
@@ -10,23 +11,25 @@
       "footer": "오디세이 · 용산 IMAX",
       "composition": "full-bleed-still",
       "text_anchor": "bottom-left",
-      "motion": "slow-push"
+      "motion": "none"
     },
     {
       "number": 2,
-      "duration": 6,
-      "source_type": "odyssey-still",
-      "source": "content/assets/odyssey-clean/odyssey-giants-forest-1080x1350.jpg",
-      "headline": "오디세이는 보고 싶은데\n들어갈 때마다 전석 매진.",
-      "supporting": "중고 거래에는 10만 원 넘는 표까지 올라와 있었다.",
-      "footer": "정가를 넘긴 일부 리셀 게시물 사례",
-      "composition": "evidence-overlay",
-      "text_anchor": "top-left",
-      "motion": "slow-push"
+      "media_type": "png",
+      "duration": null,
+      "source_type": "user-provided-comparison-reference",
+      "source": "content/assets/imax-comparison/the-direct-35mm-vs-imax70mm-user-reference.png",
+      "headline": "이 영화가 IMAX에서\n더 궁금했던 이유.",
+      "supporting": "보이는 범위부터 다르니까.\n그래서 용아맥은 들어갈 때마다 전석 매진.",
+      "footer": "IMAX 70mm 비교 예시 · 용산 IMAX LASER 2D와 상영 형식 다름 · 출처 The Direct",
+      "composition": "imax-comparison-evidence",
+      "text_anchor": "bottom-left",
+      "motion": "none"
     },
     {
       "number": 3,
-      "duration": 7,
+      "media_type": "png",
+      "duration": null,
       "source_type": "cgv-user-evidence",
       "source": "content/assets/cgv-evidence/odyssey-yongsan-single-seat-20260815.png",
       "headline": "자리 있다고 떠서 들어가도\n붙어 있는 2석은 없다.",
@@ -34,11 +37,12 @@
       "footer": "사용자 제공 실제 CGV 화면 · 개인정보 없음",
       "composition": "single-seat-evidence",
       "text_anchor": "bottom",
-      "motion": "evidence-pan"
+      "motion": "none"
     },
     {
       "number": 4,
-      "duration": 9,
+      "media_type": "png",
+      "duration": null,
       "source_type": "helper-setup",
       "source": "generated_assets/prickly_imax_helper_launch/visuals/assets/helper-setup-preview.png",
       "headline": "그래서 그냥\n내가 보려고 만들었다.",
@@ -46,23 +50,25 @@
       "footer": "실제 로컬 설정 화면",
       "composition": "setup-full-frame",
       "text_anchor": "bottom-left",
-      "motion": "guided-focus"
+      "motion": "none"
     },
     {
       "number": 5,
+      "media_type": "mp4",
       "duration": 8,
       "source_type": "local-monitor",
       "source": "generated_assets/prickly_imax_helper_launch/visuals/assets/helper-monitor-preview.png",
-      "headline": "조건만 정하고 켜두면\n새 날짜와 취소표를 확인한다.",
-      "supporting": "내 컴퓨터에서만 실행 · 비밀번호 별도 입력 없음",
-      "footer": "armed · match:null",
-      "composition": "monitor-full-frame",
+      "headline": "조건을 정하면\n이 순서로 작동한다.",
+      "supporting": "조건 설정 · 감시 시작 · 연속 좌석 후보 · 안전검증",
+      "footer": "내 컴퓨터에서 실행 · 비밀번호 별도 입력 없음",
+      "composition": "workflow-sequence",
       "text_anchor": "bottom-left",
-      "motion": "proof-pan"
+      "motion": "workflow-sequence"
     },
     {
       "number": 6,
-      "duration": 7,
+      "media_type": "png",
+      "duration": null,
       "source_type": "helper-setup",
       "source": "generated_assets/prickly_imax_helper_launch/visuals/assets/helper-setup-preview.png",
       "headline": "아무 자리나\n잡는 건 싫어서",
@@ -70,23 +76,25 @@
       "footer": "조건은 사용자가 변경 가능",
       "composition": "conditions-asymmetric",
       "text_anchor": "right",
-      "motion": "guided-scroll"
+      "motion": "none"
     },
     {
       "number": 7,
-      "duration": 9,
-      "source_type": "guide-preview",
-      "source": "generated_assets/prickly_imax_helper_launch/visuals/assets/install-guide-preview.png",
-      "headline": "이제 내가 계속\nCGV를 보고 있지 않아도 된다.",
-      "supporting": "조건이 맞을 때만 관람권과 잔액을 확인하고 한 번만 제출한다.",
-      "footer": "설정 완료 → 감시 중 → 설치 안내",
-      "composition": "setup-monitor-guide",
+      "media_type": "mp4",
+      "duration": 8,
+      "source_type": "prickly-outcome-flow",
+      "source": "generated_assets/prickly_imax_helper_launch/visuals/assets/helper-monitor-preview.png",
+      "headline": "자리를 찾는 데서 끝나지 않는다.\n조건 확인부터 결과 알림까지.",
+      "supporting": "조건 일치 · 안전검증 · 최종 제출 1회 · 결과 이메일",
+      "footer": "Prickly 결과 흐름",
+      "composition": "outcome-sequence",
       "text_anchor": "bottom-left",
-      "motion": "three-scene-sequence"
+      "motion": "outcome-sequence"
     },
     {
       "number": 8,
-      "duration": 6,
+      "media_type": "png",
+      "duration": null,
       "source_type": "cta",
       "source": "",
       "headline": "용아맥 새로고침에\n지친 사람이라면",
@@ -94,7 +102,7 @@
       "footer": "prickly.ai",
       "composition": "black-note-cta",
       "text_anchor": "center-left",
-      "motion": "text-reveal"
+      "motion": "none"
     }
   ]
 }
