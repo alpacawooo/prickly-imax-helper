@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Prickly IMAX · 리셀 증거형 표지 시안</title>
+  <style>
+    :root{--bg:#080808;--ink:#f6f6f2;--muted:#8d8d88;--red:#ef382f;--line:#292929}
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+    body{padding:54px 38px 80px}
+    header{max-width:1240px;margin:0 auto 38px;border-bottom:1px solid var(--line);padding-bottom:28px}
+    .kicker{color:var(--red);font-size:13px;font-weight:800;letter-spacing:.14em}
+    h1{margin:12px 0 8px;font-size:clamp(34px,4vw,58px);line-height:1.06;letter-spacing:-.055em}
+    header p{margin:0;color:#a9a9a4;font-size:17px;line-height:1.55}
+    main{max-width:1240px;margin:auto}
+    .compare{display:grid;grid-template-columns:1fr 1fr;gap:36px;align-items:start}
+    .column>h2{margin:0 0 14px;font-size:16px;color:#b9b9b4}.column>h2 b{color:var(--red);margin-right:9px}
+    .cover{position:relative;width:100%;aspect-ratio:4/5;overflow:hidden;background:#030303;box-shadow:0 18px 55px rgba(0,0,0,.45)}
+    .cover>img.base{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+    .current>img{width:100%;height:100%;object-fit:cover}
+    .evidence{position:absolute;z-index:2;left:0;right:0;top:0;height:43%;overflow:hidden;filter:saturate(.35) brightness(.55) contrast(.9);-webkit-mask-image:linear-gradient(#000 0 70%,transparent 100%);mask-image:linear-gradient(#000 0 70%,transparent 100%)}
+    .evidence img{width:124%;height:100%;object-fit:cover;object-position:100% 0;transform:translateX(-8%)}
+    .shade{position:absolute;z-index:3;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.08) 12%,rgba(0,0,0,.2) 44%,rgba(0,0,0,.96) 100%)}
+    .copy{position:absolute;z-index:4;left:6.2%;right:5%;bottom:7.5%}
+    .copy h3{margin:0;font-size:clamp(31px,3.5vw,52px);line-height:1.08;letter-spacing:-.065em;font-weight:900}
+    .copy p{margin:19px 0 0;font-size:clamp(14px,1.4vw,20px);font-weight:750}.copy small{display:block;margin-top:36px;color:#888883;font-size:11px}
+    .page{position:absolute;z-index:5;right:4.5%;top:3.5%;font-size:13px}
+    .notes{margin-top:42px;display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+    .notes div{padding:24px 20px;border-right:1px solid var(--line)}.notes div:last-child{border-right:0}
+    .notes span{display:block;color:var(--muted);font-size:12px;margin-bottom:9px}.notes b{font-size:18px;line-height:1.35}
+    .decision{margin-top:34px;max-width:850px}.decision h2{font-size:26px;margin:0 0 10px}.decision p{color:#b2b2ad;font-size:17px;line-height:1.65;margin:0}
+    @media(max-width:850px){body{padding:28px 18px 60px}.compare{grid-template-columns:1fr;gap:30px}.notes{grid-template-columns:1fr 1fr}.notes div:nth-child(2){border-right:0}.notes div:nth-child(-n+2){border-bottom:1px solid var(--line)}}
+  </style>
+</head>
+<body>
+  <header>
+    <span class="kicker">PRICKLY IMAX · COVER DIRECTION</span>
+    <h1>리셀 화면을 붙이지 않고,<br>문제의 증거로 배경에 녹인다.</h1>
+    <p>기존 시네마틱 표지의 인물과 제목을 유지하면서 리셀 목록만 상단에 결합한 1장 시안.</p>
+  </header>
+  <main>
+    <section class="compare">
+      <div class="column">
+        <h2><b>BEFORE</b>현재 표지</h2>
+        <div class="cover current">
+          <img src="../../../generated_assets/prickly_imax_helper_launch/visuals/video-carousel/cards/01.png" alt="현재 첫 번째 슬라이드">
+        </div>
+      </div>
+      <div class="column">
+        <h2><b>PROPOSED</b>리셀 증거형 표지</h2>
+        <div class="cover proposed">
+          <img class="base" src="../../../content/assets/odyssey-clean/odyssey-agamemnon-fullbody-1080x1350.jpg" alt="오디세이 갑옷 스틸">
+          <div class="evidence"><img src="../../../content/assets/source-originals/knn/knn-odyssey-resale-reference.png" alt="오디세이 리셀 사례 화면"></div>
+          <div class="shade"></div>
+          <span class="page">1/8</span>
+          <div class="copy">
+            <h3>용아맥 표 보려고<br>며칠째 새로고침 중인 사람?</h3>
+            <p>나도 그랬음.</p>
+            <small>리셀 사례 화면 · 출처 KNN NEWS</small>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="notes">
+      <div><span>리셀 화면</span><b>상단 약 40%</b></div>
+      <div><span>채도</span><b>원본의 35%</b></div>
+      <div><span>밝기</span><b>원본의 55%</b></div>
+      <div><span>연결</span><b>검은 페이드</b></div>
+    </section>
+    <section class="decision">
+      <h2>의도</h2>
+      <p>첫눈에는 큰 제목이 읽히고, 다음 시선에서 여러 리셀 가격이 보이도록 한다. 뉴스 캡처를 카드처럼 붙인 흔적과 플레이어 UI는 제거하며, KNN이 Prickly 콘텐츠를 제작한 것처럼 보이지 않도록 출처를 분리한다.</p>
+    </section>
+  </main>
+</body>
+</html>
