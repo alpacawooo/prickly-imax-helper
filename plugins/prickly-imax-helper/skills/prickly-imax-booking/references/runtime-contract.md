@@ -18,4 +18,6 @@ Runtime files live below `~/.prickly-imax-helper/` on macOS or `%LOCALAPPDATA%\P
 - `state/checkout.json`: current transaction state
 - `logs/`: redacted operational logs
 
-The monitor must keep the booking page pre-positioned, use a bounded request budget, fetch seat maps only after relevant changes or scheduled verification, lock the browser through submission, revalidate the pair and duplicate guard, and stop after one completed or uncertain transaction.
+The monitor must discover open dates and every open date's schedule serially at process startup and once at Korea Standard Time midnight. It makes no daytime schedule-discovery requests between those events and rotates only through known eligible seat maps. If the host sleeps through midnight, the first loop after wake performs the missed discovery once; a process restart performs startup discovery again. A show added after the daily discovery is intentionally deferred until the next midnight or restart.
+
+The monitor must keep the booking page pre-positioned, use a bounded request budget, lock the browser through submission, revalidate the pair and duplicate guard, and stop after one completed or uncertain transaction.
