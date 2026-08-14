@@ -156,7 +156,7 @@ class ReleaseTests(unittest.TestCase):
             )
             output = root / "dist"
             process = subprocess.run(
-                [sys.executable, str(ROOT / "scripts/build_release.py"), "--version", "0.1.0", "--authorization", str(authorization), "--output", str(output)],
+                [sys.executable, str(ROOT / "scripts/build_release.py"), "--version", "0.2.0", "--authorization", str(authorization), "--output", str(output)],
                 text=True,
                 capture_output=True,
                 check=True,
@@ -203,7 +203,7 @@ class ReleaseTests(unittest.TestCase):
                 encoding="utf-8",
             )
             process = subprocess.run(
-                [sys.executable, str(ROOT / "scripts/build_release.py"), "--version", "0.1.0", "--authorization", str(authorization), "--output", str(root / "dist")],
+                [sys.executable, str(ROOT / "scripts/build_release.py"), "--version", "0.2.0", "--authorization", str(authorization), "--output", str(root / "dist")],
                 text=True,
                 capture_output=True,
             )
@@ -236,7 +236,7 @@ class ReleaseTests(unittest.TestCase):
                     sys.executable,
                     str(ROOT / "scripts/build_release.py"),
                     "--version",
-                    "0.1.0",
+                    "0.2.0",
                     "--authorization",
                     str(authorization),
                     "--output",
@@ -273,7 +273,7 @@ class ReleaseTests(unittest.TestCase):
                     sys.executable,
                     str(ROOT / "scripts/build_release.py"),
                     "--version",
-                    "0.1.0",
+                    "0.2.0",
                     "--authorization",
                     str(authorization),
                     "--output",
@@ -313,7 +313,7 @@ class ReleaseTests(unittest.TestCase):
                     sys.executable,
                     str(ROOT / "scripts/build_release.py"),
                     "--version",
-                    "0.1.0",
+                    "0.2.0",
                     "--authorization",
                     str(authorization),
                     "--output",
@@ -324,7 +324,7 @@ class ReleaseTests(unittest.TestCase):
             )
             self.assertNotEqual(process.returncode, 0)
             self.assertIn("non-public or unknown fields", process.stderr)
-            self.assertFalse((root / "dist" / "prickly-imax-helper-0.1.0.tar.gz").exists())
+            self.assertFalse((root / "dist" / "prickly-imax-helper-0.2.0.tar.gz").exists())
 
     def test_release_rejects_placeholder_authorization_reference(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -352,7 +352,7 @@ class ReleaseTests(unittest.TestCase):
                     sys.executable,
                     str(ROOT / "scripts/build_release.py"),
                     "--version",
-                    "0.1.0",
+                    "0.2.0",
                     "--authorization",
                     str(authorization),
                     "--output",
