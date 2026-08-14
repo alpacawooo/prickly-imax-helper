@@ -38,6 +38,8 @@ CGV login and browser data remain under the user's local profile. Runtime state 
 ## Safety contract
 
 - All explicit CGV availability requests share a cross-process one-request-per-second budget.
+- The monitor discovers open dates and their schedules serially at process startup and once at Korea Standard Time midnight. Between those events it makes no daytime schedule-discovery requests and rotates only through known eligible seat maps.
+- If the computer sleeps through midnight, the first loop after wake runs the missed daily discovery once. A process restart also performs startup discovery; a show added later in the day is intentionally not discovered until the next midnight or restart.
 - HTTP 429 stops traffic for at least five minutes; repeated limits double the shared cooldown up to one hour, while a longer server `Retry-After` always wins.
 - Only an exact same-row consecutive block of the configured size satisfying the configured rows and edge exclusion can proceed.
 - Shows must start at least three hours after the current Korea time by default. This 180-minute safety floor cannot be lowered, but it can be increased up to 1,440 minutes.
