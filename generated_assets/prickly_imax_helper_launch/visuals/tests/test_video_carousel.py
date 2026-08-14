@@ -34,7 +34,7 @@ class VideoCarouselManifestTests(unittest.TestCase):
             [card["media_type"] for card in cards],
             ["png", "png", "png", "mp4", "mp4", "png", "mp4", "png"],
         )
-        self.assertEqual([card["duration"] for card in cards], [None, None, None, 7, 8, None, 8, None])
+        self.assertEqual([card["duration"] for card in cards], [None, None, None, 3, 8, None, 8, None])
         self.assertTrue(all(str(card["headline"]).strip() for card in cards))
         allowed = {"none", "setup-scroll", "workflow-sequence", "outcome-sequence"}
         self.assertTrue(all(card["motion"] in allowed for card in cards))
@@ -59,10 +59,15 @@ class VideoCarouselManifestTests(unittest.TestCase):
     def test_cover_uses_approved_price_kicker_copy(self) -> None:
         card = self.load_cards()[0]
         self.assertEqual(card["kicker"], "30만 원까지 오른 용아맥 표.")
-        self.assertEqual(card["headline"], "며칠째 새로고침 중인 사람?")
-        self.assertEqual(card["supporting"], "나도 그랬음.")
+        self.assertEqual(card["headline"], "새로고침은 그만.")
+        self.assertEqual(
+            card["promise"],
+            '조건만 정하면 예매 시도까지\n"딸깍" 한 번으로',
+        )
+        self.assertEqual(card["supporting"], "내 컴퓨터가 취소표를 대신 기다린다.")
         source = BUILD_SCRIPT.read_text(encoding="utf-8")
         self.assertIn('class="cover-kicker"', source)
+        self.assertIn('class="cover-promise"', source)
 
     def test_manifest_excludes_benchmark_and_banned_copy(self) -> None:
         raw = MANIFEST.read_text(encoding="utf-8")

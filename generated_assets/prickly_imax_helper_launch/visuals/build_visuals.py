@@ -49,8 +49,8 @@ def validate_manifest(cards: list[dict[str, object]]) -> None:
     expected_media = ["png", "png", "png", "mp4", "mp4", "png", "mp4", "png"]
     if [card.get("media_type") for card in cards] != expected_media:
         raise ValueError("publishable sequence must contain five PNGs and MP4 cards 4, 5, and 7")
-    if [card.get("duration") for card in cards] != [None, None, None, 7, 8, None, 8, None]:
-        raise ValueError("card 4 must be seven seconds and cards 5 and 7 eight seconds")
+    if [card.get("duration") for card in cards] != [None, None, None, 3, 8, None, 8, None]:
+        raise ValueError("card 4 must be three seconds and cards 5 and 7 eight seconds")
     required = {
         "number", "media_type", "duration", "source_type", "source", "headline", "supporting",
         "footer", "composition", "text_anchor", "motion",
@@ -93,7 +93,7 @@ def load_carousel_manifest() -> list[dict[str, object]]:
 
 def motion_recipes() -> dict[str, dict[str, float | int]]:
     return {
-        "setup-scroll": {"duration": 7, "fps": 30, "viewport_height": 900},
+        "setup-scroll": {"duration": 3, "fps": 30, "viewport_height": 800},
         "workflow-sequence": {"transition_ms": 180},
         "outcome-sequence": {"transition_ms": 180},
     }
@@ -105,7 +105,13 @@ def card_four_scroll_offsets(
     if source_height <= 0 or viewport_height <= 0 or frame_count < 2:
         raise ValueError("scroll dimensions must be positive and require at least two frames")
     maximum = max(source_height - viewport_height, 0)
-    return [round(maximum * index / (frame_count - 1)) for index in range(frame_count)]
+    moving_frames = max(round(frame_count * 0.55), 2)
+    offsets: list[int] = []
+    for index in range(frame_count):
+        progress = min(index / (moving_frames - 1), 1.0)
+        eased = 1 - (1 - progress) ** 3
+        offsets.append(round(maximum * eased))
+    return offsets
 
 
 def redact_visual_evidence(value: str) -> str:
@@ -320,11 +326,11 @@ def cinematic_page(body: str, composition: str) -> str:
     .copy{position:absolute;z-index:3;left:66px;right:66px}.copy h1{white-space:pre-line;margin:0;font-size:68px;line-height:1.13;letter-spacing:-4.4px;font-weight:850}
     .copy p{white-space:pre-line;margin:24px 0 0;font-size:27px;line-height:1.42;letter-spacing:-1px;color:#d4d4d0;font-weight:620}.meta{position:absolute;z-index:4;left:66px;bottom:38px;color:#858580;font-size:15px;letter-spacing:.03em}
     .page-no{position:absolute;z-index:4;right:48px;top:42px;font-size:17px;color:#d7d7d2}.red{color:var(--red)}
-    .full .copy{bottom:105px}.full .copy .cover-kicker{display:block;margin:0 0 18px;color:var(--red);font-size:44px;line-height:1.1;letter-spacing:-2.6px;font-weight:850}.full .copy h1{font-size:86px;line-height:1.08;letter-spacing:-5.8px}.top .copy{top:80px;max-width:830px}.top .shade{background:linear-gradient(180deg,rgba(0,0,0,.82),rgba(0,0,0,.10) 50%,rgba(0,0,0,.82))}
+    .full .copy{bottom:105px}.full .copy .cover-kicker{display:block;margin:0 0 18px;color:var(--red);font-size:44px;line-height:1.1;letter-spacing:-2.6px;font-weight:850}.full .copy h1{font-size:86px;line-height:1.08;letter-spacing:-5.8px}.full .copy .cover-promise{display:block;white-space:pre-line;margin-top:22px;font-size:48px;line-height:1.18;letter-spacing:-3px;font-weight:820;color:#f7f7f4}.full .copy p{margin-top:18px;font-size:28px}.top .copy{top:80px;max-width:830px}.top .shade{background:linear-gradient(180deg,rgba(0,0,0,.82),rgba(0,0,0,.10) 50%,rgba(0,0,0,.82))}
     .evidence .media{object-fit:cover;object-position:50% 44%}.evidence:after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,.18) 65%,rgba(0,0,0,.96))}.evidence .copy{bottom:88px}.evidence .copy h1{font-size:70px}.evidence .copy p{font-size:32px}
     .screenfill{background:#eee}.screenfill .media{object-fit:cover;object-position:50% 20%;filter:saturate(.82)}.screenfill .shade{background:linear-gradient(180deg,rgba(0,0,0,.08),rgba(0,0,0,.02) 54%,rgba(0,0,0,.94))}.screenfill .copy{bottom:82px}
     .screenfill .copy h1{font-size:73px}.monitor .media{object-position:center}.monitor .shade{background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.15) 56%,rgba(0,0,0,.93))}.monitor .copy{bottom:80px}.monitor .copy h1{font-size:68px}.monitor .copy p{font-size:32px}
-    .setup-scroll{background:#0a0a0a}.setup-scroll .copy{left:54px;right:54px;top:66px}.setup-scroll .copy h1{font-size:62px;line-height:1.12;letter-spacing:-3.8px}.setup-scroll .copy p{margin-top:12px;font-size:25px;color:#a7a7a2}.setup-scroll .scroll-window{position:absolute;left:54px;top:320px;width:972px;height:900px;overflow:hidden;background:#fff;border:1px solid #2c2c2c}.setup-scroll .scroll-window img{display:block;width:972px;height:auto}.setup-scroll .meta{left:54px;bottom:58px}
+    .setup-scroll{background:#0a0a0a}.setup-scroll .copy{left:54px;right:54px;top:66px}.setup-scroll .copy h1{font-size:62px;line-height:1.12;letter-spacing:-3.8px}.setup-scroll .copy p{margin-top:12px;font-size:25px;color:#a7a7a2}.setup-scroll .scroll-window{position:absolute;left:54px;top:320px;width:972px;height:800px;overflow:hidden;background:#fff;border:1px solid #2c2c2c}.setup-scroll .scroll-window img{display:block;width:972px;height:auto}.setup-scroll .meta{left:54px;bottom:58px}
     .condition-focus{background:#090909;color:#f7f7f4}.condition-focus .copy{left:58px;right:58px;top:72px}.condition-focus .copy h1{font-size:67px;line-height:1.12;letter-spacing:-4.3px}.condition-focus .form-focus{position:absolute;left:58px;right:58px;top:320px;height:620px;overflow:hidden;background:#fff;border-top:1px solid #2c2c2c;border-bottom:1px solid #2c2c2c}.condition-focus .form-focus img{display:block;width:972px;height:auto;transform:translateY(-390px)}.condition-focus .condition-list{position:absolute;left:58px;right:58px;bottom:92px;display:grid;grid-template-columns:1fr 1fr;gap:0 42px;border-top:2px solid #353535}.condition-focus .condition-list div{padding:22px 0;border-bottom:1px solid #353535;font-size:32px;font-weight:820}.condition-focus .condition-list span{display:block;margin-bottom:7px;color:#92928d;font-size:19px;font-weight:700}.condition-focus .meta{display:none}
     .guide{background:#111}.guide .media{left:360px;width:720px;object-fit:cover;object-position:50% 10%;filter:saturate(.8)}.guide .shade{background:linear-gradient(90deg,rgba(0,0,0,.98) 0%,rgba(0,0,0,.92) 30%,rgba(0,0,0,.12) 78%)}.guide .copy{left:64px;right:430px;top:170px}.guide .copy h1{font-size:55px}.guide .copy p{font-size:23px;margin-top:40px}
     .compare{background:#020202}.compare .copy{left:58px;right:110px;top:54px}.compare .copy h1{font-size:53px;line-height:1.08;letter-spacing:-3.4px}.compare .copy p{position:absolute;top:1040px;margin:0;font-size:32px;line-height:1.32;max-width:900px}.compare-stack{position:absolute;left:48px;right:48px;top:210px;bottom:238px}.format-label{display:block;margin:0 0 14px;text-align:center;font-size:41px;line-height:1;font-weight:900;letter-spacing:-2.2px}.format-label.imax{margin-top:34px}.format-frame{display:block;width:100%;overflow:hidden;border:1px solid #868681;background:#050505}.format-frame.narrow{height:248px}.format-frame.tall{height:474px}.format-frame svg{display:block;width:100%;height:100%}.compare .meta{left:58px;bottom:34px;max-width:930px}
@@ -459,7 +465,7 @@ def video_carousel_covers(
     result: list[str] = []
     media = lambda src: f'<img class="media" src="{src}">'
     number = lambda n: f'<span class="page-no">{n}/8</span>'
-    result.append(cinematic_page(f'{media(sources[0])}<div class="shade"></div>{number(1)}<section class="copy"><span class="cover-kicker">{safe(cards[0]["kicker"])}</span><h1>{safe(cards[0]["headline"])}</h1><p>{safe(cards[0]["supporting"])}</p></section><small class="meta">{safe(cards[0]["footer"])}</small>', str(cards[0]["composition"])).replace('class="scene"','class="scene full"'))
+    result.append(cinematic_page(f'{media(sources[0])}<div class="shade"></div>{number(1)}<section class="copy"><span class="cover-kicker">{safe(cards[0]["kicker"])}</span><h1>{safe(cards[0]["headline"])}</h1><span class="cover-promise">{safe(cards[0]["promise"])}</span><p>{safe(cards[0]["supporting"])}</p></section><small class="meta">{safe(cards[0]["footer"])}</small>', str(cards[0]["composition"])).replace('class="scene"','class="scene full"'))
     comparison_stack = (
         '<div class="compare-stack">'
         '<b class="format-label">35MM</b>'
@@ -545,7 +551,8 @@ def render_card_four_scroll_video(
 ) -> None:
     frame_count = duration * fps
     viewport_x, viewport_y = 54, 320
-    viewport_width, viewport_height = 972, 900
+    viewport_width = 972
+    viewport_height = int(motion_recipes()["setup-scroll"]["viewport_height"])
     with Image.open(cover) as cover_image, Image.open(setup_scroll_png) as source_image:
         base = cover_image.convert("RGB")
         source = source_image.convert("RGB")
@@ -701,7 +708,7 @@ def package_video_carousel(
 
 - 업로드 순서: `01.png` · `02.png` · `03.png` · `04.mp4` · `05.mp4` · `06.png` · `07.mp4` · `08.png`
 - PNG 5개와 MP4 3개는 모두 1080×1350입니다.
-- Card 4는 실제 설정 화면을 아래로 스크롤하는 7초 영상입니다.
+- Card 4는 실제 설정 화면을 빠르게 아래로 스크롤하는 3초 영상입니다.
 - Card 5와 Card 7은 H.264, yuv420p, 30fps, 무음, 각 8초입니다.
 - 댓글 키워드: `아이맥스`
 - 음악은 인스타그램 게시 단계에서 별도로 추가하세요.
@@ -716,7 +723,7 @@ def package_video_carousel(
 - 게시용 MP4: 3개 (Card 4, Card 5, Card 7)
 - 검수용 PNG 표지: 8개
 - 해상도: 전부 1080×1350
-- 비디오: H.264 · yuv420p · 30fps · 무음 · Card 4는 7초, Card 5·7은 8초
+- 비디오: H.264 · yuv420p · 30fps · 무음 · Card 4는 3초, Card 5·7은 8초
 - 오디세이 스틸: 사용자 사용 허용 게시물의 UI 없는 원본 2장
 - Card 2: 사용자 제공 The Direct 비교 자료 · 워터마크 유지 · IMAX 70mm와 용산 IMAX LASER 2D 형식 차이 표기
 - Card 3: 사용자 제공 실제 CGV 한 자리 화면, `연속 2석 없음` 범위로만 표현
