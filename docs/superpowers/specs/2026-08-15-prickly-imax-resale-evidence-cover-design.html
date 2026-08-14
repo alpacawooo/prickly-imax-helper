@@ -19,11 +19,9 @@
     .cover{position:relative;width:100%;aspect-ratio:4/5;overflow:hidden;background:#030303;box-shadow:0 18px 55px rgba(0,0,0,.45)}
     .cover>img.base{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
     .current>img{width:100%;height:100%;object-fit:cover}
-    .evidence{position:absolute;z-index:2;left:0;right:0;top:0;height:43%;overflow:hidden;filter:saturate(.35) brightness(.55) contrast(.9);-webkit-mask-image:linear-gradient(#000 0 70%,transparent 100%);mask-image:linear-gradient(#000 0 70%,transparent 100%)}
-    .evidence img{width:124%;height:100%;object-fit:cover;object-position:100% 0;transform:translateX(-8%)}
     .shade{position:absolute;z-index:3;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.08) 12%,rgba(0,0,0,.2) 44%,rgba(0,0,0,.96) 100%)}
     .copy{position:absolute;z-index:4;left:6.2%;right:5%;bottom:7.5%}
-    .copy h3{margin:0;font-size:clamp(31px,3.5vw,52px);line-height:1.08;letter-spacing:-.065em;font-weight:900}
+    .copy .price-kicker{display:block;margin-bottom:11px;color:var(--red);font-size:clamp(17px,1.8vw,26px);font-weight:850;letter-spacing:-.045em}.copy h3{margin:0;font-size:clamp(31px,3.5vw,52px);line-height:1.08;letter-spacing:-.065em;font-weight:900}
     .copy p{margin:19px 0 0;font-size:clamp(14px,1.4vw,20px);font-weight:750}.copy small{display:block;margin-top:36px;color:#888883;font-size:11px}
     .page{position:absolute;z-index:5;right:4.5%;top:3.5%;font-size:13px}
     .notes{margin-top:42px;display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
@@ -36,8 +34,8 @@
 <body>
   <header>
     <span class="kicker">PRICKLY IMAX · COVER DIRECTION</span>
-    <h1>리셀 화면을 붙이지 않고,<br>문제의 증거로 배경에 녹인다.</h1>
-    <p>기존 시네마틱 표지의 인물과 제목을 유지하면서 리셀 목록만 상단에 결합한 1장 시안.</p>
+    <h1>기존 시네마틱 배경을 유지하고,<br>가격만 짧게 강조한다.</h1>
+    <p>리셀 화면을 합성하지 않고 기존 표지의 톤과 인물, 큰 질문을 그대로 살린 최종 문구 시안.</p>
   </header>
   <main>
     <section class="compare">
@@ -48,29 +46,29 @@
         </div>
       </div>
       <div class="column">
-        <h2><b>PROPOSED</b>리셀 증거형 표지</h2>
+        <h2><b>PROPOSED</b>가격 강조형 표지</h2>
         <div class="cover proposed">
           <img class="base" src="../../../content/assets/odyssey-clean/odyssey-agamemnon-fullbody-1080x1350.jpg" alt="오디세이 갑옷 스틸">
-          <div class="evidence"><img src="../../../content/assets/source-originals/knn/knn-odyssey-resale-reference.png" alt="오디세이 리셀 사례 화면"></div>
           <div class="shade"></div>
           <span class="page">1/8</span>
           <div class="copy">
-            <h3>용아맥 표 보려고<br>며칠째 새로고침 중인 사람?</h3>
+            <span class="price-kicker">30만 원까지 오른 용아맥 표.</span>
+            <h3>며칠째 새로고침 중인 사람?</h3>
             <p>나도 그랬음.</p>
-            <small>리셀 사례 화면 · 출처 KNN NEWS</small>
+            <small>오디세이 · 용산 IMAX</small>
           </div>
         </div>
       </div>
     </section>
     <section class="notes">
-      <div><span>리셀 화면</span><b>상단 약 40%</b></div>
-      <div><span>채도</span><b>원본의 35%</b></div>
-      <div><span>밝기</span><b>원본의 55%</b></div>
-      <div><span>연결</span><b>검은 페이드</b></div>
+      <div><span>배경</span><b>기존 스틸 유지</b></div>
+      <div><span>가격 문구</span><b>빨간색 44px</b></div>
+      <div><span>질문</span><b>흰색 86px</b></div>
+      <div><span>추가 이미지</span><b>사용하지 않음</b></div>
     </section>
     <section class="decision">
       <h2>의도</h2>
-      <p>첫눈에는 큰 제목이 읽히고, 다음 시선에서 여러 리셀 가격이 보이도록 한다. 뉴스 캡처를 카드처럼 붙인 흔적과 플레이어 UI는 제거하며, KNN이 Prickly 콘텐츠를 제작한 것처럼 보이지 않도록 출처를 분리한다.</p>
+      <p>첫 시선에는 `30만 원`이 들어오고, 바로 아래 큰 질문이 페르소나를 호출한다. 뉴스 화면을 추가하지 않아 영화의 웅장함과 기존 캐러셀의 시네마틱 톤을 유지한다.</p>
     </section>
   </main>
 </body>

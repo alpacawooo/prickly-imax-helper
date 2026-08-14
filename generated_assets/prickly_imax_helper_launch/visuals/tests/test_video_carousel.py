@@ -56,6 +56,14 @@ class VideoCarouselManifestTests(unittest.TestCase):
         )
         self.assertNotIn("여기서만", str(card["headline"]) + str(card["supporting"]))
 
+    def test_cover_uses_approved_price_kicker_copy(self) -> None:
+        card = self.load_cards()[0]
+        self.assertEqual(card["kicker"], "30만 원까지 오른 용아맥 표.")
+        self.assertEqual(card["headline"], "며칠째 새로고침 중인 사람?")
+        self.assertEqual(card["supporting"], "나도 그랬음.")
+        source = BUILD_SCRIPT.read_text(encoding="utf-8")
+        self.assertIn('class="cover-kicker"', source)
+
     def test_manifest_excludes_benchmark_and_banned_copy(self) -> None:
         raw = MANIFEST.read_text(encoding="utf-8")
         self.assertNotIn("ScreenRecording_08-14-2026", raw)
@@ -64,6 +72,34 @@ class VideoCarouselManifestTests(unittest.TestCase):
 
 
 class VideoCarouselOutputTests(unittest.TestCase):
+    def test_cover_headline_uses_large_mobile_first_type(self) -> None:
+        source = BUILD_SCRIPT.read_text(encoding="utf-8")
+        self.assertIn(
+            ".full .copy h1{font-size:86px;line-height:1.08;letter-spacing:-5.8px}",
+            source,
+        )
+
+    def test_comparison_slide_stacks_35mm_over_imax_and_fills_the_canvas(self) -> None:
+        source = BUILD_SCRIPT.read_text(encoding="utf-8")
+        self.assertIn('<b class="format-label">35MM</b>', source)
+        self.assertIn('<b class="format-label imax">IMAX 70MM</b>', source)
+        self.assertIn(".format-frame.narrow{height:248px}", source)
+        self.assertIn(".format-frame.tall{height:474px}", source)
+
+    def test_cards_two_through_eight_use_twenty_percent_larger_type(self) -> None:
+        source = BUILD_SCRIPT.read_text(encoding="utf-8")
+        expected_rules = (
+            ".compare .copy h1{font-size:53px",
+            ".evidence .copy h1{font-size:70px}",
+            ".setup-scroll .copy h1{font-size:62px",
+            ".flowstage .copy h1{font-size:78px}",
+            ".condition-focus .copy h1{font-size:67px",
+            ".outcome .copy h1{font-size:82px}",
+            ".note .copy h1{font-size:72px",
+        )
+        for rule in expected_rules:
+            self.assertIn(rule, source)
+
     def test_condition_slide_uses_the_shared_dark_product_background(self) -> None:
         source = BUILD_SCRIPT.read_text(encoding="utf-8")
         self.assertIn(".condition-focus{background:#090909;color:#f7f7f4}", source)
