@@ -20,9 +20,9 @@ def test_manifest_locks_eight_distinct_compositions() -> None:
     cards = load_builder().load_carousel_manifest()
     assert [card["number"] for card in cards] == list(range(1, 9))
     assert [card["media_type"] for card in cards] == [
-        "png", "png", "png", "png", "mp4", "png", "mp4", "png"
+        "png", "png", "png", "mp4", "mp4", "png", "mp4", "png"
     ]
-    assert [card["duration"] for card in cards] == [None, None, None, None, 8, None, 8, None]
+    assert [card["duration"] for card in cards] == [None, None, None, 7, 8, None, 8, None]
     assert len({card["composition"] for card in cards}) >= 6
     assert all(
         card["text_anchor"] in {"bottom-left", "top-left", "bottom", "right", "center-left"}
@@ -59,8 +59,38 @@ def test_cover_html_has_eight_distinct_compositions_and_no_fake_chrome(tmp_path:
 
 def test_motion_recipes_are_restrained() -> None:
     recipes = load_builder().motion_recipes()
-    assert set(recipes) == {"workflow-sequence", "outcome-sequence"}
-    assert all(recipe["transition_ms"] <= 220 for recipe in recipes.values())
+    assert set(recipes) == {"setup-scroll", "workflow-sequence", "outcome-sequence"}
+    assert recipes["setup-scroll"]["duration"] == 7
+    assert all(
+        recipe.get("transition_ms", 0) <= 220
+        for recipe in recipes.values()
+    )
+
+
+def test_card_four_scroll_is_continuous_and_reaches_the_bottom() -> None:
+    builder = load_builder()
+    offsets = builder.card_four_scroll_offsets(
+        source_height=2400,
+        viewport_height=900,
+        frame_count=211,
+    )
+    assert len(offsets) == 211
+    assert offsets[0] == 0
+    assert offsets[-1] == 1500
+    assert offsets == sorted(offsets)
+    assert len(set(offsets[1:-1])) > 180
+
+
+def test_card_six_uses_a_readable_field_focus_instead_of_a_clipped_split(tmp_path: Path) -> None:
+    builder = load_builder()
+    cards = builder.load_carousel_manifest()
+    placeholders = [tmp_path / name for name in ("setup.png", "monitor.png", "guide.png")]
+    html = builder.video_carousel_covers(*placeholders, cards)
+    card_six = html[5]
+    assert "condition-focus" in card_six
+    assert "asym" not in card_six
+    for value in ("연속 2석", "D–J열", "양끝 20% 제외", "3시간 이상"):
+        assert value in card_six
 
 
 def test_card_five_has_four_ordered_workflow_states(tmp_path: Path) -> None:

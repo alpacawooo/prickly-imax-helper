@@ -34,6 +34,7 @@ VIDEO_CARDS = VIDEO_CAROUSEL / "cards"
 SCENE_FRAMES = BUILD / "scene-frames"
 ALLOWED_MOTIONS = {
     "none",
+    "setup-scroll",
     "workflow-sequence",
     "outcome-sequence",
 }
@@ -45,11 +46,11 @@ BANNED_COPY = "Prickly AI는 사람이 반복하던 일을 실제로 작동하�
 def validate_manifest(cards: list[dict[str, object]]) -> None:
     if [card.get("number") for card in cards] != list(range(1, 9)):
         raise ValueError("video carousel must contain cards 1 through 8 in order")
-    expected_media = ["png", "png", "png", "png", "mp4", "png", "mp4", "png"]
+    expected_media = ["png", "png", "png", "mp4", "mp4", "png", "mp4", "png"]
     if [card.get("media_type") for card in cards] != expected_media:
-        raise ValueError("publishable sequence must contain six PNGs and MP4 cards 5 and 7")
-    if [card.get("duration") for card in cards] != [None, None, None, None, 8, None, 8, None]:
-        raise ValueError("only cards 5 and 7 may have an eight-second duration")
+        raise ValueError("publishable sequence must contain five PNGs and MP4 cards 4, 5, and 7")
+    if [card.get("duration") for card in cards] != [None, None, None, 7, 8, None, 8, None]:
+        raise ValueError("card 4 must be seven seconds and cards 5 and 7 eight seconds")
     required = {
         "number", "media_type", "duration", "source_type", "source", "headline", "supporting",
         "footer", "composition", "text_anchor", "motion",
@@ -63,7 +64,11 @@ def validate_manifest(cards: list[dict[str, object]]) -> None:
             raise ValueError(f"card {number} has no headline")
         if card.get("motion") not in ALLOWED_MOTIONS:
             raise ValueError(f"card {number} has unsupported motion")
-        expected_motion = {5: "workflow-sequence", 7: "outcome-sequence"}.get(int(number), "none")
+        expected_motion = {
+            4: "setup-scroll",
+            5: "workflow-sequence",
+            7: "outcome-sequence",
+        }.get(int(number), "none")
         if card.get("motion") != expected_motion:
             raise ValueError(f"card {number} has motion that does not match its media type")
         if card.get("text_anchor") not in ALLOWED_ANCHORS:
@@ -88,9 +93,19 @@ def load_carousel_manifest() -> list[dict[str, object]]:
 
 def motion_recipes() -> dict[str, dict[str, float | int]]:
     return {
+        "setup-scroll": {"duration": 7, "fps": 30, "viewport_height": 900},
         "workflow-sequence": {"transition_ms": 180},
         "outcome-sequence": {"transition_ms": 180},
     }
+
+
+def card_four_scroll_offsets(
+    *, source_height: int, viewport_height: int, frame_count: int
+) -> list[int]:
+    if source_height <= 0 or viewport_height <= 0 or frame_count < 2:
+        raise ValueError("scroll dimensions must be positive and require at least two frames")
+    maximum = max(source_height - viewport_height, 0)
+    return [round(maximum * index / (frame_count - 1)) for index in range(frame_count)]
 
 
 def redact_visual_evidence(value: str) -> str:
@@ -131,6 +146,35 @@ with sync_playwright() as p:
         str(CHROME),
         str(width),
         str(height),
+    )
+
+
+def capture_full_page(html: Path, output: Path, width: int) -> None:
+    output.parent.mkdir(parents=True, exist_ok=True)
+    script = """
+import sys
+from playwright.sync_api import sync_playwright
+uri, output, chrome, width = sys.argv[1:]
+with sync_playwright() as p:
+    browser = p.chromium.launch(
+        executable_path=chrome,
+        headless=True,
+        args=['--disable-background-networking', '--disable-gpu', '--hide-scrollbars'],
+    )
+    page = browser.new_page(viewport={'width': int(width), 'height': 1100}, device_scale_factor=1)
+    page.goto(uri, wait_until='load')
+    page.wait_for_timeout(250)
+    page.screenshot(path=output, full_page=True)
+    browser.close()
+"""
+    run(
+        str(PRODUCT_PYTHON),
+        "-c",
+        script,
+        html.as_uri(),
+        str(output),
+        str(CHROME),
+        str(width),
     )
 
 
@@ -207,7 +251,7 @@ def install_guide_preview() -> Path:
     return out
 
 
-def setup_preview() -> Path:
+def setup_preview_html() -> Path:
     path = HTML / "setup-preview.html"
     env = os.environ.copy()
     env["PYTHONPATH"] = str(ROOT / "runtime")
@@ -218,8 +262,20 @@ def setup_preview() -> Path:
         f"Path({str(path)!r}).write_text(rendered, encoding='utf-8')"
     )
     subprocess.run([str(PRODUCT_PYTHON), "-c", script], check=True, env=env)
+    return path
+
+
+def setup_preview() -> Path:
+    path = setup_preview_html()
     out = ASSETS / "helper-setup-preview.png"
     capture(path, out, 1440, 1100)
+    return out
+
+
+def setup_scroll_preview() -> Path:
+    path = setup_preview_html()
+    out = ASSETS / "helper-setup-scroll.png"
+    capture_full_page(path, out, 1440)
     return out
 
 
@@ -268,7 +324,8 @@ def cinematic_page(body: str, composition: str) -> str:
     .evidence .media{object-fit:cover;object-position:50% 44%}.evidence:after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,.18) 65%,rgba(0,0,0,.96))}.evidence .copy{bottom:88px}.evidence .copy h1{font-size:58px}
     .screenfill{background:#eee}.screenfill .media{object-fit:cover;object-position:50% 20%;filter:saturate(.82)}.screenfill .shade{background:linear-gradient(180deg,rgba(0,0,0,.08),rgba(0,0,0,.02) 54%,rgba(0,0,0,.94))}.screenfill .copy{bottom:82px}
     .screenfill .copy h1{font-size:61px}.monitor .media{object-position:center}.monitor .shade{background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.15) 56%,rgba(0,0,0,.93))}.monitor .copy{bottom:80px}.monitor .copy h1{font-size:57px}
-    .asym{background:#f2f0eb;color:#121212}.asym .media{left:0;right:auto;width:61%;object-fit:cover;object-position:33% 15%}.asym .copy{left:650px;right:54px;top:155px}.asym .copy h1{font-size:58px;letter-spacing:-3.5px}.asym .copy p{color:#3f3f3d;font-size:26px;line-height:1.7}.asym .meta{left:650px;color:#767672}
+    .setup-scroll{background:#0a0a0a}.setup-scroll .copy{left:54px;right:54px;top:66px}.setup-scroll .copy h1{font-size:52px;line-height:1.12;letter-spacing:-3.2px}.setup-scroll .copy p{margin-top:12px;font-size:21px;color:#a7a7a2}.setup-scroll .scroll-window{position:absolute;left:54px;top:320px;width:972px;height:900px;overflow:hidden;background:#fff;border:1px solid #2c2c2c}.setup-scroll .scroll-window img{display:block;width:972px;height:auto}.setup-scroll .meta{left:54px;bottom:58px}
+    .condition-focus{background:#f2f0eb;color:#121212}.condition-focus .copy{left:58px;right:58px;top:72px}.condition-focus .copy h1{font-size:56px;line-height:1.12;letter-spacing:-3.6px}.condition-focus .form-focus{position:absolute;left:58px;right:58px;top:320px;height:620px;overflow:hidden;background:#fff;border-top:1px solid #c9c8c4;border-bottom:1px solid #c9c8c4}.condition-focus .form-focus img{display:block;width:972px;height:auto;transform:translateY(-390px)}.condition-focus .condition-list{position:absolute;left:58px;right:58px;bottom:92px;display:grid;grid-template-columns:1fr 1fr;gap:0 42px;border-top:2px solid #151515}.condition-focus .condition-list div{padding:22px 0;border-bottom:1px solid #aaa9a4;font-size:27px;font-weight:820}.condition-focus .condition-list span{display:block;margin-bottom:7px;color:#77756f;font-size:16px;font-weight:700}.condition-focus .meta{display:none}
     .guide{background:#111}.guide .media{left:360px;width:720px;object-fit:cover;object-position:50% 10%;filter:saturate(.8)}.guide .shade{background:linear-gradient(90deg,rgba(0,0,0,.98) 0%,rgba(0,0,0,.92) 30%,rgba(0,0,0,.12) 78%)}.guide .copy{left:64px;right:430px;top:170px}.guide .copy h1{font-size:55px}.guide .copy p{font-size:23px;margin-top:40px}
     .compare{background:#020202}.compare .media{inset:105px 34px auto;width:1012px;height:570px;object-fit:contain;filter:saturate(.82) contrast(1.04)}.compare .shade{background:linear-gradient(180deg,rgba(0,0,0,.04),rgba(0,0,0,.12) 48%,#050505 73%)}.compare .copy{left:64px;right:64px;bottom:118px}.compare .copy h1{font-size:58px}.compare .copy p{font-size:25px;max-width:850px}
     .flowstage{background:linear-gradient(150deg,#151515,#070707 70%)}.flowstage .ghost{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.24;filter:blur(4px) grayscale(.72)}.flowstage .stage-index{position:absolute;z-index:2;left:66px;top:96px;color:var(--red);font:800 20px/1 ui-monospace,monospace}.flowstage .copy{z-index:2;left:66px;right:66px;top:250px;text-shadow:0 2px 22px #000}.flowstage .copy h1{font-size:65px}.flowstage .copy p{font-size:28px;max-width:760px}.flowstage .rail{position:absolute;z-index:2;left:66px;right:66px;bottom:90px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.flowstage .rail i{height:5px;background:#333}.flowstage .rail i.on{background:var(--red)}
@@ -390,19 +447,44 @@ def video_carousel_covers(
     monitor_png: Path,
     guide_png: Path,
     cards: list[dict[str, object]],
+    setup_scroll_png: Path | None = None,
 ) -> list[str]:
     safe = lambda value: html_module.escape(str(value)).replace("\n", "<br>")
     sources = [img_uri(ROOT / str(card["source"])) if str(card["source"]) else "" for card in cards]
-    sources[3], sources[4], sources[5], sources[6] = map(img_uri, (setup_png, monitor_png, setup_png, monitor_png))
+    scroll_source = setup_scroll_png or setup_png
+    sources[3], sources[4], sources[5], sources[6] = map(
+        img_uri, (scroll_source, monitor_png, scroll_source, monitor_png)
+    )
     result: list[str] = []
     media = lambda src: f'<img class="media" src="{src}">'
     number = lambda n: f'<span class="page-no">{n}/8</span>'
     result.append(cinematic_page(f'{media(sources[0])}<div class="shade"></div>{number(1)}<section class="copy"><h1>{safe(cards[0]["headline"])}</h1><p>{safe(cards[0]["supporting"])}</p></section><small class="meta">{safe(cards[0]["footer"])}</small>', str(cards[0]["composition"])).replace('class="scene"','class="scene full"'))
     result.append(cinematic_page(f'{media(sources[1])}<div class="shade"></div>{number(2)}<section class="copy"><h1>{safe(cards[1]["headline"])}</h1><p>{safe(cards[1]["supporting"])}</p></section><small class="meta">{safe(cards[1]["footer"])}</small>', str(cards[1]["composition"])).replace('class="scene"','class="scene compare"'))
     result.append(cinematic_page(f'{media(sources[2])}{number(3)}<section class="copy"><h1>{safe(cards[2]["headline"])}</h1><p>{safe(cards[2]["supporting"])}</p></section><small class="meta">{safe(cards[2]["footer"])}</small>', str(cards[2]["composition"])).replace('class="scene"','class="scene evidence"'))
-    result.append(cinematic_page(f'{media(sources[3])}<div class="shade"></div>{number(4)}<section class="copy"><h1>{safe(cards[3]["headline"])}</h1><p>{safe(cards[3]["supporting"])}</p></section><small class="meta">{safe(cards[3]["footer"])}</small>', str(cards[3]["composition"])).replace('class="scene"','class="scene screenfill"'))
+    result.append(cinematic_page(
+        f'{number(4)}<section class="copy"><h1>{safe(cards[3]["headline"])}</h1>'
+        f'<p>{safe(cards[3]["supporting"])}</p></section>'
+        f'<div class="scroll-window"><img src="{sources[3]}"></div>'
+        f'<small class="meta">{safe(cards[3]["footer"])}</small>',
+        str(cards[3]["composition"]),
+    ).replace('class="scene"','class="scene setup-scroll"'))
     result.append(cinematic_page(f'{media(sources[4])}<div class="shade"></div>{number(5)}<section class="copy"><h1>{safe(cards[4]["headline"])}</h1><p>{safe(cards[4]["supporting"])}</p></section><small class="meta">{safe(cards[4]["footer"])}</small>', str(cards[4]["composition"])).replace('class="scene"','class="scene monitor"'))
-    result.append(cinematic_page(f'{media(sources[5])}{number(6)}<section class="copy"><h1>{safe(cards[5]["headline"])}</h1><p>{safe(cards[5]["supporting"])}</p></section><small class="meta">{safe(cards[5]["footer"])}</small>', str(cards[5]["composition"])).replace('class="scene"','class="scene asym"'))
+    condition_rows = "".join(
+        f'<div><span>{label}</span>{value}</div>'
+        for label, value in (
+            ("같은 행 좌석", "연속 2석"),
+            ("허용 열", "D–J열"),
+            ("좌석 위치", "양끝 20% 제외"),
+            ("당일 회차", "3시간 이상"),
+        )
+    )
+    result.append(cinematic_page(
+        f'{number(6)}<section class="copy"><h1>{safe(cards[5]["headline"])}</h1></section>'
+        f'<div class="form-focus"><img src="{sources[5]}"></div>'
+        f'<div class="condition-list">{condition_rows}</div>'
+        f'<small class="meta">{safe(cards[5]["footer"])}</small>',
+        str(cards[5]["composition"]),
+    ).replace('class="scene"','class="scene condition-focus"'))
     outcome_rows = "".join(
         f'<div><b>0{idx}</b>{label}</div>'
         for idx, label in enumerate(("조건 일치", "안전검증", "최종 제출 1회", "결과 이메일"), 1)
@@ -418,10 +500,13 @@ def render_video_carousel_covers(cards: list[dict[str, object]]) -> list[Path]:
     setup_png = ASSETS / "helper-setup-preview.png"
     if not setup_png.is_file():
         setup_png = setup_preview()
+    setup_scroll_png = setup_scroll_preview()
     monitor_png = redacted_monitor_preview()
     guide_png = install_guide_preview()
     paths: list[Path] = []
-    for idx, source in enumerate(video_carousel_covers(setup_png, monitor_png, guide_png, cards), 1):
+    for idx, source in enumerate(
+        video_carousel_covers(setup_png, monitor_png, guide_png, cards, setup_scroll_png), 1
+    ):
         html = HTML / f"video-carousel-{idx:02d}.html"
         png = VIDEO_COVERS / f"{idx:02d}.png"
         html.write_text(source, encoding="utf-8")
@@ -439,6 +524,48 @@ def render_video_carousel_covers(cards: list[dict[str, object]]) -> list[Path]:
         capture(html, png, 1080, 1350)
     contact_sheet(paths, VIDEO_CAROUSEL / "contact-sheet.png", 4, (216, 270))
     return paths
+
+
+def render_card_four_scroll_video(
+    cover: Path,
+    setup_scroll_png: Path,
+    output: Path,
+    *,
+    duration: int,
+    fps: int = 30,
+) -> None:
+    frame_count = duration * fps
+    viewport_x, viewport_y = 54, 320
+    viewport_width, viewport_height = 972, 900
+    with Image.open(cover) as cover_image, Image.open(setup_scroll_png) as source_image:
+        base = cover_image.convert("RGB")
+        source = source_image.convert("RGB")
+        scaled_height = max(round(source.height * viewport_width / source.width), viewport_height)
+        source = source.resize((viewport_width, scaled_height), Image.Resampling.LANCZOS)
+        offsets = card_four_scroll_offsets(
+            source_height=source.height,
+            viewport_height=viewport_height,
+            frame_count=frame_count,
+        )
+        with tempfile.TemporaryDirectory(prefix="prickly-card-four-scroll-") as tmp:
+            frame_dir = Path(tmp)
+            for index, offset in enumerate(offsets):
+                frame = base.copy()
+                crop = source.crop((0, offset, viewport_width, offset + viewport_height))
+                frame.paste(crop, (viewport_x, viewport_y))
+                frame.save(frame_dir / f"frame-{index:04d}.jpg", quality=94, subsampling=0)
+            run(
+                FFMPEG,
+                "-loglevel", "error", "-y",
+                "-framerate", str(fps),
+                "-i", str(frame_dir / "frame-%04d.jpg"),
+                "-t", str(duration),
+                "-vf", "scale=iw:ih:in_range=full:out_range=tv,format=yuv420p",
+                "-an", "-c:v", "libx264",
+                "-preset", "medium", "-crf", "18",
+                "-pix_fmt", "yuv420p", "-color_range", "tv", "-movflags", "+faststart",
+                str(output),
+            )
 
 
 def render_video_carousel_cards(
@@ -461,6 +588,18 @@ def render_video_carousel_cards(
             continue
         duration = int(card["duration"])
         output = VIDEO_CARDS / f"{number:02d}.mp4"
+        if number == 4:
+            setup_scroll_png = ASSETS / "helper-setup-scroll.png"
+            if not setup_scroll_png.is_file():
+                raise FileNotFoundError("card 4 setup scroll source is missing")
+            render_card_four_scroll_video(
+                cover,
+                setup_scroll_png,
+                output,
+                duration=duration,
+            )
+            outputs.append(output)
+            continue
         frames = [SCENE_FRAMES / f"card{number:02d}-{idx}.png" for idx in range(1, 5)]
         if not all(frame.is_file() for frame in frames):
             raise FileNotFoundError(f"card {number} scene frames are missing")
@@ -522,7 +661,12 @@ def verify_video_carousel(
             raise ValueError(f"card {expected} media contract mismatch")
         if abs(float(probe["format"]["duration"]) - float(card["duration"])) > 0.1:
             raise ValueError(f"card {expected} duration mismatch")
-    return {"covers": 8, "png_cards": 6, "video_cards": 2, "verified": True}
+    return {
+        "covers": 8,
+        "png_cards": sum(card["media_type"] == "png" for card in cards),
+        "video_cards": sum(card["media_type"] == "mp4" for card in cards),
+        "verified": True,
+    }
 
 
 def sha256(path: Path) -> str:
@@ -546,8 +690,9 @@ def package_video_carousel(
     (VIDEO_CAROUSEL / "SHA256SUMS").write_text(sums, encoding="utf-8")
     readme = """# Prickly IMAX Helper 혼합 캐러셀
 
-- 업로드 순서: `01.png` · `02.png` · `03.png` · `04.png` · `05.mp4` · `06.png` · `07.mp4` · `08.png`
-- PNG 6개와 MP4 2개는 모두 1080×1350입니다.
+- 업로드 순서: `01.png` · `02.png` · `03.png` · `04.mp4` · `05.mp4` · `06.png` · `07.mp4` · `08.png`
+- PNG 5개와 MP4 3개는 모두 1080×1350입니다.
+- Card 4는 실제 설정 화면을 아래로 스크롤하는 7초 영상입니다.
 - Card 5와 Card 7은 H.264, yuv420p, 30fps, 무음, 각 8초입니다.
 - 댓글 키워드: `아이맥스`
 - 음악은 인스타그램 게시 단계에서 별도로 추가하세요.
@@ -558,17 +703,19 @@ def package_video_carousel(
     (VIDEO_CAROUSEL / "README.md").write_text(readme, encoding="utf-8")
     qa = """# 혼합 캐러셀 최종 QA
 
-- 게시용 PNG: 6개
-- 게시용 MP4: 2개 (Card 5, Card 7)
+- 게시용 PNG: 5개
+- 게시용 MP4: 3개 (Card 4, Card 5, Card 7)
 - 검수용 PNG 표지: 8개
 - 해상도: 전부 1080×1350
-- 비디오: H.264 · yuv420p · 30fps · 무음 · 각 8초
+- 비디오: H.264 · yuv420p · 30fps · 무음 · Card 4는 7초, Card 5·7은 8초
 - 오디세이 스틸: 사용자 사용 허용 게시물의 UI 없는 원본 2장
 - Card 2: 사용자 제공 The Direct 비교 자료 · 워터마크 유지 · IMAX 70mm와 용산 IMAX LASER 2D 형식 차이 표기
 - Card 3: 사용자 제공 실제 CGV 한 자리 화면, `연속 2석 없음` 범위로만 표현
 - 제품 설정 화면: 실제 로컬 Helper UI를 오프라인 렌더링
+- Card 4: 실제 설정 화면을 한눈에 이해하도록 위에서 아래로 연속 스크롤
 - 감시 화면: 개인정보를 제외한 실제 로컬 diagnose 값
 - Card 5: 조건 설정부터 안전검증까지의 작동 과정
+- Card 6: 실제 설정 화면 중 좌석 조건을 크게 보여주는 필드 중심 구도
 - Card 7: 조건 일치부터 결과 이메일까지의 제품 흐름
 - 반복 템플릿·가짜 브라우저·가짜 터미널·휴대폰 목업: 없음
 - 벤치마킹 계정 화면 녹화: 최종 결과물에서 제외

@@ -41,16 +41,16 @@
     },
     {
       "number": 4,
-      "media_type": "png",
-      "duration": null,
+      "media_type": "mp4",
+      "duration": 7,
       "source_type": "helper-setup",
       "source": "generated_assets/prickly_imax_helper_launch/visuals/assets/helper-setup-preview.png",
-      "headline": "그래서 그냥\n내가 보려고 만들었다.",
-      "supporting": "영화 · 극장 · 시간 · 붙어 있는 좌석",
-      "footer": "실제 로컬 설정 화면",
-      "composition": "setup-full-frame",
-      "text_anchor": "bottom-left",
-      "motion": "none"
+      "headline": "영화·극장·시간·좌석만\n정하면 된다.",
+      "supporting": "실제 설정 화면을 아래로 확인",
+      "footer": "실제 로컬 설정 화면 · 내 컴퓨터에서 실행",
+      "composition": "setup-scroll-demo",
+      "text_anchor": "top-left",
+      "motion": "setup-scroll"
     },
     {
       "number": 5,
@@ -72,10 +72,10 @@
       "source_type": "helper-setup",
       "source": "generated_assets/prickly_imax_helper_launch/visuals/assets/helper-setup-preview.png",
       "headline": "아무 자리나\n잡는 건 싫어서",
-      "supporting": "붙어 있는 2석 · 원하는 열 · 중앙 우선 · 시작 3시간 이상",
+      "supporting": "연속 2석 · D–J열 · 양끝 20% 제외 · 3시간 이상",
       "footer": "조건은 사용자가 변경 가능",
-      "composition": "conditions-asymmetric",
-      "text_anchor": "right",
+      "composition": "condition-field-focus",
+      "text_anchor": "top-left",
       "motion": "none"
     },
     {
