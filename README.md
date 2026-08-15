@@ -4,9 +4,9 @@ Prickly IMAX Helper is a local-first CGV IMAX availability monitor and fail-clos
 
 The repository contains no CGV credentials, customer identifiers, cookies, voucher numbers, email credentials, or developer-specific paths.
 
-## Private beta flow
+## Public release flow
 
-1. Accept the private GitHub repository invitation and download the pinned release plus its SHA-256 file.
+1. Open the public [0.2.1 release](https://github.com/alpacawooo/prickly-imax-helper/releases/tag/0.2.1) and download the installer for your operating system plus its SHA-256 file. No repository invitation or GitHub sign-in is required.
 2. Verify the checksum, extract the release, and run `scripts/Install.command` on macOS or `scripts/Install.ps1` on Windows.
 3. In the localhost-only setup page, open the dedicated Chrome profile and log in to CGV personally.
 4. Keep or edit the Odyssey preset (movie, CGV theater, IMAX format, time windows, minimum lead time, party size, rows, edge exclusion, and seat priority), then confirm the notification email and one-time automatic voucher-submission consent.
@@ -25,7 +25,7 @@ The configured recipient account can also be added to the iPhone Mail app. The h
 - `plugins/prickly-imax-helper/`: plugin package
 - `runtime/`: independent local runtime
 - `scripts/`: installer, uninstaller, and gated release builder
-- `docs/notion-quick-start.md`: copy-ready private-beta guide
+- `docs/notion-quick-start.md`: copy-ready public installation guide
 - `docs/dm-operator-pack.md`: copy-ready DM recruitment, waitlist, invite, and completion replies
 - `docs/pilot-runbook.md`: three-person operator checklist and privacy-safe evidence workflow
 - `docs/beta-readiness.md`: evidence-backed release and pilot gate
@@ -38,12 +38,15 @@ CGV login and browser data remain under the user's local profile. Runtime state 
 ## Safety contract
 
 - All explicit CGV availability requests share a cross-process one-request-per-second budget.
+- The monitor discovers open dates and their schedules serially at process startup and once at Korea Standard Time midnight. Between those events it makes no daytime schedule-discovery requests and rotates only through known eligible seat maps.
+- If the computer sleeps through midnight, the first loop after wake runs the missed daily discovery once. A process restart also performs startup discovery; a show added later in the day is intentionally not discovered until the next midnight or restart.
 - HTTP 429 stops traffic for at least five minutes; repeated limits double the shared cooldown up to one hour, while a longer server `Retry-After` always wins.
 - Only an exact same-row consecutive block of the configured size satisfying the configured rows and edge exclusion can proceed.
 - Shows must start at least three hours after the current Korea time by default. This 180-minute safety floor cannot be lowered, but it can be increased up to 1,440 minutes.
 - CGV extended clock values from `24:00` through `29:59` are normalized to the following calendar day before the minimum-lead check.
 - Odyssey at Yongsan IMAX, weekday 19:00+, all Saturday, Sunday before 22:00, two seats, D-J rows, 20% edge exclusion, and center priority are editable defaults rather than locked values.
-- The runtime submits once only after duplicate, seat, voucher count, and zero-balance checks.
+- Shipped presets keep duplicate-booking prevention enabled, so the runtime checks existing tickets before booking preparation and again after the seat, voucher-count, and zero-balance checks.
+- An advanced local `prevent_duplicate_booking: false` policy skips only those two existing-ticket page lookups. It is intended for a voucher-exhaustive one-transaction setup; exact consecutive seats, voucher count, zero balance, one submission, mobile-ticket proof, and terminal stop behavior remain mandatory.
 - A restart or network failure across the submission boundary becomes `unknown_after_submit` and is never retried automatically.
 
 ## Development

@@ -18,4 +18,6 @@ Runtime files live below `~/.prickly-imax-helper/` on macOS or `%LOCALAPPDATA%\P
 - `state/checkout.json`: current transaction state
 - `logs/`: redacted operational logs
 
-The monitor must keep the booking page pre-positioned, use a bounded request budget, fetch seat maps only after relevant changes or scheduled verification, lock the browser through submission, revalidate the pair and duplicate guard, and stop after one completed or uncertain transaction.
+The monitor must discover open dates and every open date's schedule serially at process startup and once at Korea Standard Time midnight. It makes no daytime schedule-discovery requests between those events and rotates only through known eligible seat maps. If the host sleeps through midnight, the first loop after wake performs the missed discovery once; a process restart performs startup discovery again. A show added after the daily discovery is intentionally deferred until the next midnight or restart.
+
+The monitor must keep the booking page pre-positioned, use a bounded request budget, lock the browser through submission, revalidate the pair, and stop after one completed or uncertain transaction. Shipped presets set `prevent_duplicate_booking` to `true`, which requires existing-ticket checks before booking preparation and again immediately before submission. An explicit advanced local `false` may skip only those two page lookups for a voucher-exhaustive one-transaction setup; it must not weaken the exact-seat, voucher-count, zero-balance, one-submit, mobile-ticket-proof, or terminal-stop guards.

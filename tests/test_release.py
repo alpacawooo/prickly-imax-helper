@@ -58,6 +58,19 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn("PLIST_PATH=${APP_HOME}/ai.prickly.imax-helper.plist", installer)
         self.assertIn("dry-run 설치가 완료됐습니다", installer)
 
+    def test_user_and_plugin_docs_disclose_midnight_only_discovery(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        runtime_contract = (
+            ROOT
+            / "plugins/prickly-imax-helper/skills/prickly-imax-booking/references/runtime-contract.md"
+        ).read_text(encoding="utf-8")
+
+        for document in (readme, runtime_contract):
+            self.assertIn("startup", document)
+            self.assertIn("Korea Standard Time midnight", document)
+            self.assertIn("no daytime schedule-discovery requests", document)
+            self.assertIn("serially", document)
+
     def test_install_and_uninstall_restrict_app_home_to_user_home(self):
         for name in ("Install.command", "Uninstall.command"):
             script = (ROOT / "scripts" / name).read_text(encoding="utf-8")
@@ -156,7 +169,7 @@ class ReleaseTests(unittest.TestCase):
             )
             output = root / "dist"
             process = subprocess.run(
-                [sys.executable, str(ROOT / "scripts/build_release.py"), "--version", "0.2.0", "--authorization", str(authorization), "--output", str(output)],
+                [sys.executable, str(ROOT / "scripts/build_release.py"), "--version", "0.2.1", "--authorization", str(authorization), "--output", str(output)],
                 text=True,
                 capture_output=True,
                 check=True,
@@ -203,7 +216,7 @@ class ReleaseTests(unittest.TestCase):
                 encoding="utf-8",
             )
             process = subprocess.run(
-                [sys.executable, str(ROOT / "scripts/build_release.py"), "--version", "0.2.0", "--authorization", str(authorization), "--output", str(root / "dist")],
+                [sys.executable, str(ROOT / "scripts/build_release.py"), "--version", "0.2.1", "--authorization", str(authorization), "--output", str(root / "dist")],
                 text=True,
                 capture_output=True,
             )
@@ -236,7 +249,7 @@ class ReleaseTests(unittest.TestCase):
                     sys.executable,
                     str(ROOT / "scripts/build_release.py"),
                     "--version",
-                    "0.2.0",
+                    "0.2.1",
                     "--authorization",
                     str(authorization),
                     "--output",
@@ -273,7 +286,7 @@ class ReleaseTests(unittest.TestCase):
                     sys.executable,
                     str(ROOT / "scripts/build_release.py"),
                     "--version",
-                    "0.2.0",
+                    "0.2.1",
                     "--authorization",
                     str(authorization),
                     "--output",
@@ -313,7 +326,7 @@ class ReleaseTests(unittest.TestCase):
                     sys.executable,
                     str(ROOT / "scripts/build_release.py"),
                     "--version",
-                    "0.2.0",
+                    "0.2.1",
                     "--authorization",
                     str(authorization),
                     "--output",
@@ -324,7 +337,7 @@ class ReleaseTests(unittest.TestCase):
             )
             self.assertNotEqual(process.returncode, 0)
             self.assertIn("non-public or unknown fields", process.stderr)
-            self.assertFalse((root / "dist" / "prickly-imax-helper-0.2.0.tar.gz").exists())
+            self.assertFalse((root / "dist" / "prickly-imax-helper-0.2.1.tar.gz").exists())
 
     def test_release_rejects_placeholder_authorization_reference(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -352,7 +365,7 @@ class ReleaseTests(unittest.TestCase):
                     sys.executable,
                     str(ROOT / "scripts/build_release.py"),
                     "--version",
-                    "0.2.0",
+                    "0.2.1",
                     "--authorization",
                     str(authorization),
                     "--output",

@@ -5,6 +5,7 @@ import contextlib
 import subprocess
 import tempfile
 import unittest
+from datetime import date, datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -12,14 +13,22 @@ from prickly_imax_helper.checkout import DuplicateBlocked, PaymentBlocked, Ticke
 from prickly_imax_helper.checkout_attempt import CheckoutAttemptRecorder
 from prickly_imax_helper.config import write_config
 from prickly_imax_helper.cli import main as cli_main
-from prickly_imax_helper.monitor import CHECKOUT_GUARD_RETRY_SECONDS, OPEN_DATE_REFRESH_SECONDS, _checkout, rate_limit_backoff_seconds, run
+from prickly_imax_helper.monitor import (
+    CHECKOUT_GUARD_RETRY_SECONDS,
+    _checkout,
+    _kst_day,
+    _refresh_discovery,
+    rate_limit_backoff_seconds,
+    run,
+)
 from prickly_imax_helper.paths import RuntimePaths
+from prickly_imax_helper.scheduler import BalancedScanPlanner
 from prickly_imax_helper.state import Status, read_state, transition
 from test_runtime_core import VALID_CONFIG
 
 
 class MonitorRestartSafetyTests(unittest.TestCase):
-    def test_resident_uses_four_fair_hot_probes_before_schedule_discovery(self):
+    def test_resident_bootstraps_once_then_uses_only_hot_seat_probes_same_day(self):
         calls = []
 
         class FakeSession:
@@ -58,6 +67,8 @@ class MonitorRestartSafetyTests(unittest.TestCase):
 
             with patch("prickly_imax_helper.monitor.launch_browser"), patch(
                 "prickly_imax_helper.monitor.CgvSession", FakeSession
+            ), patch(
+                "prickly_imax_helper.monitor._kst_day", return_value=date(2026, 8, 15)
             ):
                 self.assertEqual(run(paths, max_cycles=7, allow_checkout=False), 0)
 
@@ -70,13 +81,105 @@ class MonitorRestartSafetyTests(unittest.TestCase):
                     ("seats", "2"),
                     ("seats", "1"),
                     ("seats", "2"),
-                    ("schedule", "20260820"),
+                    ("seats", "1"),
+                    ("seats", "2"),
                 ],
             )
             state = read_state(paths.heartbeat)
-            self.assertEqual(state["last_scan_lane"], "discovery")
+            self.assertEqual(state["last_scan_lane"], "hot")
             self.assertEqual(state["hot_target_count"], 2)
             self.assertLessEqual(state["estimated_hot_revisit_seconds"], 3.0)
+
+    def test_kst_day_changes_at_korean_midnight(self):
+        before = datetime(2026, 8, 15, 14, 59, 59, tzinfo=timezone.utc)
+        after = datetime(2026, 8, 15, 15, 0, 0, tzinfo=timezone.utc)
+
+        self.assertEqual(_kst_day(before), date(2026, 8, 15))
+        self.assertEqual(_kst_day(after), date(2026, 8, 16))
+
+    def test_discovery_refreshes_open_dates_and_schedules_serially(self):
+        calls = []
+
+        class FakeSession:
+            def open_dates(self):
+                calls.append(("open_dates", None))
+                return ["20260820", "20260821"]
+
+            def schedules(self, ymd):
+                calls.append(("schedule", ymd))
+                return [{"movkndDsplNm": "IMAX", "scnsrtTm": "1900", "scnsNo": "18", "scnSseq": ymd[-2:]}]
+
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            planner = BalancedScanPlanner(minimum_interval_seconds=1.0)
+
+            count = _refresh_discovery(
+                paths,
+                FakeSession(),
+                planner,
+                copy.deepcopy(VALID_CONFIG),
+                now=123.0,
+            )
+
+        self.assertEqual(
+            calls,
+            [("open_dates", None), ("schedule", "20260820"), ("schedule", "20260821")],
+        )
+        self.assertEqual(count, 2)
+        self.assertEqual(len(planner.hot_targets), 2)
+
+    def test_kst_date_change_runs_exactly_one_new_discovery_cycle(self):
+        calls = []
+
+        class FakeSession:
+            page = object()
+
+            def __init__(self, *args, **kwargs):
+                pass
+
+            @contextlib.contextmanager
+            def locked(self):
+                yield self
+
+            def require_login(self):
+                return None
+
+            def open_dates(self):
+                calls.append(("open_dates", None))
+                return ["20260820"]
+
+            def schedules(self, ymd):
+                calls.append(("schedule", ymd))
+                return [{"movkndDsplNm": "IMAX", "scnsrtTm": "1900", "scnsNo": "18", "scnSseq": "1"}]
+
+            def seats(self, _ymd, _screen_no, sequence):
+                calls.append(("seats", sequence))
+                return {"all": ["H15", "H16"], "available": []}
+
+        days = [
+            date(2026, 8, 15),
+            date(2026, 8, 15),
+            date(2026, 8, 16),
+            date(2026, 8, 16),
+            date(2026, 8, 16),
+        ]
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            write_config(paths.config, copy.deepcopy(VALID_CONFIG))
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+
+            with patch("prickly_imax_helper.monitor.launch_browser"), patch(
+                "prickly_imax_helper.monitor.CgvSession", FakeSession
+            ), patch(
+                "prickly_imax_helper.monitor._kst_day", side_effect=days
+            ):
+                self.assertEqual(run(paths, max_cycles=5, allow_checkout=False), 0)
+
+        self.assertEqual(calls.count(("open_dates", None)), 2)
+        self.assertEqual(calls.count(("schedule", "20260820")), 2)
+        self.assertEqual(calls.count(("seats", "1")), 3)
 
     def test_hot_target_is_pruned_when_it_no_longer_meets_time_policy(self):
         seat_calls = []
@@ -129,7 +232,7 @@ class MonitorRestartSafetyTests(unittest.TestCase):
             self.assertEqual(seat_calls, [])
             self.assertEqual(read_state(paths.heartbeat)["hot_target_count"], 0)
 
-    def test_empty_seat_map_prunes_target_and_prioritizes_schedule_refresh(self):
+    def test_empty_seat_map_prunes_target_without_daytime_rediscovery(self):
         calls = []
 
         class FakeSession:
@@ -165,6 +268,10 @@ class MonitorRestartSafetyTests(unittest.TestCase):
 
             with patch("prickly_imax_helper.monitor.launch_browser"), patch(
                 "prickly_imax_helper.monitor.CgvSession", FakeSession
+            ), patch(
+                "prickly_imax_helper.monitor._kst_day", return_value=date(2026, 8, 15)
+            ), patch(
+                "prickly_imax_helper.monitor.time.sleep"
             ):
                 self.assertEqual(run(paths, max_cycles=4, allow_checkout=False), 0)
 
@@ -174,9 +281,11 @@ class MonitorRestartSafetyTests(unittest.TestCase):
                     ("open_dates", None),
                     ("schedule", "20260820"),
                     ("seats", "1"),
-                    ("schedule", "20260820"),
                 ],
             )
+            state = read_state(paths.heartbeat)
+            self.assertEqual(state["last_scan_lane"], "idle")
+            self.assertEqual(state["hot_target_count"], 0)
 
     def test_first_matching_seat_map_stops_scanning_after_one_checkout(self):
         class FakeSession:
@@ -218,9 +327,6 @@ class MonitorRestartSafetyTests(unittest.TestCase):
                 self.assertEqual(run(paths, max_cycles=20, allow_checkout=True), 0)
 
             checkout.assert_called_once()
-
-    def test_new_booking_dates_are_refreshed_within_thirty_seconds(self):
-        self.assertLessEqual(OPEN_DATE_REFRESH_SECONDS, 30.0)
 
     def test_repeated_429_backoff_grows_and_is_capped(self):
         self.assertEqual([rate_limit_backoff_seconds(streak, 300) for streak in range(1, 6)], [300, 600, 1200, 2400, 3600])
@@ -379,6 +485,122 @@ class MonitorRestartSafetyTests(unittest.TestCase):
                 ("notify", "Prickly IMAX 예매 완료", "attempt-a"),
             ],
         )
+
+    def test_checkout_skips_duplicate_guards_only_when_explicitly_disabled(self):
+        actions = []
+
+        class SuccessfulFlow:
+            def __init__(self, *_args, **_kwargs):
+                pass
+
+            def ensure_no_existing_ticket(self, *_args, **_kwargs):
+                raise AssertionError("duplicate ticket lookup must be skipped")
+
+            def open_movie_and_theater(self):
+                actions.append("theater")
+
+            def _require_match_date(self, _match):
+                actions.append("date")
+
+            def _open_match_showtime(self, _match):
+                actions.append("showtime")
+
+            def _select_general_party(self, party):
+                actions.append(f"party:{party}")
+
+            def _select_seats(self, _match):
+                actions.append("seats")
+
+            def open_payment_and_apply_vouchers(self):
+                actions.append("vouchers")
+
+            def prove_ready(self, _match):
+                actions.append("zero_balance")
+
+            def submit_once(self):
+                actions.append("submission")
+
+            def verify_mobile_ticket(self, _match):
+                actions.append("mobile_ticket")
+                return type("CheckoutResult", (), {"proof": {"ticket_count": 1}})()
+
+        class RecorderSpy:
+            attempt_id = "attempt-fast"
+
+            def __init__(self):
+                self.stages = []
+                self.terminals = []
+
+            @contextlib.contextmanager
+            def stage(self, name):
+                self.stages.append((name, "started"))
+                yield
+                self.stages.append((name, "passed"))
+
+            def mark(self, name, outcome="passed"):
+                self.stages.append((name, outcome))
+
+            def terminal(self, name, *, error=None):
+                self.terminals.append((name, error))
+
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+            transition(paths.heartbeat, Status.ARMED)
+            match = {"date": "2026-08-21", "time": "24:30", "seats": ["G13", "G14"], "pair": "G13-G14"}
+            session = type(
+                "Session",
+                (),
+                {
+                    "page": object(),
+                    "booking_target_from_page": lambda _self: {
+                        "company_code": "A420",
+                        "site_no": "0013",
+                        "movie_no": "30001323",
+                    },
+                },
+            )()
+            recorder = RecorderSpy()
+            config = copy.deepcopy(VALID_CONFIG)
+            config["prevent_duplicate_booking"] = False
+            with patch("prickly_imax_helper.monitor.CheckoutFlow", SuccessfulFlow), patch(
+                "prickly_imax_helper.monitor._notify"
+            ):
+                result = _checkout(paths, config, session, match, recorder)
+
+        self.assertEqual(result, Status.COMPLETED.value)
+        self.assertEqual(
+            actions,
+            [
+                "theater",
+                "date",
+                "showtime",
+                "party:2",
+                "seats",
+                "vouchers",
+                "zero_balance",
+                "submission",
+                "mobile_ticket",
+            ],
+        )
+        passed = [name for name, outcome in recorder.stages if outcome == "passed"]
+        self.assertEqual(
+            passed,
+            [
+                "theater",
+                "date",
+                "showtime",
+                "party",
+                "seats",
+                "vouchers",
+                "zero_balance",
+                "submission_ready",
+                "submission",
+                "mobile_ticket",
+            ],
+        )
+        self.assertEqual(recorder.terminals, [("completed", None)])
 
     def test_terminal_block_and_unknown_notifications_follow_correlated_terminal_outcomes(self):
         cases = (

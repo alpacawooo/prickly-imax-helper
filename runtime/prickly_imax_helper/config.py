@@ -117,8 +117,8 @@ def validate_config(value: dict[str, Any]) -> list[str]:
         errors.append("allow_cancel_existing must be false")
     if value.get("allow_change_existing", False):
         errors.append("allow_change_existing must be false")
-    if not value.get("prevent_duplicate_booking", True):
-        errors.append("prevent_duplicate_booking must be true")
+    if not isinstance(value.get("prevent_duplicate_booking", True), bool):
+        errors.append("prevent_duplicate_booking must be a boolean")
     rate = value.get("request_policy", {}).get("minimum_interval_seconds")
     if not isinstance(rate, (int, float)) or rate < 1.0:
         errors.append("request_policy.minimum_interval_seconds must be at least 1.0")

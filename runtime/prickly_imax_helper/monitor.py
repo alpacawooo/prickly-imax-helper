@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import time
+from datetime import date, datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from .browser import launch_browser
 from .cgv import CgvSession, LoginRequired, RateLimited
@@ -12,11 +14,11 @@ from .eventlog import write_event
 from .locks import LockUnavailable, locked_file
 from .notify import send_email, show_notification
 from .paths import RuntimePaths
-from .scheduler import BalancedScanPlanner, eligible_shows, match_for
+from .scheduler import BalancedScanPlanner, eligible_shows, match_for, show_key
 from .state import TERMINAL, Status, read_state, transition
 
 
-OPEN_DATE_REFRESH_SECONDS = 30.0
+KST = ZoneInfo("Asia/Seoul")
 MAX_RATE_LIMIT_COOLDOWN_SECONDS = 3600.0
 CHECKOUT_GUARD_RETRY_SECONDS = 300.0
 
@@ -89,6 +91,40 @@ def _heartbeat(paths: RuntimePaths, status: Status, detail: str = "", **fields: 
     transition(paths.heartbeat, status, detail=detail, **fields)
 
 
+def _kst_day(now: datetime | None = None) -> date:
+    value = now or datetime.now(tz=KST)
+    if value.tzinfo is None:
+        raise ValueError("Korean calendar checks require a timezone-aware datetime")
+    return value.astimezone(KST).date()
+
+
+def _refresh_discovery(
+    paths: RuntimePaths,
+    session: CgvSession,
+    planner: BalancedScanPlanner,
+    config: dict[str, Any],
+    *,
+    now: float,
+) -> int:
+    previous_dates = set(planner.open_dates)
+    previous_keys = {show_key(show) for show in planner.hot_targets}
+    dates = session.open_dates()
+    schedules = {
+        ymd: eligible_shows(ymd, session.schedules(ymd), config)
+        for ymd in dates
+    }
+    planner.replace_discovery(dates, schedules, now=now)
+    next_dates = set(planner.open_dates)
+    next_keys = {show_key(show) for show in planner.hot_targets}
+    if next_dates != previous_dates:
+        write_event(paths.logs, "open_dates_refreshed", count=len(next_dates))
+    for discovered in sorted(next_dates - previous_dates):
+        write_event(paths.logs, "booking_date_discovered", ymd=discovered)
+    if next_keys != previous_keys:
+        write_event(paths.logs, "hot_queue_changed", count=len(next_keys))
+    return len(planner.hot_targets)
+
+
 def _checkout(
     paths: RuntimePaths,
     config: dict[str, Any],
@@ -99,8 +135,10 @@ def _checkout(
     _heartbeat(paths, Status.STAGING, match=match, attempt_id=recorder.attempt_id)
     flow = CheckoutFlow(session.page, config)
     try:
-        with recorder.stage("duplicate_guard_before"):
-            flow.ensure_no_existing_ticket(match, separate_tab=True)
+        prevent_duplicates = config.get("prevent_duplicate_booking", True)
+        if prevent_duplicates:
+            with recorder.stage("duplicate_guard_before"):
+                flow.ensure_no_existing_ticket(match, separate_tab=True)
         with recorder.stage("theater"):
             flow.open_movie_and_theater()
             selected_target = session.booking_target_from_page()
@@ -123,8 +161,9 @@ def _checkout(
             flow.open_payment_and_apply_vouchers()
         with recorder.stage("zero_balance"):
             flow.prove_ready(match)
-        with recorder.stage("duplicate_guard_final"):
-            flow.ensure_no_existing_ticket(match, separate_tab=True)
+        if prevent_duplicates:
+            with recorder.stage("duplicate_guard_final"):
+                flow.ensure_no_existing_ticket(match, separate_tab=True)
         recorder.mark("submission_ready")
     except DuplicateBlocked as exc:
         recorder.terminal("blocked_duplicate", error=str(exc))
@@ -248,7 +287,7 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
         planner = BalancedScanPlanner(
             minimum_interval_seconds=float(config["request_policy"]["minimum_interval_seconds"]),
         )
-        last_open_date_refresh = 0.0
+        last_discovery_day: date | None = None
         consecutive_errors = 0
         rate_limit_streak = 0
         session = CgvSession(
@@ -269,36 +308,52 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
                     current = read_state(paths.heartbeat).get("status")
                     if current != Status.ARMED.value:
                         _heartbeat(paths, Status.ARMED, "CGV login verified", match=None, errors=0)
-                    now = time.monotonic()
-                    open_dates_due = not planner.open_dates or now - last_open_date_refresh >= OPEN_DATE_REFRESH_SECONDS
-                    action = planner.next_action(now=now, open_dates_due=open_dates_due)
                     checkout_guard_unavailable = False
-                    eligible_count = len(planner.hot_targets)
-                    if action.kind == "open_dates":
-                        previous_dates = set(planner.open_dates)
-                        planner.replace_dates(session.open_dates())
-                        last_open_date_refresh = time.monotonic()
-                        if set(planner.open_dates) != previous_dates:
-                            write_event(paths.logs, "open_dates_refreshed", count=len(planner.open_dates))
-                        for discovered in sorted(set(planner.open_dates) - previous_dates):
-                            write_event(paths.logs, "booking_date_discovered", ymd=discovered)
-                    elif action.kind == "schedule" and action.ymd is not None:
-                        previous_keys = {f"{show['ymd']}|{show.get('scnsNo')}|{show.get('scnSseq')}" for show in planner.hot_targets}
-                        shows = eligible_shows(action.ymd, session.schedules(action.ymd), config)
-                        planner.update_schedule(action.ymd, shows, now=time.monotonic())
-                        next_keys = {f"{show['ymd']}|{show.get('scnsNo')}|{show.get('scnSseq')}" for show in planner.hot_targets}
-                        if next_keys != previous_keys:
-                            write_event(paths.logs, "hot_queue_changed", count=len(next_keys))
-                        eligible_count = len(shows)
-                    elif action.kind == "seats" and action.show is not None:
+                    today = _kst_day()
+                    if last_discovery_day != today:
+                        eligible_count = _refresh_discovery(
+                            paths,
+                            session,
+                            planner,
+                            config,
+                            now=time.monotonic(),
+                        )
+                        last_discovery_day = today
+                        scanned_date = None
+                        last_scan_lane = "discovery"
+                    else:
+                        action = planner.next_hot_action()
+                        if action is None:
+                            consecutive_errors = 0
+                            rate_limit_streak = 0
+                            metrics = planner.metrics(now=time.monotonic())
+                            _heartbeat(
+                                paths,
+                                Status.ARMED,
+                                "no eligible showtimes; waiting for Korean midnight discovery",
+                                open_dates=len(planner.open_dates),
+                                scanned_date=None,
+                                eligible_shows=0,
+                                match=None,
+                                errors=0,
+                                last_scan_lane="idle",
+                                **metrics,
+                            )
+                            completed_cycles += 1
+                            if max_cycles is not None and completed_cycles >= max_cycles:
+                                return 0
+                            time.sleep(float(config["request_policy"]["minimum_interval_seconds"]))
+                            continue
+                        eligible_count = len(planner.hot_targets)
                         show = action.show
+                        assert show is not None
                         if not eligible_shows(show["ymd"], [show], config):
                             planner.remove_hot_target(show)
                             write_event(paths.logs, "hot_target_pruned", reason="schedule_policy")
                         else:
                             seat_map = session.seats(show["ymd"], str(show["scnsNo"]), str(show["scnSseq"]))
                             if not seat_map.get("all"):
-                                planner.remove_hot_target(show, prioritize_discovery=True)
+                                planner.remove_hot_target(show)
                                 write_event(paths.logs, "hot_target_pruned", reason="seat_map_empty")
                                 match = None
                             else:
@@ -314,7 +369,9 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
                                 else:
                                     write_event(paths.logs, "seat_match", match=match)
                                     write_event(paths.logs, "dry_run_match_not_selected", match=match)
-                    planner.complete(action)
+                        planner.complete(action)
+                        scanned_date = action.ymd
+                        last_scan_lane = action.lane
                     if checkout_guard_unavailable:
                         write_event(paths.logs, "checkout_guard_retry_deferred", seconds=CHECKOUT_GUARD_RETRY_SECONDS)
                         if max_cycles is not None:
@@ -329,11 +386,11 @@ def run(paths: RuntimePaths, *, max_cycles: int | None = None, allow_checkout: b
                         Status.ARMED,
                         "scan completed",
                         open_dates=len(planner.open_dates),
-                        scanned_date=action.ymd,
+                        scanned_date=scanned_date,
                         eligible_shows=eligible_count,
                         match=None,
                         errors=0,
-                        last_scan_lane=action.lane,
+                        last_scan_lane=last_scan_lane,
                         **metrics,
                     )
                     completed_cycles += 1
