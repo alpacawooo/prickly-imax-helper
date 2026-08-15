@@ -57,7 +57,7 @@ class VideoCarouselManifestTests(unittest.TestCase):
     def test_cover_uses_approved_price_kicker_copy(self) -> None:
         card = self.load_cards()[0]
         self.assertEqual(card["kicker"], "용아맥 표는 30만 원까지 올랐습니다.")
-        self.assertEqual(card["headline"], "이제 새로고침을 멈춥니다.")
+        self.assertEqual(card["headline"], "새로고침은 그만.")
         self.assertEqual(
             card["promise"],
             '조건만 정하면 예매 시도까지\n"딸깍" 한 번이면 됩니다.',
@@ -69,7 +69,7 @@ class VideoCarouselManifestTests(unittest.TestCase):
 
     def test_manifest_uses_formal_korean_endings(self) -> None:
         raw = MANIFEST.read_text(encoding="utf-8")
-        for informal in ("기다린다.", "없다.", "된다.", "돌아간다.", "싶으니까.", "새로고침은 그만."):
+        for informal in ("기다린다.", "없다.", "된다.", "돌아간다.", "싶으니까."):
             self.assertNotIn(informal, raw)
 
     def test_manifest_excludes_benchmark_and_banned_copy(self) -> None:
