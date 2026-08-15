@@ -52,6 +52,22 @@ VALID_CONFIG = {
 
 
 class ConfigTests(unittest.TestCase):
+    def test_duplicate_policy_accepts_explicit_false_and_legacy_default(self):
+        disabled = copy.deepcopy(VALID_CONFIG)
+        disabled["prevent_duplicate_booking"] = False
+        self.assertEqual(validate_config(disabled), [])
+
+        legacy = copy.deepcopy(VALID_CONFIG)
+        legacy.pop("prevent_duplicate_booking")
+        self.assertEqual(validate_config(legacy), [])
+
+    def test_duplicate_policy_rejects_non_boolean_values(self):
+        for invalid in (0, 1, None, "false"):
+            with self.subTest(invalid=invalid):
+                value = copy.deepcopy(VALID_CONFIG)
+                value["prevent_duplicate_booking"] = invalid
+                self.assertTrue(any("prevent_duplicate_booking" in error for error in validate_config(value)))
+
     def test_legacy_config_without_minimum_lead_remains_valid(self):
         legacy = copy.deepcopy(VALID_CONFIG)
         legacy.pop("minimum_lead_minutes", None)
