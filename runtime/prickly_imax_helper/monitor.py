@@ -135,8 +135,10 @@ def _checkout(
     _heartbeat(paths, Status.STAGING, match=match, attempt_id=recorder.attempt_id)
     flow = CheckoutFlow(session.page, config)
     try:
-        with recorder.stage("duplicate_guard_before"):
-            flow.ensure_no_existing_ticket(match, separate_tab=True)
+        prevent_duplicates = config.get("prevent_duplicate_booking", True)
+        if prevent_duplicates:
+            with recorder.stage("duplicate_guard_before"):
+                flow.ensure_no_existing_ticket(match, separate_tab=True)
         with recorder.stage("theater"):
             flow.open_movie_and_theater()
             selected_target = session.booking_target_from_page()
@@ -159,8 +161,9 @@ def _checkout(
             flow.open_payment_and_apply_vouchers()
         with recorder.stage("zero_balance"):
             flow.prove_ready(match)
-        with recorder.stage("duplicate_guard_final"):
-            flow.ensure_no_existing_ticket(match, separate_tab=True)
+        if prevent_duplicates:
+            with recorder.stage("duplicate_guard_final"):
+                flow.ensure_no_existing_ticket(match, separate_tab=True)
         recorder.mark("submission_ready")
     except DuplicateBlocked as exc:
         recorder.terminal("blocked_duplicate", error=str(exc))

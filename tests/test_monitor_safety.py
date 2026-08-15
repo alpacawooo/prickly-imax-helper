@@ -486,6 +486,122 @@ class MonitorRestartSafetyTests(unittest.TestCase):
             ],
         )
 
+    def test_checkout_skips_duplicate_guards_only_when_explicitly_disabled(self):
+        actions = []
+
+        class SuccessfulFlow:
+            def __init__(self, *_args, **_kwargs):
+                pass
+
+            def ensure_no_existing_ticket(self, *_args, **_kwargs):
+                raise AssertionError("duplicate ticket lookup must be skipped")
+
+            def open_movie_and_theater(self):
+                actions.append("theater")
+
+            def _require_match_date(self, _match):
+                actions.append("date")
+
+            def _open_match_showtime(self, _match):
+                actions.append("showtime")
+
+            def _select_general_party(self, party):
+                actions.append(f"party:{party}")
+
+            def _select_seats(self, _match):
+                actions.append("seats")
+
+            def open_payment_and_apply_vouchers(self):
+                actions.append("vouchers")
+
+            def prove_ready(self, _match):
+                actions.append("zero_balance")
+
+            def submit_once(self):
+                actions.append("submission")
+
+            def verify_mobile_ticket(self, _match):
+                actions.append("mobile_ticket")
+                return type("CheckoutResult", (), {"proof": {"ticket_count": 1}})()
+
+        class RecorderSpy:
+            attempt_id = "attempt-fast"
+
+            def __init__(self):
+                self.stages = []
+                self.terminals = []
+
+            @contextlib.contextmanager
+            def stage(self, name):
+                self.stages.append((name, "started"))
+                yield
+                self.stages.append((name, "passed"))
+
+            def mark(self, name, outcome="passed"):
+                self.stages.append((name, outcome))
+
+            def terminal(self, name, *, error=None):
+                self.terminals.append((name, error))
+
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+            transition(paths.heartbeat, Status.ARMED)
+            match = {"date": "2026-08-21", "time": "24:30", "seats": ["G13", "G14"], "pair": "G13-G14"}
+            session = type(
+                "Session",
+                (),
+                {
+                    "page": object(),
+                    "booking_target_from_page": lambda _self: {
+                        "company_code": "A420",
+                        "site_no": "0013",
+                        "movie_no": "30001323",
+                    },
+                },
+            )()
+            recorder = RecorderSpy()
+            config = copy.deepcopy(VALID_CONFIG)
+            config["prevent_duplicate_booking"] = False
+            with patch("prickly_imax_helper.monitor.CheckoutFlow", SuccessfulFlow), patch(
+                "prickly_imax_helper.monitor._notify"
+            ):
+                result = _checkout(paths, config, session, match, recorder)
+
+        self.assertEqual(result, Status.COMPLETED.value)
+        self.assertEqual(
+            actions,
+            [
+                "theater",
+                "date",
+                "showtime",
+                "party:2",
+                "seats",
+                "vouchers",
+                "zero_balance",
+                "submission",
+                "mobile_ticket",
+            ],
+        )
+        passed = [name for name, outcome in recorder.stages if outcome == "passed"]
+        self.assertEqual(
+            passed,
+            [
+                "theater",
+                "date",
+                "showtime",
+                "party",
+                "seats",
+                "vouchers",
+                "zero_balance",
+                "submission_ready",
+                "submission",
+                "mobile_ticket",
+            ],
+        )
+        self.assertEqual(recorder.terminals, [("completed", None)])
+
     def test_terminal_block_and_unknown_notifications_follow_correlated_terminal_outcomes(self):
         cases = (
             (
