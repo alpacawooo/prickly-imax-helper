@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -16,14 +18,15 @@ def load_builder():
     return module
 
 
-def test_manifest_locks_eight_distinct_compositions() -> None:
+def test_manifest_locks_six_card_sequence() -> None:
     cards = load_builder().load_carousel_manifest()
-    assert [card["number"] for card in cards] == list(range(1, 9))
+    assert [card["number"] for card in cards] == [1, 2, 3, 4, 5, 6]
     assert [card["media_type"] for card in cards] == [
-        "png", "png", "png", "mp4", "mp4", "png", "mp4", "png"
+        "png", "png", "png", "mp4", "mp4", "png"
     ]
-    assert [card["duration"] for card in cards] == [None, None, None, 7, 8, None, 8, None]
-    assert len({card["composition"] for card in cards}) >= 6
+    assert [card["duration"] for card in cards] == [None, None, None, 3, 8, None]
+    assert cards[4]["composition"] == "monitoring-process"
+    assert cards[5]["composition"] == "black-note-cta"
     assert all(
         card["text_anchor"] in {"bottom-left", "top-left", "bottom", "right", "center-left"}
         for card in cards
@@ -44,76 +47,45 @@ def test_manifest_rejects_fake_ui_sources() -> None:
     assert not ({card["source_type"] for card in cards} & banned)
 
 
-def test_cover_html_has_eight_distinct_compositions_and_no_fake_chrome(tmp_path: Path) -> None:
+def test_cover_html_has_six_distinct_compositions_and_no_fake_chrome(tmp_path: Path) -> None:
     builder = load_builder()
     cards = builder.load_carousel_manifest()
     placeholders = [tmp_path / name for name in ("setup.png", "monitor.png", "guide.png")]
     html = builder.video_carousel_covers(*placeholders, cards)
-    assert len(html) == 8
+    assert len(html) == 6
     joined = "\n".join(html)
     for banned in ("browserbar", "status-grid", "phone-mockup", "class=\"pill", "eyebrow"):
         assert banned not in joined
     for composition in {card["composition"] for card in cards}:
         assert any(f'data-composition="{composition}"' in page for page in html)
+    assert "05/06" in html[4]
+    assert "06/06" in html[5]
+    assert "/8" not in joined
 
 
 def test_motion_recipes_are_restrained() -> None:
     recipes = load_builder().motion_recipes()
-    assert set(recipes) == {"setup-scroll", "workflow-sequence", "outcome-sequence"}
-    assert recipes["setup-scroll"]["duration"] == 7
+    assert set(recipes) == {"setup-scroll", "workflow-sequence"}
+    assert recipes["setup-scroll"] == {"duration": 3, "fps": 30, "viewport_height": 800}
     assert all(
         recipe.get("transition_ms", 0) <= 220
         for recipe in recipes.values()
     )
 
 
-def test_card_four_scroll_is_continuous_and_reaches_the_bottom() -> None:
+def test_card_four_scroll_matches_the_fast_benchmark_tempo() -> None:
     builder = load_builder()
     offsets = builder.card_four_scroll_offsets(
-        source_height=2400,
-        viewport_height=900,
-        frame_count=211,
+        source_height=1098,
+        viewport_height=800,
+        frame_count=90,
     )
-    assert len(offsets) == 211
+    assert len(offsets) == 90
     assert offsets[0] == 0
-    assert offsets[-1] == 1500
+    assert offsets[-1] == 298
     assert offsets == sorted(offsets)
-    assert len(set(offsets[1:-1])) > 180
-
-
-def test_card_six_uses_a_readable_field_focus_instead_of_a_clipped_split(tmp_path: Path) -> None:
-    builder = load_builder()
-    cards = builder.load_carousel_manifest()
-    placeholders = [tmp_path / name for name in ("setup.png", "monitor.png", "guide.png")]
-    html = builder.video_carousel_covers(*placeholders, cards)
-    card_six = html[5]
-    assert "condition-focus" in card_six
-    assert "asym" not in card_six
-    for value in ("연속 2석", "D–J열", "양끝 20% 제외", "3시간 이상"):
-        assert value in card_six
-
-
-def test_card_five_has_four_ordered_workflow_states(tmp_path: Path) -> None:
-    builder = load_builder()
-    html = builder.card_five_scene_htmls(tmp_path / "setup.png", tmp_path / "monitor.png")
-    assert len(html) == 4
-    assert "조건 설정" in html[0]
-    assert "감시 시작" in html[1]
-    assert "연속 좌석 후보 발견" in html[2]
-    assert "중복·관람권·잔액 검증" in html[3]
-
-
-def test_card_seven_has_four_honest_outcome_states(tmp_path: Path) -> None:
-    builder = load_builder()
-    pages = builder.card_seven_scene_htmls(tmp_path / "monitor.png")
-    assert len(pages) == 4
-    assert "조건 일치" in pages[0]
-    assert "안전검증 통과" in pages[1]
-    assert "최종 제출 1회" in pages[2]
-    assert "결과 이메일 전송" in pages[3]
-    raw = "\n".join(pages).lower()
-    for banned in ("모바일티켓", "예매번호", "qr", "barcode", "fake-ticket"):
-        assert banned not in raw
+    assert offsets[49:] == [298] * 41
+    assert len(set(offsets[:50])) >= 40
 
 
 def test_redaction_blocks_private_fields() -> None:
@@ -124,11 +96,88 @@ def test_redaction_blocks_private_fields() -> None:
         assert secret not in redacted
 
 
+def test_monitor_sampling_reads_local_state_only() -> None:
+    builder = load_builder()
+    states = iter([
+        {"status": "armed", "open_dates": 12, "eligible_shows": 35, "match": None,
+         "last_scan_lane": "discovery"},
+        {"status": "armed", "open_dates": 12, "eligible_shows": 35, "match": None,
+         "last_scan_lane": "hot"},
+    ])
+    sleeps: list[float] = []
+    sampled = builder.sample_monitor_states(
+        lambda: next(states), count=2, interval_seconds=0.4, sleeper=sleeps.append
+    )
+    assert sampled[0]["last_scan_lane"] == "discovery"
+    assert sampled[1]["last_scan_lane"] == "hot"
+    assert sleeps == [0.4]
+
+
+def test_redacted_monitor_state_invokes_only_diagnose(monkeypatch) -> None:
+    builder = load_builder()
+    calls: list[tuple[list[str], dict[str, object]]] = []
+    payload = {
+        "status": {
+            "status": "armed", "detail": "email=a@example.com cookie=secret",
+            "open_dates": 12, "eligible_shows": 35, "match": None, "errors": 0,
+            "last_scan_lane": "hot", "profile": "/Users/name/private ",
+        }
+    }
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        return SimpleNamespace(stdout=json.dumps(payload), returncode=0)
+
+    monkeypatch.setattr(builder.subprocess, "run", fake_run)
+    state = builder.read_redacted_monitor_state(Path("/tmp/prickly-imax"))
+    assert [call[0] for call in calls] == [["/tmp/prickly-imax", "diagnose"]]
+    assert set(state) == {
+        "status", "detail", "open_dates", "eligible_shows", "match", "errors",
+        "last_scan_lane",
+    }
+    raw = json.dumps(state, ensure_ascii=False)
+    for secret in ("a@example.com", "secret", "/Users/name/private"):
+        assert secret not in raw
+
+
+def test_card_five_uses_actual_monitoring_stages_without_fake_match() -> None:
+    builder = load_builder()
+    states = [{
+        "status": "armed", "open_dates": 12, "eligible_shows": 35,
+        "match": None, "errors": 0, "last_scan_lane": "hot",
+    }] * 5
+    pages = builder.card_five_monitor_scene_htmls(states)
+    assert len(pages) == 5
+    assert "감시 시작" in pages[0] and "armed" in pages[0]
+    assert "열린 날짜·회차 확인" in pages[1]
+    assert "연속 좌석 감시" in pages[2] and "hot" in pages[2]
+    assert "후보가 없으면 계속 순환" in pages[3] and "null" in pages[3]
+    assert "좌석 발견 시" in pages[4]
+    assert "match&quot;: true" not in "\n".join(pages)
+
+
+def test_scene_sequence_encoder_builds_five_input_eight_second_video(
+    tmp_path: Path, monkeypatch
+) -> None:
+    builder = load_builder()
+    captured: list[tuple[str, ...]] = []
+    monkeypatch.setattr(builder, "run", lambda *args, **_kwargs: captured.append(args))
+    frames = [tmp_path / f"frame-{index}.png" for index in range(5)]
+    builder.render_scene_sequence(frames, tmp_path / "card-05.mp4", duration=8)
+    args = captured[0]
+    command = " ".join(args)
+    assert args.count("-i") == 5
+    assert command.count("xfade=") == 4
+    assert "-t 8" in command
+    assert "fps=30" in command
+    assert "yuv420p" in command
+
+
 def test_verify_video_carousel_rejects_wrong_count() -> None:
     builder = load_builder()
     try:
         builder.verify_video_carousel([], [], [])
     except ValueError as exc:
-        assert "eight" in str(exc).lower()
+        assert "six" in str(exc).lower()
     else:
         raise AssertionError("wrong card count must fail")

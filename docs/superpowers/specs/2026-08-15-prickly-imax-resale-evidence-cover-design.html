@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Prickly IMAX · 리셀 증거형 표지 시안</title>
+  <style>
+    :root{--bg:#080808;--ink:#f6f6f2;--muted:#8d8d88;--red:#ef382f;--line:#292929}
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+    body{padding:54px 38px 80px}
+    header{max-width:1240px;margin:0 auto 38px;border-bottom:1px solid var(--line);padding-bottom:28px}
+    .kicker{color:var(--red);font-size:13px;font-weight:800;letter-spacing:.14em}
+    h1{margin:12px 0 8px;font-size:clamp(34px,4vw,58px);line-height:1.06;letter-spacing:-.055em}
+    header p{margin:0;color:#a9a9a4;font-size:17px;line-height:1.55}
+    main{max-width:1240px;margin:auto}
+    .compare{display:grid;grid-template-columns:1fr 1fr;gap:36px;align-items:start}
+    .column>h2{margin:0 0 14px;font-size:16px;color:#b9b9b4}.column>h2 b{color:var(--red);margin-right:9px}
+    .cover{position:relative;width:100%;aspect-ratio:4/5;overflow:hidden;background:#030303;box-shadow:0 18px 55px rgba(0,0,0,.45)}
+    .cover>img.base{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+    .current>img{width:100%;height:100%;object-fit:cover}
+    .shade{position:absolute;z-index:3;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.08) 12%,rgba(0,0,0,.2) 44%,rgba(0,0,0,.96) 100%)}
+    .copy{position:absolute;z-index:4;left:6.2%;right:5%;bottom:7.5%}
+    .copy .price-kicker{display:block;margin-bottom:11px;color:var(--red);font-size:clamp(17px,1.8vw,26px);font-weight:850;letter-spacing:-.045em}.copy h3{margin:0;font-size:clamp(31px,3.5vw,52px);line-height:1.08;letter-spacing:-.065em;font-weight:900}
+    .copy p{margin:19px 0 0;font-size:clamp(14px,1.4vw,20px);font-weight:750}.copy small{display:block;margin-top:36px;color:#888883;font-size:11px}
+    .page{position:absolute;z-index:5;right:4.5%;top:3.5%;font-size:13px}
+    .notes{margin-top:42px;display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+    .notes div{padding:24px 20px;border-right:1px solid var(--line)}.notes div:last-child{border-right:0}
+    .notes span{display:block;color:var(--muted);font-size:12px;margin-bottom:9px}.notes b{font-size:18px;line-height:1.35}
+    .decision{margin-top:34px;max-width:850px}.decision h2{font-size:26px;margin:0 0 10px}.decision p{color:#b2b2ad;font-size:17px;line-height:1.65;margin:0}
+    @media(max-width:850px){body{padding:28px 18px 60px}.compare{grid-template-columns:1fr;gap:30px}.notes{grid-template-columns:1fr 1fr}.notes div:nth-child(2){border-right:0}.notes div:nth-child(-n+2){border-bottom:1px solid var(--line)}}
+  </style>
+</head>
+<body>
+  <header>
+    <span class="kicker">PRICKLY IMAX · COVER DIRECTION</span>
+    <h1>기존 시네마틱 배경을 유지하고,<br>가격만 짧게 강조한다.</h1>
+    <p>리셀 화면을 합성하지 않고 기존 표지의 톤과 인물, 큰 질문을 그대로 살린 최종 문구 시안.</p>
+  </header>
+  <main>
+    <section class="compare">
+      <div class="column">
+        <h2><b>BEFORE</b>현재 표지</h2>
+        <div class="cover current">
+          <img src="../../../generated_assets/prickly_imax_helper_launch/visuals/video-carousel/cards/01.png" alt="현재 첫 번째 슬라이드">
+        </div>
+      </div>
+      <div class="column">
+        <h2><b>PROPOSED</b>가격 강조형 표지</h2>
+        <div class="cover proposed">
+          <img class="base" src="../../../content/assets/odyssey-clean/odyssey-agamemnon-fullbody-1080x1350.jpg" alt="오디세이 갑옷 스틸">
+          <div class="shade"></div>
+          <span class="page">1/8</span>
+          <div class="copy">
+            <span class="price-kicker">30만 원까지 오른 용아맥 표.</span>
+            <h3>며칠째 새로고침 중인 사람?</h3>
+            <p>나도 그랬음.</p>
+            <small>오디세이 · 용산 IMAX</small>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="notes">
+      <div><span>배경</span><b>기존 스틸 유지</b></div>
+      <div><span>가격 문구</span><b>빨간색 44px</b></div>
+      <div><span>질문</span><b>흰색 86px</b></div>
+      <div><span>추가 이미지</span><b>사용하지 않음</b></div>
+    </section>
+    <section class="decision">
+      <h2>의도</h2>
+      <p>첫 시선에는 `30만 원`이 들어오고, 바로 아래 큰 질문이 페르소나를 호출한다. 뉴스 화면을 추가하지 않아 영화의 웅장함과 기존 캐러셀의 시네마틱 톤을 유지한다.</p>
+    </section>
+  </main>
+</body>
+</html>

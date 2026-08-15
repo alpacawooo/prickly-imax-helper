@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prickly IMAX 6장 압축형 · 5–6장 시각 초안</title>
+  <style>
+    :root { --red:#ef382f; --ink:#080808; --paper:#f7f7f4; --muted:#92928d; }
+    * { box-sizing:border-box; }
+    body { margin:0; padding:56px; background:#171717; color:var(--paper); font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif; }
+    header { max-width:1180px; margin:0 auto 34px; }
+    header small { color:var(--red); font-weight:800; letter-spacing:.06em; }
+    header h1 { margin:10px 0 8px; font-size:34px; letter-spacing:-1.8px; }
+    header p { margin:0; color:#aaa; font-size:16px; line-height:1.55; }
+    .boards { display:grid; grid-template-columns:repeat(2,minmax(420px,540px)); justify-content:center; gap:32px; }
+    .board { position:relative; width:100%; aspect-ratio:4/5; overflow:hidden; background:var(--ink); box-shadow:0 22px 70px rgba(0,0,0,.34); }
+    .page { position:absolute; right:24px; top:22px; z-index:6; color:#d8d8d4; font-size:12px; }
+    .slide5 .copy { position:absolute; z-index:4; left:32px; right:32px; top:34px; }
+    .slide5 h2 { margin:0; font-size:37px; line-height:1.08; letter-spacing:-2.4px; }
+    .slide5 h2 em { color:var(--red); font-style:normal; }
+    .slide5 .screen { position:absolute; left:28px; right:28px; top:182px; height:390px; overflow:hidden; background:#fff; }
+    .slide5 .screen img { width:100%; height:100%; object-fit:cover; object-position:50% 16%; filter:saturate(.78) contrast(.98); }
+    .slide5 .screen:after { content:""; position:absolute; inset:0; background:linear-gradient(180deg,transparent 58%,rgba(0,0,0,.72)); }
+    .slide5 .current { position:absolute; z-index:3; left:22px; bottom:20px; font-size:24px; font-weight:850; letter-spacing:-1.4px; }
+    .slide5 .current b { color:var(--red); margin-right:10px; font:800 13px ui-monospace,monospace; }
+    .timeline { position:absolute; left:32px; right:32px; bottom:36px; display:grid; grid-template-columns:repeat(5,1fr); gap:0; border-top:1px solid #41413f; }
+    .timeline span { position:relative; padding-top:16px; color:#777; font-size:10px; line-height:1.25; font-weight:700; }
+    .timeline span:before { content:""; position:absolute; left:0; top:-2px; width:100%; height:3px; background:#333; }
+    .timeline span:first-child { color:#fff; }
+    .timeline span:first-child:before { background:var(--red); }
+    .slide6 .note { position:absolute; left:38px; right:38px; top:178px; }
+    .slide6 h2 { margin:0; font-size:48px; line-height:1.15; letter-spacing:-3.2px; }
+    .slide6 .action { position:absolute; left:38px; bottom:132px; }
+    .slide6 .action small { display:block; margin-bottom:12px; color:#9d9d98; font-size:18px; font-weight:700; }
+    .slide6 .action strong { display:block; color:var(--red); font-size:64px; line-height:1; letter-spacing:-4px; }
+    .slide6 .action p { margin:22px 0 0; color:#d0d0cb; font-size:18px; }
+    .brand { position:absolute; left:38px; bottom:32px; color:#9b9b96; font-size:14px; font-weight:750; }
+    .spec { max-width:1112px; margin:36px auto 0; display:grid; grid-template-columns:1.4fr 1fr; gap:24px; }
+    .spec section { border-top:1px solid #3c3c3c; padding-top:18px; }
+    .spec h3 { margin:0 0 12px; font-size:18px; }
+    .spec p,.spec li { color:#aaa; font-size:14px; line-height:1.65; }
+    .spec ol { margin:0; padding-left:20px; }
+    @media(max-width:980px){ body{padding:28px 18px}.boards{grid-template-columns:minmax(320px,540px)}.spec{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+  <header>
+    <small>PRICKLY IMAX · SIX-CARD ENDING</small>
+    <h1>5장 작동 과정 + 6장 CTA 시각 초안</h1>
+    <p>기존 1–4장의 검정 배경, 흰 글자, Prickly red, 실제 제품 화면 중심 구도를 그대로 이어간다.</p>
+  </header>
+
+  <main class="boards">
+    <article class="board slide5">
+      <span class="page">05 / 06</span>
+      <div class="copy"><h2>설정이 끝나면<br><em>그다음은</em> 이렇게 돌아간다.</h2></div>
+      <div class="screen">
+        <img src="../../../generated_assets/prickly_imax_helper_launch/visuals/assets/helper-monitor-preview.png" alt="개인정보를 제외한 실제 Prickly Helper 감시 화면">
+        <div class="current"><b>01</b>감시 시작</div>
+      </div>
+      <div class="timeline" aria-label="8초 영상 순서">
+        <span>감시<br>시작</span><span>연속 좌석<br>발견</span><span>안전<br>검증</span><span>한 번<br>제출</span><span>이메일<br>알림</span>
+      </div>
+    </article>
+
+    <article class="board slide6">
+      <span class="page">06 / 06</span>
+      <div class="note"><h2>용아맥 새로고침에<br>지쳤다면.</h2></div>
+      <div class="action">
+        <small>댓글에</small>
+        <strong>아이맥스</strong>
+        <p>설치 방법을 보내드립니다.</p>
+      </div>
+      <span class="brand">prickly.ai</span>
+    </article>
+  </main>
+
+  <div class="spec">
+    <section>
+      <h3>5장 · 실제 감시 과정 8초 영상</h3>
+      <ol>
+        <li>0.0–1.3초: 실제 로컬 상태가 `armed`인 화면과 `감시 시작`</li>
+        <li>1.3–2.8초: `open_dates`, `eligible_shows`가 갱신되며 `열린 날짜·회차 확인`</li>
+        <li>2.8–4.4초: 빠른 좌석 감시와 새 날짜 탐색 상태가 번갈아 바뀌며 `연속 좌석 감시`</li>
+        <li>4.4–6.0초: `match: null`과 최근 확인 시각이 갱신되며 `후보가 없으면 계속 순환`</li>
+        <li>6.0–8.0초: `좌석 발견 → 안전검증 → 한 번 제출 → 이메일 알림` 전환 규칙을 한 줄로 연결</li>
+      </ol>
+    </section>
+    <section>
+      <h3>제작 제한</h3>
+      <p>둥근 카드, 가짜 브라우저, 휴대폰 목업, 장식용 아이콘은 사용하지 않는다. 개인정보를 제외한 실제 로컬 감시 상태만 촬영하고, 문구는 단계마다 한 줄만 교체한다. 영상 제작을 위한 CGV 추가 조회·좌석 선택·관람권·결제 동작은 하지 않으며 실제로 발생하지 않은 좌석 발견 상태를 만들지 않는다.</p>
+    </section>
+  </div>
+</body>
+</html>

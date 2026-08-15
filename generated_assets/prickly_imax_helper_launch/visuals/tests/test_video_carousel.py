@@ -27,25 +27,23 @@ class VideoCarouselManifestTests(unittest.TestCase):
     def load_cards(self) -> list[dict[str, object]]:
         return json.loads(MANIFEST.read_text(encoding="utf-8"))["cards"]
 
-    def test_manifest_has_eight_ordered_cards_and_exact_durations(self) -> None:
+    def test_manifest_has_six_ordered_cards_and_exact_durations(self) -> None:
         cards = self.load_cards()
-        self.assertEqual([card["number"] for card in cards], list(range(1, 9)))
+        self.assertEqual([card["number"] for card in cards], [1, 2, 3, 4, 5, 6])
         self.assertEqual(
             [card["media_type"] for card in cards],
-            ["png", "png", "png", "mp4", "mp4", "png", "mp4", "png"],
+            ["png", "png", "png", "mp4", "mp4", "png"],
         )
-        self.assertEqual([card["duration"] for card in cards], [None, None, None, 7, 8, None, 8, None])
+        self.assertEqual([card["duration"] for card in cards], [None, None, None, 3, 8, None])
         self.assertTrue(all(str(card["headline"]).strip() for card in cards))
-        allowed = {"none", "setup-scroll", "workflow-sequence", "outcome-sequence"}
+        allowed = {"none", "setup-scroll", "workflow-sequence"}
         self.assertTrue(all(card["motion"] in allowed for card in cards))
         self.assertGreaterEqual(len({card["composition"] for card in cards}), 6)
 
-    def test_card_seven_copy_describes_outcome_flow_without_fake_transaction(self) -> None:
-        card = self.load_cards()[6]
-        self.assertIn("결과 알림", str(card["headline"]) + str(card["supporting"]))
-        raw = json.dumps(card, ensure_ascii=False).lower()
-        for banned in ("모바일티켓", "예매번호", "qr", "barcode", "실제 예매 완료"):
-            self.assertNotIn(banned, raw)
+    def test_card_five_is_monitoring_process_and_card_six_is_cta(self) -> None:
+        cards = self.load_cards()
+        self.assertEqual(cards[4]["composition"], "monitoring-process")
+        self.assertEqual(cards[5]["composition"], "black-note-cta")
 
     def test_card_two_explains_why_the_odyssey_belongs_on_yongsan_imax(self) -> None:
         card = self.load_cards()[1]
@@ -56,6 +54,19 @@ class VideoCarouselManifestTests(unittest.TestCase):
         )
         self.assertNotIn("여기서만", str(card["headline"]) + str(card["supporting"]))
 
+    def test_cover_uses_approved_price_kicker_copy(self) -> None:
+        card = self.load_cards()[0]
+        self.assertEqual(card["kicker"], "30만 원까지 오른 용아맥 표.")
+        self.assertEqual(card["headline"], "새로고침은 그만.")
+        self.assertEqual(
+            card["promise"],
+            '조건만 정하면 예매 시도까지\n"딸깍" 한 번으로',
+        )
+        self.assertEqual(card["supporting"], "내 컴퓨터가 취소표를 대신 기다린다.")
+        source = BUILD_SCRIPT.read_text(encoding="utf-8")
+        self.assertIn('class="cover-kicker"', source)
+        self.assertIn('class="cover-promise"', source)
+
     def test_manifest_excludes_benchmark_and_banned_copy(self) -> None:
         raw = MANIFEST.read_text(encoding="utf-8")
         self.assertNotIn("ScreenRecording_08-14-2026", raw)
@@ -64,23 +75,48 @@ class VideoCarouselManifestTests(unittest.TestCase):
 
 
 class VideoCarouselOutputTests(unittest.TestCase):
-    def test_condition_slide_uses_the_shared_dark_product_background(self) -> None:
+    def test_cover_headline_uses_large_mobile_first_type(self) -> None:
         source = BUILD_SCRIPT.read_text(encoding="utf-8")
-        self.assertIn(".condition-focus{background:#090909;color:#f7f7f4}", source)
-        self.assertNotIn(".condition-focus{background:#f2f0eb", source)
+        self.assertIn(
+            ".full .copy h1{font-size:86px;line-height:1.08;letter-spacing:-5.8px}",
+            source,
+        )
 
-    def test_eight_png_covers_are_exact_instagram_dimensions(self) -> None:
+    def test_comparison_slide_stacks_35mm_over_imax_and_fills_the_canvas(self) -> None:
+        source = BUILD_SCRIPT.read_text(encoding="utf-8")
+        self.assertIn('<b class="format-label">35MM</b>', source)
+        self.assertIn('<b class="format-label imax">IMAX 70MM</b>', source)
+        self.assertIn(".format-frame.narrow{height:248px}", source)
+        self.assertIn(".format-frame.tall{height:474px}", source)
+
+    def test_cards_two_through_six_use_large_mobile_type(self) -> None:
+        source = BUILD_SCRIPT.read_text(encoding="utf-8")
+        expected_rules = (
+            ".compare .copy h1{font-size:53px",
+            ".evidence .copy h1{font-size:70px}",
+            ".setup-scroll .copy h1{font-size:62px",
+            ".monitor-process .copy h1{font-size:70px",
+            ".note .copy h1{font-size:72px",
+        )
+        for rule in expected_rules:
+            self.assertIn(rule, source)
+
+    def test_monitoring_process_uses_the_shared_dark_product_background(self) -> None:
+        source = BUILD_SCRIPT.read_text(encoding="utf-8")
+        self.assertIn(".monitor-process{background:#090909}", source)
+
+    def test_six_png_covers_are_exact_instagram_dimensions(self) -> None:
         covers = sorted((OUTPUT / "covers").glob("*.png"))
-        self.assertEqual(len(covers), 8)
+        self.assertEqual(len(covers), 6)
         for cover in covers:
             self.assertEqual(png_size(cover), (1080, 1350), cover)
 
-    def test_publishable_sequence_has_five_pngs_and_three_mp4s(self) -> None:
+    def test_publishable_sequence_has_four_pngs_and_two_mp4s(self) -> None:
         cards = self.load_cards()
         media = sorted((OUTPUT / "cards").glob("*"))
         self.assertEqual(
             [path.name for path in media],
-            ["01.png", "02.png", "03.png", "04.mp4", "05.mp4", "06.png", "07.mp4", "08.png"],
+            ["01.png", "02.png", "03.png", "04.mp4", "05.mp4", "06.png"],
         )
         for image in [path for path in media if path.suffix == ".png"]:
             self.assertEqual(png_size(image), (1080, 1350), image)
@@ -114,8 +150,12 @@ class VideoCarouselOutputTests(unittest.TestCase):
         archive = VISUALS / "prickly-imax-helper-video-carousel.zip"
         with zipfile.ZipFile(archive) as bundle:
             names = bundle.namelist()
-        self.assertEqual(sum(name.startswith("cards/") and name.endswith(".mp4") for name in names), 3)
-        self.assertEqual(sum(name.startswith("cards/") and name.endswith(".png") for name in names), 5)
+        card_names = sorted(name for name in names if name.startswith("cards/") and name != "cards/")
+        self.assertEqual(
+            card_names,
+            ["cards/01.png", "cards/02.png", "cards/03.png", "cards/04.mp4", "cards/05.mp4", "cards/06.png"],
+        )
+        self.assertFalse(any(name.startswith("cards/07.") or name.startswith("cards/08.") for name in names))
         self.assertEqual(sum(name.startswith("covers/") for name in names), 0)
         self.assertNotIn("ScreenRecording_08-14-2026 17-39-23_1.MP4", names)
 
