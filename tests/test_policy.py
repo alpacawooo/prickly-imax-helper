@@ -22,6 +22,24 @@ CONFIG = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 
 
 class PolicyTests(unittest.TestCase):
+    def test_duplicate_policy_accepts_explicit_false_and_legacy_default(self):
+        disabled = copy.deepcopy(CONFIG)
+        disabled["prevent_duplicate_booking"] = False
+        self.assertEqual(policy.validate(disabled), {"ok": True, "errors": []})
+
+        legacy = copy.deepcopy(CONFIG)
+        legacy.pop("prevent_duplicate_booking")
+        self.assertEqual(policy.validate(legacy), {"ok": True, "errors": []})
+
+    def test_duplicate_policy_rejects_non_boolean_values(self):
+        for invalid in (0, 1, None, "false"):
+            with self.subTest(invalid=invalid):
+                config = copy.deepcopy(CONFIG)
+                config["prevent_duplicate_booking"] = invalid
+                result = policy.validate(config)
+                self.assertFalse(result["ok"])
+                self.assertTrue(any("prevent_duplicate_booking" in error for error in result["errors"]))
+
     def test_korea_timezone_loads_without_system_timezone_database(self):
         environment = os.environ.copy()
         environment["PYTHONTZPATH"] = ""

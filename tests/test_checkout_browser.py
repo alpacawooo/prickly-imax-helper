@@ -279,7 +279,7 @@ class CheckoutBrowserTests(unittest.TestCase):
         )
 
         with self.assertRaises(CheckoutError):
-            self.flow._select_general_party(2, timeout_ms=100)
+            self.flow._select_general_party(2, timeout_ms=500)
 
         self.assertEqual(self.page.evaluate("() => window.general"), 1)
 

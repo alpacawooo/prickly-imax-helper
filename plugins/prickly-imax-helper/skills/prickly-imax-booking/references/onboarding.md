@@ -30,7 +30,9 @@ Default Odyssey profile:
 - preference: consecutive same-row seats closest to center
 - duplicate booking, cancellation, and seat changes: forbidden
 
-Movie, CGV theater, IMAX display format, party size, time windows, rows, edge exclusion, and center preference are user-editable defaults. The minimum lead time can be increased as high as 1,440 minutes, but the default 180-minute safety floor cannot be lowered. CGV extended clocks from `24:00` through `29:59` are normalized to the following calendar day before this check. Same-row adjacency, all-open-date refresh, duplicate prevention, no cancellation/change, voucher-only zero-balance submission, and the request budget remain enforced safety boundaries.
+Movie, CGV theater, IMAX display format, party size, time windows, rows, edge exclusion, and center preference are user-editable defaults. The minimum lead time can be increased as high as 1,440 minutes, but the default 180-minute safety floor cannot be lowered. CGV extended clocks from `24:00` through `29:59` are normalized to the following calendar day before this check. Same-row adjacency, all-open-date refresh, no cancellation/change, voucher-only zero-balance submission, and the request budget remain enforced safety boundaries.
+
+Duplicate prevention is enabled in every shipped preset. An advanced operator may explicitly set `prevent_duplicate_booking` to `false` only for a voucher-exhaustive one-transaction setup where the configured account has exactly the registered IMAX voucher count required for the selected party. This skips only the two existing-ticket page lookups; it does not skip seat validation, voucher-count proof, zero-balance proof, the one-submit guard, mobile-ticket verification, or the terminal stop.
 
 The user logs in personally in the dedicated Chrome window. Confirm login by visible account state, not by reading credentials.
 The recipient provider is independent of the operating system. Use Apple Mail on macOS or classic Outlook desktop on Windows only as the local sending bridge, and never request an email password or app password.

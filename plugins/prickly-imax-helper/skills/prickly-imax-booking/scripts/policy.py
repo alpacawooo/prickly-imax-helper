@@ -12,7 +12,6 @@ from pathlib import Path
 WEEKDAYS = "월화수목금토일"
 LOCKED_SAFETY = {
     "dates": "all_open",
-    "prevent_duplicate_booking": True,
     "allow_cancel_existing": False,
     "allow_change_existing": False,
     "authorization": {
@@ -69,8 +68,8 @@ def validate(config: dict) -> dict:
         errors.append("allow_cancel_existing must be false")
     if config.get("allow_change_existing", False):
         errors.append("allow_change_existing must be false")
-    if not config.get("prevent_duplicate_booking", True):
-        errors.append("prevent_duplicate_booking must be true")
+    if not isinstance(config.get("prevent_duplicate_booking", True), bool):
+        errors.append("prevent_duplicate_booking must be a boolean")
     return {"ok": not errors, "errors": errors}
 
 
