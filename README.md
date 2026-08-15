@@ -45,7 +45,8 @@ CGV login and browser data remain under the user's local profile. Runtime state 
 - Shows must start at least three hours after the current Korea time by default. This 180-minute safety floor cannot be lowered, but it can be increased up to 1,440 minutes.
 - CGV extended clock values from `24:00` through `29:59` are normalized to the following calendar day before the minimum-lead check.
 - Odyssey at Yongsan IMAX, weekday 19:00+, all Saturday, Sunday before 22:00, two seats, D-J rows, 20% edge exclusion, and center priority are editable defaults rather than locked values.
-- The runtime submits once only after duplicate, seat, voucher count, and zero-balance checks.
+- Shipped presets keep duplicate-booking prevention enabled, so the runtime checks existing tickets before booking preparation and again after the seat, voucher-count, and zero-balance checks.
+- An advanced local `prevent_duplicate_booking: false` policy skips only those two existing-ticket page lookups. It is intended for a voucher-exhaustive one-transaction setup; exact consecutive seats, voucher count, zero balance, one submission, mobile-ticket proof, and terminal stop behavior remain mandatory.
 - A restart or network failure across the submission boundary becomes `unknown_after_submit` and is never retried automatically.
 
 ## Development
