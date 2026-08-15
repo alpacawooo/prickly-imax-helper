@@ -14,7 +14,7 @@
 - The final sequence is `01.png`, `02.png`, `03.png`, `04.mp4`, `05.mp4`, `06.png`.
 - Card 4 remains a three-second setup-scroll video.
 - Card 5 is an eight-second muted H.264 video at 1080×1350, 30fps, yuv420p.
-- Card 5 starts after setup: `감시 시작 → 열린 날짜·회차 확인 → 연속 좌석 감시 → 후보가 없으면 계속 순환 → 좌석 발견 시 안전검증·한 번 제출·이메일 알림`.
+- Card 5 starts after setup: `감시를 시작합니다 → 열린 날짜와 회차를 확인합니다 → 연속 좌석을 감시합니다 → 후보가 없으면 계속 순환합니다 → 좌석 발견 시 안전검증·한 번 제출·이메일 알림`.
 - Card 5 uses only redacted local `prickly-imax diagnose` state and must not fabricate a seat match.
 - Card 6 is the approved CTA: `용아맥 새로고침에 지쳤다면.` and `댓글에 아이맥스`.
 - Preserve the existing black background, white type, Prickly red accent, typography, and page-number placement.
@@ -72,7 +72,7 @@ Keep entries 1–4. Replace entry 5 with:
   "duration": 8,
   "source_type": "local-monitor",
   "source": "generated_assets/prickly_imax_helper_launch/visuals/assets/helper-monitor-preview.png",
-  "headline": "설정이 끝나면\n그다음은 이렇게 돌아간다.",
+  "headline": "설정이 끝나면\n이렇게 작동합니다.",
   "supporting": "실제 로컬 감시 상태",
   "footer": "개인정보를 제외한 로컬 상태 · 추가 CGV 요청 없음",
   "composition": "monitoring-process",
@@ -203,10 +203,10 @@ def test_card_five_uses_actual_monitoring_stages_without_fake_match() -> None:
                "match": None, "errors": 0, "last_scan_lane": "hot"}] * 5
     pages = load_builder().card_five_monitor_scene_htmls(states)
     assert len(pages) == 5
-    assert "감시 시작" in pages[0] and "armed" in pages[0]
-    assert "열린 날짜·회차 확인" in pages[1]
-    assert "연속 좌석 감시" in pages[2] and "hot" in pages[2]
-    assert "후보가 없으면 계속 순환" in pages[3] and "null" in pages[3]
+    assert "감시를 시작합니다" in pages[0] and "armed" in pages[0]
+    assert "열린 날짜와 회차를 확인합니다" in pages[1]
+    assert "연속 좌석을 감시합니다" in pages[2] and "hot" in pages[2]
+    assert "후보가 없으면 계속 순환합니다" in pages[3] and "null" in pages[3]
     assert "좌석 발견 시" in pages[4]
     assert "match&quot;: true" not in "\n".join(pages)
 ```
@@ -226,10 +226,10 @@ Expected: missing five-stage builder and generic sequence renderer.
 
 Each stage uses the same actual redacted local state screen, changing only the crop/focus and one large overlay line:
 
-1. `감시 시작` — emphasize `status: armed`.
-2. `열린 날짜·회차 확인` — emphasize `open_dates` and `eligible_shows`.
-3. `연속 좌석 감시` — emphasize `last_scan_lane` and explain hot/discovery rotation.
-4. `후보가 없으면 계속 순환` — emphasize `match: null`.
+1. `감시를 시작합니다` — emphasize `status: armed`.
+2. `열린 날짜와 회차를 확인합니다` — emphasize `open_dates` and `eligible_shows`.
+3. `연속 좌석을 감시합니다` — emphasize `last_scan_lane` and explain the registered-show rotation.
+4. `후보가 없으면 계속 순환합니다` — emphasize `match: null`.
 5. `좌석 발견 시 안전검증 → 한 번 제출 → 이메일 알림` — transition rule only; do not change the actual `match` value.
 
 Use full-bleed black, actual diagnose typography, white stage text, and one Prickly red index/rail. Do not wrap stages in cards.

@@ -394,11 +394,11 @@ def card_five_monitor_scene_htmls(states: list[dict[str, object]]) -> list[str]:
     if len(states) != 5:
         raise ValueError("card 5 requires five actual monitor samples")
     stages = [
-        ("감시 시작", "로컬 모니터가 켜진 상태", {"status"}),
-        ("열린 날짜·회차 확인", "현재와 새로 열리는 예매 범위를 확인", {"open_dates", "eligible_shows"}),
-        ("연속 좌석 감시", "빠른 대상과 새 날짜 탐색을 번갈아 확인", {"last_scan_lane"}),
-        ("후보가 없으면 계속 순환", "조건에 맞는 붙어 있는 좌석을 기다리는 중", {"match"}),
-        ("좌석 발견 시 안전검증 → 한 번 제출 → 이메일 알림", "실제 후보가 없으면 제출 단계로 가지 않음", set()),
+        ("감시를 시작합니다", "로컬 모니터가 켜진 상태입니다.", {"status"}),
+        ("열린 날짜와 회차를 확인합니다", "현재와 새로 열리는 예매 범위를 확인합니다.", {"open_dates", "eligible_shows"}),
+        ("연속 좌석을 감시합니다", "등록된 회차의 좌석표를 순환하며 확인합니다.", {"last_scan_lane"}),
+        ("후보가 없으면 계속 순환합니다", "조건에 맞는 붙어 있는 좌석을 기다립니다.", {"match"}),
+        ("좌석을 발견하면 안전검증 후 한 번 제출하고 이메일로 알립니다", "실제 후보가 없으면 제출 단계로 진행하지 않습니다.", set()),
     ]
     pages: list[str] = []
     for index, (state, (title, detail, focused)) in enumerate(zip(states, stages), 1):
@@ -813,7 +813,7 @@ def carousel_slides(setup_png: Path) -> list[str]:
     slides.append(page(f"""{header(4,9)}<div class="content"><div class="eyebrow">THE ALTERNATIVE</div>
       <h2>그래서 사람 대신<br><span class="red">내 컴퓨터가</span><br>취소표를 기다리게 했다.</h2>
       <div style="margin-top:52px">{setup_mock(setup_png)}</div>
-      <p class="sub" style="font-size:25px;margin-top:30px">하루 종일 새로고침하지 않아도,<br>내 조건에 맞는 취소표를 내 컴퓨터가 기다린다.</p></div>{footer('LOCAL FIRST')}</div>""",width=1080,height=1350,extra_css=common))
+      <p class="sub" style="font-size:25px;margin-top:30px">하루 종일 새로고침하지 않아도,<br>내 조건에 맞는 취소표를 내 컴퓨터가 기다립니다.</p></div>{footer('LOCAL FIRST')}</div>""",width=1080,height=1350,extra_css=common))
     slides.append(page(f"""{header(5,9)}<div class="content"><div class="eyebrow">SETUP</div>
       <h2>로그인도, 조건도<br><span class="red">내가 직접 정한다.</span></h2>
       <div style="margin-top:42px">{setup_mock(setup_png)}</div>
@@ -838,7 +838,7 @@ def carousel_slides(setup_png: Path) -> list[str]:
       <div class="bg-photo" style="background-image:url('{bg}');background-position:50% 68%;filter:grayscale(.35)"></div><div class="scrim" style="background:linear-gradient(180deg,rgba(6,7,9,.52),rgba(6,7,9,.95))"></div>{header(8,9)}
       <div class="content" style="top:285px"><div class="eyebrow">THE CHOICE</div>
       <h1 style="font-size:70px">암표를 사는 대신,<br><span class="red">정가 취소표를</span><br>기다릴 수 있는 선택지.</h1>
-      <div class="rule" style="margin-top:70px"></div><p class="sub">표가 생긴다고 약속할 수는 없다.<br>대신 사람이 화면에 붙어 있어야 했던 시간을 줄인다.</p></div>{footer('NO GUARANTEE · LESS REFRESH')}</div>""",width=1080,height=1350,extra_css=common))
+      <div class="rule" style="margin-top:70px"></div><p class="sub">표가 생긴다고 약속할 수는 없습니다.<br>대신 사람이 화면에 붙어 있어야 했던 시간을 줄입니다.</p></div>{footer('NO GUARANTEE · LESS REFRESH')}</div>""",width=1080,height=1350,extra_css=common))
     slides.append(page(f"""{header(9,9)}<div class="content" style="top:300px">
       <div class="eyebrow">TRY IT YOURSELF</div>
       <h1 style="font-size:68px;max-width:860px">댓글에 <span class="red">“아이맥스”</span>라고 남기면<br>설치 방법을 보내줄게.</h1>
