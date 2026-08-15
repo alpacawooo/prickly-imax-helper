@@ -4,9 +4,9 @@ Prickly IMAX Helper is a local-first CGV IMAX availability monitor and fail-clos
 
 The repository contains no CGV credentials, customer identifiers, cookies, voucher numbers, email credentials, or developer-specific paths.
 
-## Private beta flow
+## Public release flow
 
-1. Accept the private GitHub repository invitation and download the pinned release plus its SHA-256 file.
+1. Open the public [0.2.1 release](https://github.com/alpacawooo/prickly-imax-helper/releases/tag/0.2.1) and download the installer for your operating system plus its SHA-256 file. No repository invitation or GitHub sign-in is required.
 2. Verify the checksum, extract the release, and run `scripts/Install.command` on macOS or `scripts/Install.ps1` on Windows.
 3. In the localhost-only setup page, open the dedicated Chrome profile and log in to CGV personally.
 4. Keep or edit the Odyssey preset (movie, CGV theater, IMAX format, time windows, minimum lead time, party size, rows, edge exclusion, and seat priority), then confirm the notification email and one-time automatic voucher-submission consent.
@@ -25,7 +25,7 @@ The configured recipient account can also be added to the iPhone Mail app. The h
 - `plugins/prickly-imax-helper/`: plugin package
 - `runtime/`: independent local runtime
 - `scripts/`: installer, uninstaller, and gated release builder
-- `docs/notion-quick-start.md`: copy-ready private-beta guide
+- `docs/notion-quick-start.md`: copy-ready public installation guide
 - `docs/dm-operator-pack.md`: copy-ready DM recruitment, waitlist, invite, and completion replies
 - `docs/pilot-runbook.md`: three-person operator checklist and privacy-safe evidence workflow
 - `docs/beta-readiness.md`: evidence-backed release and pilot gate
