@@ -148,11 +148,11 @@ def test_card_five_uses_actual_monitoring_stages_without_fake_match() -> None:
     }] * 5
     pages = builder.card_five_monitor_scene_htmls(states)
     assert len(pages) == 5
-    assert "감시 시작" in pages[0] and "armed" in pages[0]
-    assert "열린 날짜·회차 확인" in pages[1]
-    assert "연속 좌석 감시" in pages[2] and "hot" in pages[2]
-    assert "후보가 없으면 계속 순환" in pages[3] and "null" in pages[3]
-    assert "좌석 발견 시" in pages[4]
+    assert "감시를 시작합니다" in pages[0] and "armed" in pages[0]
+    assert "열린 날짜와 회차를 확인합니다" in pages[1]
+    assert "연속 좌석을 감시합니다" in pages[2] and "hot" in pages[2]
+    assert "후보가 없으면 계속 순환합니다" in pages[3] and "null" in pages[3]
+    assert "좌석을 발견하면" in pages[4]
     assert "match&quot;: true" not in "\n".join(pages)
 
 

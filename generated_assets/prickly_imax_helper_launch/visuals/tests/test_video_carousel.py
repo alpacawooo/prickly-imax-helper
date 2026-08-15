@@ -47,25 +47,30 @@ class VideoCarouselManifestTests(unittest.TestCase):
 
     def test_card_two_explains_why_the_odyssey_belongs_on_yongsan_imax(self) -> None:
         card = self.load_cards()[1]
-        self.assertEqual(card["headline"], "오디세이를\n용산 IMAX에서 꼭 봐야 하는 이유.")
+        self.assertEqual(card["headline"], "오디세이를\n용산 IMAX에서 봐야 하는 이유입니다.")
         self.assertEqual(
             card["supporting"],
-            "IMAX를 위해 촬영한 장면을\n이 압도적인 화면으로 보고 싶으니까.",
+            "IMAX를 위해 촬영한 장면을\n압도적인 화면으로 볼 수 있기 때문입니다.",
         )
         self.assertNotIn("여기서만", str(card["headline"]) + str(card["supporting"]))
 
     def test_cover_uses_approved_price_kicker_copy(self) -> None:
         card = self.load_cards()[0]
-        self.assertEqual(card["kicker"], "30만 원까지 오른 용아맥 표.")
-        self.assertEqual(card["headline"], "새로고침은 그만.")
+        self.assertEqual(card["kicker"], "용아맥 표는 30만 원까지 올랐습니다.")
+        self.assertEqual(card["headline"], "이제 새로고침을 멈춥니다.")
         self.assertEqual(
             card["promise"],
-            '조건만 정하면 예매 시도까지\n"딸깍" 한 번으로',
+            '조건만 정하면 예매 시도까지\n"딸깍" 한 번이면 됩니다.',
         )
-        self.assertEqual(card["supporting"], "내 컴퓨터가 취소표를 대신 기다린다.")
+        self.assertEqual(card["supporting"], "내 컴퓨터가 취소표를 대신 기다립니다.")
         source = BUILD_SCRIPT.read_text(encoding="utf-8")
         self.assertIn('class="cover-kicker"', source)
         self.assertIn('class="cover-promise"', source)
+
+    def test_manifest_uses_formal_korean_endings(self) -> None:
+        raw = MANIFEST.read_text(encoding="utf-8")
+        for informal in ("기다린다.", "없다.", "된다.", "돌아간다.", "싶으니까.", "새로고침은 그만."):
+            self.assertNotIn(informal, raw)
 
     def test_manifest_excludes_benchmark_and_banned_copy(self) -> None:
         raw = MANIFEST.read_text(encoding="utf-8")
