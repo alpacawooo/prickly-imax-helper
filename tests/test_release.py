@@ -71,6 +71,41 @@ class ReleaseTests(unittest.TestCase):
             self.assertIn("no daytime schedule-discovery requests", document)
             self.assertIn("serially", document)
 
+    def test_windows_quick_start_stops_before_hashing_when_zip_is_missing(self):
+        guide = (ROOT / "docs/notion-quick-start.md").read_text(encoding="utf-8")
+        zip_guard = "if(-not $zip)"
+        hash_check = "Get-FileHash -LiteralPath $zip.FullName -Algorithm SHA256"
+
+        self.assertIn(zip_guard, guide)
+        self.assertIn(hash_check, guide)
+        self.assertLess(guide.index(zip_guard), guide.index(hash_check))
+        self.assertIn("설치 ZIP 파일을 찾을 수 없습니다.", guide)
+        self.assertIn("압축을 풀지 않은 원본 ZIP", guide)
+        self.assertIn("파일이 손상되었거나 다른 버전의 설치 파일입니다.", guide)
+        self.assertNotIn("Get-FileHash $f -Algorithm SHA256", guide)
+
+    def test_windows_quick_start_finds_zip_in_custom_desktop_download_folder(self):
+        guide = (ROOT / "docs/notion-quick-start.md").read_text(encoding="utf-8")
+
+        self.assertIn("[Environment]::GetFolderPath('Desktop')", guide)
+        self.assertIn("Get-ChildItem", guide)
+        self.assertIn("-Filter $f", guide)
+        self.assertIn("-File -Recurse", guide)
+        self.assertIn("Sort-Object LastWriteTime -Descending", guide)
+        self.assertIn("Select-Object -First 1", guide)
+        self.assertNotIn('cd "$HOME\\Downloads"', guide)
+
+    def test_public_github_docs_explain_the_windows_zip_discovery_guard(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        release_notes = (ROOT / "docs/release-notes-0.2.1.md").read_text(encoding="utf-8")
+
+        self.assertIn("docs/notion-quick-start.md", readme)
+        self.assertIn("Desktop subfolders", readme)
+        self.assertIn("stops before hashing", readme)
+        self.assertIn("다운로드 폴더와 바탕화면 아래의 하위 폴더", release_notes)
+        self.assertIn("ZIP이 없으면 체크섬을 검사하지 않고", release_notes)
+        self.assertIn("설치 ZIP과 SHA-256 값은 변경되지 않았다", release_notes)
+
     def test_install_and_uninstall_restrict_app_home_to_user_home(self):
         for name in ("Install.command", "Uninstall.command"):
             script = (ROOT / "scripts" / name).read_text(encoding="utf-8")

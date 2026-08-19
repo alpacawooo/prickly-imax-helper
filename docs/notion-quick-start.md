@@ -46,10 +46,10 @@ cd "$HOME/Downloads"; f='prickly-imax-helper-0.2.1.tar.gz'; expected='aa8cf1b5d4
 시작 메뉴에서 `Windows PowerShell`을 열고 아래 한 줄을 붙여넣습니다.
 
 ```powershell
-$v='0.2.1'; $f="prickly-imax-helper-$v.zip"; $expected='0067fc3919f551de64748551c925d50addadc3b8681c20cdd660a0999dfd5fa7'; cd "$HOME\Downloads"; $actual=(Get-FileHash $f -Algorithm SHA256).Hash.ToLower(); if($actual -ne $expected){throw '체크섬 불일치: 설치 중단'}; Expand-Archive -Force $f .; powershell -ExecutionPolicy RemoteSigned -File ".\prickly-imax-helper-$v\scripts\Install.ps1"
+& { $v='0.2.1'; $f="prickly-imax-helper-$v.zip"; $expected='0067fc3919f551de64748551c925d50addadc3b8681c20cdd660a0999dfd5fa7'; $roots=@("$HOME\Downloads",[Environment]::GetFolderPath('Desktop')) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Container) } | Select-Object -Unique; $zip=Get-ChildItem -LiteralPath $roots -Filter $f -File -Recurse -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if(-not $zip){Write-Host '설치 ZIP 파일을 찾을 수 없습니다. Windows 전용 ZIP을 다시 다운로드해 압축을 풀지 않은 원본 ZIP을 다운로드 폴더 또는 바탕화면 아래에 두세요.' -ForegroundColor Yellow; return}; Write-Host "설치 파일 확인: $($zip.FullName)" -ForegroundColor Cyan; $actual=(Get-FileHash -LiteralPath $zip.FullName -Algorithm SHA256).Hash.ToLowerInvariant(); if($actual -ne $expected){Write-Host '파일이 손상되었거나 다른 버전의 설치 파일입니다. Windows 전용 0.2.1 ZIP을 다시 다운로드해 주세요.' -ForegroundColor Red; return}; $dest=$zip.DirectoryName; Expand-Archive -LiteralPath $zip.FullName -DestinationPath $dest -Force; $script=Join-Path $dest "prickly-imax-helper-$v\scripts\Install.ps1"; powershell -ExecutionPolicy RemoteSigned -File $script }
 ```
 
-체크섬이 다르면 설치가 즉시 중단됩니다. 관리자 PowerShell은 필요하지 않습니다. Windows가 실행 여부를 물으면 다운로드한 공식 GitHub 공개 릴리스가 맞는지 확인한 뒤 실행합니다.
+명령은 다운로드 폴더와 바탕화면 아래의 하위 폴더까지 검색해 원본 ZIP을 자동으로 찾습니다. Chrome 다운로드 위치가 `바탕화면\크롬 다운로드 파일`처럼 변경되어 있어도 사용할 수 있습니다. ZIP이 없으면 다시 다운로드하라는 안내만 표시하고 즉시 멈추며, 파일이 있을 때만 체크섬을 검사합니다. 체크섬이 다르면 파일이 손상되었거나 다른 버전이라는 안내를 표시하고 설치를 중단합니다. 압축을 푼 폴더가 아니라 압축을 풀지 않은 원본 ZIP이 필요합니다. 관리자 PowerShell은 필요하지 않습니다. Windows가 실행 여부를 물으면 위 GitHub 페이지에서 받은 파일이 맞는지 확인한 뒤 실행합니다.
 
 ## 2. 로그인과 조건 확인
 

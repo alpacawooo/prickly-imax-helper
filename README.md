@@ -12,6 +12,10 @@ The repository contains no CGV credentials, customer identifiers, cookies, vouch
 4. Keep or edit the Odyssey preset (movie, CGV theater, IMAX format, time windows, minimum lead time, party size, rows, edge exclusion, and seat priority), then confirm the notification email and one-time automatic voucher-submission consent.
 5. The macOS LaunchAgent or Windows Scheduled Task starts the resident monitor. Check it with the OS-specific launcher described in the onboarding guide.
 
+### Windows 10/11 one-line install
+
+Download only `prickly-imax-helper-0.2.1.zip` and leave the original ZIP unextracted. Use the current PowerShell command in [docs/notion-quick-start.md](docs/notion-quick-start.md). It searches the default Downloads folder, the Desktop, and Desktop subfolders such as a custom Chrome download folder. If the ZIP is missing, the command stops before hashing and prints only the download instruction. If the ZIP exists but the SHA-256 differs, it stops with a separate wrong-version or damaged-file message. Only a matching ZIP is extracted and installed.
+
 No password or payment credential is entered into Prickly AI, Codex, Notion, GitHub, or the helper.
 Python is not a user prerequisite; the installer bootstraps a checksum-verified, pinned `uv` binary and managed Python. It installs only the locked runtime dependencies and generates a local launcher without resolving a separate project build backend.
 
