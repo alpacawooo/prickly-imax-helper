@@ -73,6 +73,31 @@ def validate_stage(stage: Path) -> None:
         raise SystemExit("release stage privacy check failed: " + "; ".join(problems))
 
 
+def validate_release_versions(root: Path, version: str) -> None:
+    project_version = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+    if version != project_version:
+        raise SystemExit(f"release version {version} does not match pyproject version {project_version}")
+    lock = tomllib.loads((root / "uv.lock").read_text(encoding="utf-8"))
+    root_package = next(
+        (package for package in lock["package"] if package.get("name") == "prickly-imax-helper"),
+        None,
+    )
+    if not root_package or root_package.get("version") != version:
+        raise SystemExit("uv.lock root package version does not match the release version")
+    runtime_init = (root / "runtime" / "prickly_imax_helper" / "__init__.py").read_text(encoding="utf-8")
+    runtime_version = re.search(r'^__version__ = "([^"]+)"$', runtime_init, re.MULTILINE)
+    if not runtime_version or runtime_version.group(1) != version:
+        raise SystemExit("runtime __version__ does not match the release version")
+    mac_installer = (root / "scripts" / "Install.command").read_text(encoding="utf-8")
+    mac_version = re.search(r"^APP_VERSION=([^\s]+)$", mac_installer, re.MULTILINE)
+    if not mac_version or mac_version.group(1) != version:
+        raise SystemExit("Install.command APP_VERSION does not match the release version")
+    windows_installer = (root / "scripts" / "Install.ps1").read_text(encoding="utf-8")
+    windows_version = re.search(r'^\$AppVersion = "([^"]+)"$', windows_installer, re.MULTILINE)
+    if not windows_version or windows_version.group(1) != version:
+        raise SystemExit("Install.ps1 AppVersion does not match the release version")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", required=True)
@@ -80,17 +105,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=Path("dist"))
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
-    project_version = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
-    if args.version != project_version:
-        raise SystemExit(f"release version {args.version} does not match pyproject version {project_version}")
-    mac_installer = (root / "scripts" / "Install.command").read_text(encoding="utf-8")
-    mac_version = re.search(r"^APP_VERSION=([^\s]+)$", mac_installer, re.MULTILINE)
-    if not mac_version or mac_version.group(1) != args.version:
-        raise SystemExit("Install.command APP_VERSION does not match the release version")
-    windows_installer = (root / "scripts" / "Install.ps1").read_text(encoding="utf-8")
-    windows_version = re.search(r'^\$AppVersion = "([^"]+)"$', windows_installer, re.MULTILINE)
-    if not windows_version or windows_version.group(1) != args.version:
-        raise SystemExit("Install.ps1 AppVersion does not match the release version")
+    validate_release_versions(root, args.version)
     authorization = json.loads(args.authorization.read_text(encoding="utf-8"))
     if not isinstance(authorization, dict):
         raise SystemExit("authorization metadata must be a JSON object")
@@ -168,7 +183,16 @@ def main() -> int:
             source = root / name
             destination = stage / name
             if source.is_dir():
-                shutil.copytree(source, destination, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.egg-info"))
+                shutil.copytree(
+                    source,
+                    destination,
+                    ignore=shutil.ignore_patterns(
+                        "__pycache__",
+                        "*.pyc",
+                        "*.egg-info",
+                        "cgv_checkout_no_submit_probe.py",
+                    ),
+                )
             else:
                 shutil.copy2(source, destination)
         (stage / "AUTHORIZATION.json").write_text(

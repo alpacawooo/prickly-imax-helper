@@ -13,6 +13,42 @@ from .browser import CGV_BOOKING_URL
 
 MOBILE_TICKETS_URL = "https://cgv.co.kr/mcv/mobileTicketList"
 KOREAN_WEEKDAYS = "월화수목금토일"
+_CHECKOUT_MODAL_HELPERS = r"""
+  const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+  const visible = element => {
+    if (!element?.isConnected) return false;
+    const style = window.getComputedStyle(element);
+    if (style.visibility === 'hidden' || style.visibility === 'collapse') return false;
+    const bounds = element.getBoundingClientRect();
+    return bounds.width > 0 && bounds.height > 0;
+  };
+  const actionable = element => visible(element) && !element.matches(':disabled') &&
+    !element.closest('[aria-disabled="true" i]');
+  const checkoutModalState = () => {
+    const semanticModalSelector = '[role="dialog"],[role="alertdialog"],[aria-modal="true"]';
+    const classModalSelector = '[class*="modal" i],[class*="popup" i]';
+    const modalSelector = semanticModalSelector + ',' + classModalSelector;
+    const semanticModals = [...document.querySelectorAll(semanticModalSelector)].filter(visible);
+    const modalMatches = [...document.querySelectorAll(modalSelector)].filter(visible);
+    const titles = [...document.querySelectorAll('body *')].filter(element =>
+      visible(element) && compact(element.textContent) === '결제 전 확인해 주세요' &&
+      ![...element.children].some(child =>
+        visible(child) && compact(child.textContent) === '결제 전 확인해 주세요'));
+    if (!modalMatches.length) {
+      return {unknownVisibleModal: false, modalMatches, modalContainers: [], titles};
+    }
+    if (titles.length !== 1) {
+      return {unknownVisibleModal: true, modalMatches, modalContainers: [], titles};
+    }
+    const titleContainers = modalMatches.filter(container => container.contains(titles[0]));
+    const modalContainers = titleContainers.filter(container =>
+      !titleContainers.some(other => other !== container && other.contains(container)));
+    const unknownVisibleModal = titleContainers.length !== modalMatches.length ||
+      semanticModals.length > 1 || modalContainers.length !== 1;
+    return {unknownVisibleModal, modalMatches, modalContainers, titles};
+  };
+  const hasUnknownVisibleModal = () => checkoutModalState().unknownVisibleModal;
+"""
 
 
 class CheckoutError(RuntimeError):
@@ -515,52 +551,199 @@ class CheckoutFlow:
         )
         if not result.get("ok") or int(result.get("count", 0)) != party:
             raise SeatVanished(f"target seat vanished: {result.get('missing')}")
+        try:
+            self.page.wait_for_function(
+                r"""wanted => {
+                  const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+                  const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+                  return wanted.every(seat => {
+                    const candidates = [...document.querySelectorAll('button[data-seatlocno]')]
+                      .filter(element => visible(element) && compact(element.textContent) === seat);
+                    return candidates.length === 1 &&
+                      (String(candidates[0].className).includes('seatSelected') ||
+                       candidates[0].getAttribute('aria-pressed') === 'true');
+                  });
+                }""",
+                arg=seats,
+                timeout=10_000,
+            )
+        except PlaywrightTimeoutError as exc:
+            raise SeatVanished("target seat selection was not confirmed") from exc
 
     def select_party_and_seats(self, match: dict[str, Any]) -> None:
         self._select_general_party(int(self.config["party_size"]))
         self._select_seats(match)
 
     def open_payment_and_apply_vouchers(self) -> None:
+        order_button_ready = r"""() => {
+          const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+          const visible = element => {
+            if (!element?.isConnected) return false;
+            const style = window.getComputedStyle(element);
+            if (style.visibility === 'hidden' || style.visibility === 'collapse') return false;
+            const bounds = element.getBoundingClientRect();
+            return bounds.width > 0 && bounds.height > 0;
+          };
+          const actionable = element => visible(element) && !element.matches(':disabled') &&
+            !element.closest('[aria-disabled="true" i]');
+          return [...document.querySelectorAll('button')]
+            .filter(element => actionable(element) &&
+              /원\s*결제하기$/.test(compact(element.textContent))).length === 1;
+        }"""
+        try:
+            self.page.wait_for_function(order_button_ready, timeout=10_000)
+        except PlaywrightTimeoutError as exc:
+            raise CheckoutError("seat order button not available") from exc
         clicked = self.page.evaluate(
-            r"""() => { const buttons = [...document.querySelectorAll('button')].filter(b => b.offsetParent && !b.disabled);
-            const b = buttons.find(x => /원\s*결제하기$/.test(x.textContent.replace(/\s+/g, ' ').trim()));
-            if (!b) return false; b.click(); return true; }"""
+            r"""() => {
+              const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+              const visible = element => {
+                if (!element?.isConnected) return false;
+                const style = window.getComputedStyle(element);
+                if (style.visibility === 'hidden' || style.visibility === 'collapse') return false;
+                const bounds = element.getBoundingClientRect();
+                return bounds.width > 0 && bounds.height > 0;
+              };
+              const actionable = element => visible(element) && !element.matches(':disabled') &&
+                !element.closest('[aria-disabled="true" i]');
+              const buttons = [...document.querySelectorAll('button')]
+                .filter(element => actionable(element) &&
+                  /원\s*결제하기$/.test(compact(element.textContent)));
+              if (buttons.length !== 1) return false;
+              buttons[0].click();
+              return true;
+            }"""
         )
         if not clicked:
             raise CheckoutError("seat order button not available")
-        self._wait("() => [...document.querySelectorAll('button')].some(b => b.offsetParent && /관람권|기프트콘/.test(b.textContent))")
-        opened = self.page.evaluate(
-            r"""() => { const b = [...document.querySelectorAll('button')].find(x =>
-            x.offsetParent && !x.disabled && /관람권|기프트콘/.test(x.textContent)); if (!b) return false; b.click(); return true; }"""
+        payment_transition_ready = r"""() => {
+        """ + _CHECKOUT_MODAL_HELPERS + r"""
+          const voucherReady = [...document.querySelectorAll('button')]
+            .some(element => actionable(element) && /관람권|기프트콘/.test(compact(element.textContent)));
+          const modalState = checkoutModalState();
+          if (!modalState.modalMatches.length) return modalState.titles.length ? true : voucherReady;
+          if (modalState.unknownVisibleModal) return true;
+          const buttons = [...modalState.modalContainers[0].querySelectorAll('button')]
+            .filter(element => visible(element) && compact(element.textContent) === '결제하기');
+          if (buttons.length > 1) return true;
+          return buttons.length === 1 && actionable(buttons[0]);
+        }"""
+        try:
+            self.page.wait_for_function(payment_transition_ready, timeout=45_000)
+        except PlaywrightTimeoutError as exc:
+            raise CheckoutError("payment confirmation or voucher section not available") from exc
+
+        popup_result = self.page.evaluate(
+            r"""() => {
+            """ + _CHECKOUT_MODAL_HELPERS + r"""
+              const voucherReady = [...document.querySelectorAll('button')]
+                .some(element => actionable(element) && /관람권|기프트콘/.test(compact(element.textContent)));
+              const modalState = checkoutModalState();
+              if (!modalState.modalMatches.length) {
+                if (modalState.titles.length) return 'unsafe';
+                return voucherReady ? 'absent' : 'unsafe';
+              }
+              if (modalState.unknownVisibleModal) return 'unsafe';
+              const buttons = [...modalState.modalContainers[0].querySelectorAll('button')]
+                .filter(element => visible(element) && compact(element.textContent) === '결제하기');
+              if (buttons.length !== 1 || !actionable(buttons[0])) return 'unsafe';
+              const freshTitles = [...modalState.modalContainers[0].querySelectorAll('*')].filter(element =>
+                visible(element) && compact(element.textContent) === '결제 전 확인해 주세요' &&
+                ![...element.children].some(child => visible(child) && compact(child.textContent) === '결제 전 확인해 주세요'));
+              if (freshTitles.length !== 1) return 'unsafe';
+              buttons[0].click();
+              return 'clicked';
+            }"""
         )
-        if not opened:
+        if popup_result == "unsafe":
+            raise CheckoutError("payment confirmation popup is ambiguous")
+        try:
+            self.page.wait_for_function(
+                r"""() => {
+                """ + _CHECKOUT_MODAL_HELPERS + r"""
+                  return [...document.querySelectorAll('button')]
+                    .some(element => actionable(element) && /관람권|기프트콘/.test(element.textContent || ''));
+                }""",
+                timeout=45_000,
+            )
+        except PlaywrightTimeoutError as exc:
+            raise PaymentBlocked("voucher section not found") from exc
+        opened = self.page.evaluate(
+            r"""() => {
+            """ + _CHECKOUT_MODAL_HELPERS + r"""
+              if (hasUnknownVisibleModal()) return 'blocked';
+              const button = [...document.querySelectorAll('button')].find(element =>
+                actionable(element) && /관람권|기프트콘/.test(element.textContent));
+              if (!button) return 'missing';
+              button.click();
+              return 'clicked';
+            }"""
+        )
+        if opened == "blocked":
+            raise CheckoutError("unknown payment modal is visible")
+        if opened != "clicked":
             raise PaymentBlocked("voucher section not found")
-        self._wait("() => document.body.innerText.includes('IMAX 영화관람권')")
+        try:
+            self._wait("() => document.body.innerText.includes('IMAX 영화관람권')")
+        except PlaywrightTimeoutError as exc:
+            raise PaymentBlocked("voucher options not found") from exc
         count = int(self.config["payment"]["voucher_count"])
         selected = self.page.evaluate(
-            r"""count => { const candidates = [...document.querySelectorAll('button,label')].filter(x =>
-            x.offsetParent && x.textContent.includes('IMAX 영화관람권'));
-            const unique = []; for (const x of candidates) if (!unique.some(y => y.contains(x) || x.contains(y))) unique.push(x);
-            if (unique.length < count) return {ok:false, available:unique.length}; unique.slice(0, count).forEach(x => x.click());
-            return {ok:true, selected:count}; }""",
+            r"""count => {
+            """ + _CHECKOUT_MODAL_HELPERS + r"""
+              const candidates = [...document.querySelectorAll('button,label')].filter(element =>
+                visible(element) && element.textContent.includes('IMAX 영화관람권'));
+              const unique = [];
+              for (const element of candidates) {
+                if (!unique.some(other => other.contains(element) || element.contains(other))) unique.push(element);
+              }
+              if (unique.length < count) return {ok:false, available:unique.length};
+              for (const element of unique.slice(0, count)) {
+                if (hasUnknownVisibleModal()) return {ok:false, blocked:true, available:unique.length};
+                element.click();
+              }
+              return {ok:true, selected:count};
+            }""",
             count,
         )
+        if selected.get("blocked"):
+            raise CheckoutError("unknown payment modal is visible")
         if not selected.get("ok"):
             raise PaymentBlocked(f"only {selected.get('available', 0)} IMAX vouchers are visible")
-        self.page.evaluate(
-            r"""() => { const b = [...document.querySelectorAll('button')].find(x =>
-            x.offsetParent && !x.disabled && x.textContent.includes('적용')); if (b) b.click(); }"""
+        apply_result = self.page.evaluate(
+            r"""() => {
+            """ + _CHECKOUT_MODAL_HELPERS + r"""
+              if (hasUnknownVisibleModal()) return 'blocked';
+              const button = [...document.querySelectorAll('button')].find(element =>
+                actionable(element) && element.textContent.includes('적용'));
+              if (button) button.click();
+              return button ? 'clicked' : 'absent';
+            }"""
         )
+        if apply_result == "blocked":
+            raise CheckoutError("unknown payment modal is visible")
         time.sleep(0.4)
 
     def prove_ready(self, match: dict[str, Any]) -> None:
         snapshot = self.page.evaluate(
-            r"""() => { const marked = [...document.querySelectorAll('input:checked,[aria-checked="true"],[aria-selected="true"]')]
-            .filter(x => (x.closest('label,button,li,div')?.textContent || '').includes('IMAX 영화관람권'));
-            return {text: document.body.innerText, selectedVoucherCount: marked.length, buttons: [...document.querySelectorAll('button')]
-            .filter(b => b.offsetParent && !b.disabled && b.textContent.includes('결제하기'))
-            .map(b => b.textContent.replace(/\s+/g, ' ').trim())}; }"""
+            r"""() => {
+            """ + _CHECKOUT_MODAL_HELPERS + r"""
+              const marked = [...document.querySelectorAll('input:checked,[aria-checked="true"],[aria-selected="true"]')]
+                .filter(element =>
+                  (element.closest('label,button,li,div')?.textContent || '').includes('IMAX 영화관람권'));
+              const buttons = [...document.querySelectorAll('button')]
+                .filter(element => actionable(element) && element.textContent.includes('결제하기'))
+                .map(element => compact(element.textContent));
+              return {
+                text: document.body.innerText,
+                selectedVoucherCount: marked.length,
+                buttons,
+                unknownVisibleModal: hasUnknownVisibleModal(),
+              };
+            }"""
         )
+        if snapshot.get("unknownVisibleModal"):
+            raise PaymentBlocked("unknown payment modal is visible")
         errors = payment_proof(
             snapshot["text"],
             voucher_count=int(self.config["payment"]["voucher_count"]),
@@ -575,12 +758,18 @@ class CheckoutFlow:
     def submit_once(self) -> None:
         if self.submitted:
             raise UnknownAfterSubmit("submission was already attempted")
-        clicked = self.page.evaluate(
-            r"""() => { const buttons = [...document.querySelectorAll('button')].filter(b =>
-            b.offsetParent && !b.disabled && b.textContent.includes('결제하기'));
-            if (buttons.length !== 1) return false; buttons[0].click(); return true; }"""
+        click_result = self.page.evaluate(
+            r"""() => {
+            """ + _CHECKOUT_MODAL_HELPERS + r"""
+              if (hasUnknownVisibleModal()) return 'blocked';
+              const buttons = [...document.querySelectorAll('button')]
+                .filter(element => actionable(element) && element.textContent.includes('결제하기'));
+              if (buttons.length !== 1) return 'invalid';
+              buttons[0].click();
+              return 'clicked';
+            }"""
         )
-        if not clicked:
+        if click_result != "clicked":
             raise UnknownAfterSubmit("submission state entered but final click could not be proven")
         self.submitted = True
 

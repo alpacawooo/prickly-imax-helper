@@ -1,7 +1,7 @@
 ﻿$ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-$AppVersion = "0.2.2"
+$AppVersion = "0.2.3"
 $UvVersion = "0.11.15"
 $ManagedPythonVersion = "3.12.12"
 $TaskName = "Prickly IMAX Helper"
