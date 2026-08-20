@@ -1,4 +1,4 @@
-# Prickly IMAX Helper 0.2.1 공개 배포 — 3분 시작
+# 용아맥 새로고침은 그만: 취소표 자동예매 3분 설정
 
 ## 먼저 운영체제를 확인하세요
 
@@ -19,17 +19,17 @@ CGV 비밀번호, 관람권 번호, 카드번호, 이메일 비밀번호는 Pric
 
 공개 GitHub 릴리스에서 **macOS 전용 설치 파일 하나만** 다운로드합니다. 저장소 초대나 GitHub 로그인이 필요하지 않습니다.
 
-- [Prickly IMAX Helper 0.2.1 공개 릴리스 전체 보기](https://github.com/alpacawooo/prickly-imax-helper/releases/tag/0.2.1)
+- [Prickly IMAX Helper 0.2.2 공개 릴리스 전체 보기](https://github.com/alpacawooo/prickly-imax-helper/releases/tag/0.2.2)
 
-- [🍎 macOS 전용 설치 파일 받기](https://github.com/alpacawooo/prickly-imax-helper/releases/download/0.2.1/prickly-imax-helper-0.2.1.tar.gz) — `prickly-imax-helper-0.2.1.tar.gz`
-- [macOS 체크섬 보기](https://github.com/alpacawooo/prickly-imax-helper/releases/download/0.2.1/prickly-imax-helper-0.2.1.tar.gz.sha256) — 설치 파일이 공식 배포본인지 확인하는 검증값이며, 별도 설치 파일이 아닙니다.
+- [🍎 macOS 전용 설치 파일 받기](https://github.com/alpacawooo/prickly-imax-helper/releases/download/0.2.2/prickly-imax-helper-0.2.2.tar.gz) — `prickly-imax-helper-0.2.2.tar.gz`
+- [macOS 체크섬 보기](https://github.com/alpacawooo/prickly-imax-helper/releases/download/0.2.2/prickly-imax-helper-0.2.2.tar.gz.sha256) — 설치 파일이 공식 배포본인지 확인하는 검증값이며, 별도 설치 파일이 아닙니다.
 
 별도의 `.sha256` 파일은 받지 않아도 됩니다. 아래 명령에 검증된 SHA-256이 고정되어 있습니다. GitHub가 자동으로 표시하는 `Source code (zip)`과 `Source code (tar.gz)`도 설치 파일이 아니므로 다운로드하지 않습니다.
 
 터미널을 열어 이 한 줄을 붙여넣습니다.
 
 ```bash
-cd "$HOME/Downloads"; f='prickly-imax-helper-0.2.1.tar.gz'; expected='aa8cf1b5d47c64ba9f8940bf7a65fb56d5f78cb53c441770cebed8bed185527b'; actual="$(shasum -a 256 "$f" | awk '{print $1}')"; if [ "$actual" = "$expected" ]; then tar -xzf "$f" && open prickly-imax-helper-0.2.1/scripts/Install.command; else echo '체크섬 불일치: 설치 중단'; fi
+cd "$HOME/Downloads"; f='prickly-imax-helper-0.2.2.tar.gz'; expected='fd2a24e5176eacf7f03388edce66e5ec29cbcfb4c3842d94a31ce33d7ea0cf47'; actual="$(shasum -a 256 "$f" | awk '{print $1}')"; if [ "$actual" = "$expected" ]; then tar -xzf "$f" && open prickly-imax-helper-0.2.2/scripts/Install.command; else echo '체크섬 불일치: 설치 중단'; fi
 ```
 
 설정 페이지가 열리면 검증과 압축 해제가 완료된 것입니다. `체크섬 불일치: 설치 중단`이 나오면 설치하지 말고 받은 파일을 삭제합니다. macOS가 처음 실행을 막으면 Finder에서 `Install.command`를 Control-클릭한 뒤 `열기`를 선택합니다.
@@ -38,15 +38,15 @@ cd "$HOME/Downloads"; f='prickly-imax-helper-0.2.1.tar.gz'; expected='aa8cf1b5d4
 
 **Windows 전용 설치 파일 하나만** 다운로드합니다.
 
-- [🪟 Windows 10/11 전용 설치 파일 받기](https://github.com/alpacawooo/prickly-imax-helper/releases/download/0.2.1/prickly-imax-helper-0.2.1.zip) — `prickly-imax-helper-0.2.1.zip`
-- [Windows 체크섬 보기](https://github.com/alpacawooo/prickly-imax-helper/releases/download/0.2.1/prickly-imax-helper-0.2.1.zip.sha256) — 설치 파일이 공식 배포본인지 확인하는 검증값이며, 별도 설치 파일이 아닙니다.
+- [🪟 Windows 10/11 전용 설치 파일 받기](https://github.com/alpacawooo/prickly-imax-helper/releases/download/0.2.2/prickly-imax-helper-0.2.2.zip) — `prickly-imax-helper-0.2.2.zip`
+- [Windows 체크섬 보기](https://github.com/alpacawooo/prickly-imax-helper/releases/download/0.2.2/prickly-imax-helper-0.2.2.zip.sha256) — 설치 파일이 공식 배포본인지 확인하는 검증값이며, 별도 설치 파일이 아닙니다.
 
 별도의 `.sha256` 파일은 받지 않아도 됩니다. 아래 명령에 검증된 SHA-256이 고정되어 있습니다. GitHub가 자동으로 표시하는 `Source code (zip)`과 `Source code (tar.gz)`도 설치 파일이 아니므로 다운로드하지 않습니다.
 
 시작 메뉴에서 `Windows PowerShell`을 열고 아래 한 줄을 붙여넣습니다.
 
 ```powershell
-& { $v='0.2.1'; $f="prickly-imax-helper-$v.zip"; $expected='0067fc3919f551de64748551c925d50addadc3b8681c20cdd660a0999dfd5fa7'; $roots=@("$HOME\Downloads",[Environment]::GetFolderPath('Desktop')) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Container) } | Select-Object -Unique; $zip=Get-ChildItem -LiteralPath $roots -Filter $f -File -Recurse -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if(-not $zip){Write-Host '설치 ZIP 파일을 찾을 수 없습니다. Windows 전용 ZIP을 다시 다운로드해 압축을 풀지 않은 원본 ZIP을 다운로드 폴더 또는 바탕화면 아래에 두세요.' -ForegroundColor Yellow; return}; Write-Host "설치 파일 확인: $($zip.FullName)" -ForegroundColor Cyan; $actual=(Get-FileHash -LiteralPath $zip.FullName -Algorithm SHA256).Hash.ToLowerInvariant(); if($actual -ne $expected){Write-Host '파일이 손상되었거나 다른 버전의 설치 파일입니다. Windows 전용 0.2.1 ZIP을 다시 다운로드해 주세요.' -ForegroundColor Red; return}; $dest=$zip.DirectoryName; Expand-Archive -LiteralPath $zip.FullName -DestinationPath $dest -Force; $script=Join-Path $dest "prickly-imax-helper-$v\scripts\Install.ps1"; powershell -ExecutionPolicy RemoteSigned -File $script }
+& { $v='0.2.2'; $f="prickly-imax-helper-$v.zip"; $expected='61f6bded26f54b709b19e83702a79872674cccccafe98219daa3ab52f81c7b2d'; $roots=@("$HOME\Downloads",[Environment]::GetFolderPath('Desktop')) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Container) } | Select-Object -Unique; $zip=Get-ChildItem -LiteralPath $roots -Filter $f -File -Recurse -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if(-not $zip){Write-Host '설치 ZIP 파일을 찾을 수 없습니다. Windows 전용 ZIP을 다시 다운로드해 압축을 풀지 않은 원본 ZIP을 다운로드 폴더 또는 바탕화면 아래에 두세요.' -ForegroundColor Yellow; return}; Write-Host "설치 파일 확인: $($zip.FullName)" -ForegroundColor Cyan; $actual=(Get-FileHash -LiteralPath $zip.FullName -Algorithm SHA256).Hash.ToLowerInvariant(); if($actual -ne $expected){Write-Host '파일이 손상되었거나 다른 버전의 설치 파일입니다. Windows 전용 0.2.2 ZIP을 다시 다운로드해 주세요.' -ForegroundColor Red; return}; $dest=$zip.DirectoryName; Expand-Archive -LiteralPath $zip.FullName -DestinationPath $dest -Force; $script=Join-Path $dest "prickly-imax-helper-$v\scripts\Install.ps1"; powershell -ExecutionPolicy RemoteSigned -File $script }
 ```
 
 명령은 다운로드 폴더와 바탕화면 아래의 하위 폴더까지 검색해 원본 ZIP을 자동으로 찾습니다. Chrome 다운로드 위치가 `바탕화면\크롬 다운로드 파일`처럼 변경되어 있어도 사용할 수 있습니다. ZIP이 없으면 다시 다운로드하라는 안내만 표시하고 즉시 멈추며, 파일이 있을 때만 체크섬을 검사합니다. 체크섬이 다르면 파일이 손상되었거나 다른 버전이라는 안내를 표시하고 설치를 중단합니다. 압축을 푼 폴더가 아니라 압축을 풀지 않은 원본 ZIP이 필요합니다. 관리자 PowerShell은 필요하지 않습니다. Windows가 실행 여부를 물으면 위 GitHub 페이지에서 받은 파일이 맞는지 확인한 뒤 실행합니다.
