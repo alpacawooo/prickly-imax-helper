@@ -452,7 +452,7 @@ function Stop-ExistingMonitorSafely {
             $Inspection = Get-ExistingTaskInspection
             if (-not $Inspection.Found) { break }
             if ($Inspection.State -eq "Running") {
-                if ([DateTime]::UtcNow -ge $ExitDeadline) { throw "상주 감시가 $ExitTimeoutSeconds초 안에 종료되지 않아 업데이트를 중단합니다." }
+                if ([DateTime]::UtcNow -ge $ExitDeadline) { throw "상주 감시가 ${ExitTimeoutSeconds}초 안에 종료되지 않아 업데이트를 중단합니다." }
                 Start-Sleep -Milliseconds 250
                 continue
             }

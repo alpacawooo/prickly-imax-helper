@@ -488,6 +488,20 @@ class ReleaseTests(unittest.TestCase):
             "parenthesize composite expressions passed as cmdlet arguments:\n" + "\n".join(failures),
         )
 
+    def test_powershell_variables_are_braced_before_non_ascii_text(self):
+        """PowerShell treats adjacent Unicode letters as part of an unbraced variable name."""
+
+        unsafe_variable = re.compile(r"\$[A-Za-z_][A-Za-z0-9_:]*(?=[^\x00-\x7f])")
+        failures = []
+        paths = (*ROOT.glob("scripts/*.ps1"), *ROOT.glob("tests/*.ps1"))
+        for path in sorted(paths):
+            source = path.read_text(encoding="utf-8-sig")
+            for line_number, line in enumerate(source.splitlines(), 1):
+                for match in unsafe_variable.finditer(line):
+                    failures.append(f"{path.relative_to(ROOT)}:{line_number}: {match.group(0)}")
+
+        self.assertEqual([], failures, "brace PowerShell variables before adjacent Unicode text")
+
     def test_installer_avoids_unlocked_project_build_backend(self):
         installer = (ROOT / "scripts/Install.command").read_text(encoding="utf-8")
         self.assertIn("--no-install-project", installer)
@@ -692,13 +706,13 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn('Get-ExistingTaskInspection', windows_installer)
         self.assertIn('Start-Sleep -Milliseconds 250', windows_installer)
         self.assertIn('AddSeconds($ExitTimeoutSeconds)', windows_installer)
-        self.assertIn('상주 감시가 $ExitTimeoutSeconds초 안에 종료되지 않아 업데이트를 중단합니다.', windows_installer)
+        self.assertIn('상주 감시가 ${ExitTimeoutSeconds}초 안에 종료되지 않아 업데이트를 중단합니다.', windows_installer)
         self.assertLess(
             windows_installer.index('$OldStopOutput = & $OldCli --home $AppHome stop'),
             windows_installer.index('Stop-ScheduledTask -TaskName $TaskName'),
         )
         self.assertLess(
-            windows_installer.index('상주 감시가 $ExitTimeoutSeconds초 안에 종료되지 않아 업데이트를 중단합니다.'),
+            windows_installer.index('상주 감시가 ${ExitTimeoutSeconds}초 안에 종료되지 않아 업데이트를 중단합니다.'),
             windows_installer.index('        "replace-runtime", "--token"'),
         )
 
