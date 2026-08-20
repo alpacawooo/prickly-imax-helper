@@ -515,27 +515,128 @@ class CheckoutFlow:
         )
         if not result.get("ok") or int(result.get("count", 0)) != party:
             raise SeatVanished(f"target seat vanished: {result.get('missing')}")
+        try:
+            self.page.wait_for_function(
+                r"""wanted => {
+                  const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+                  const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+                  return wanted.every(seat => {
+                    const candidates = [...document.querySelectorAll('button[data-seatlocno]')]
+                      .filter(element => visible(element) && compact(element.textContent) === seat);
+                    return candidates.length === 1 &&
+                      (String(candidates[0].className).includes('seatSelected') ||
+                       candidates[0].getAttribute('aria-pressed') === 'true');
+                  });
+                }""",
+                arg=seats,
+                timeout=10_000,
+            )
+        except PlaywrightTimeoutError as exc:
+            raise SeatVanished("target seat selection was not confirmed") from exc
 
     def select_party_and_seats(self, match: dict[str, Any]) -> None:
         self._select_general_party(int(self.config["party_size"]))
         self._select_seats(match)
 
     def open_payment_and_apply_vouchers(self) -> None:
+        order_button_ready = r"""() => {
+          const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+          const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+          return [...document.querySelectorAll('button')]
+            .filter(element => visible(element) && !element.disabled &&
+              /원\s*결제하기$/.test(compact(element.textContent))).length === 1;
+        }"""
+        try:
+            self.page.wait_for_function(order_button_ready, timeout=10_000)
+        except PlaywrightTimeoutError as exc:
+            raise CheckoutError("seat order button not available") from exc
         clicked = self.page.evaluate(
-            r"""() => { const buttons = [...document.querySelectorAll('button')].filter(b => b.offsetParent && !b.disabled);
-            const b = buttons.find(x => /원\s*결제하기$/.test(x.textContent.replace(/\s+/g, ' ').trim()));
-            if (!b) return false; b.click(); return true; }"""
+            r"""() => {
+              const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+              const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+              const buttons = [...document.querySelectorAll('button')]
+                .filter(element => visible(element) && !element.disabled &&
+                  /원\s*결제하기$/.test(compact(element.textContent)));
+              if (buttons.length !== 1) return false;
+              buttons[0].click();
+              return true;
+            }"""
         )
         if not clicked:
             raise CheckoutError("seat order button not available")
-        self._wait("() => [...document.querySelectorAll('button')].some(b => b.offsetParent && /관람권|기프트콘/.test(b.textContent))")
+        payment_transition_ready = r"""() => {
+          const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+          const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+          const modalSelector = '[role="dialog"],[role="alertdialog"],[aria-modal="true"],[class*="modal" i],[class*="popup" i]';
+          const voucherReady = [...document.querySelectorAll('button')]
+            .some(element => visible(element) && !element.disabled && /관람권|기프트콘/.test(compact(element.textContent)));
+          const titles = [...document.querySelectorAll('body *')].filter(element =>
+            visible(element) && compact(element.textContent) === '결제 전 확인해 주세요' &&
+            ![...element.children].some(child => visible(child) && compact(child.textContent) === '결제 전 확인해 주세요'));
+          if (!titles.length) return voucherReady;
+          const resolved = titles.map(title => title.closest(modalSelector));
+          if (resolved.some(container => !container)) return true;
+          const containers = [...new Set(resolved)].filter(visible);
+          if (containers.length !== 1) return true;
+          const buttons = [...containers[0].querySelectorAll('button')]
+            .filter(element => visible(element) && compact(element.textContent) === '결제하기');
+          if (buttons.length > 1) return true;
+          return buttons.length === 1 && !buttons[0].disabled;
+        }"""
+        try:
+            self.page.wait_for_function(payment_transition_ready, timeout=45_000)
+        except PlaywrightTimeoutError as exc:
+            raise CheckoutError("payment confirmation or voucher section not available") from exc
+
+        popup_result = self.page.evaluate(
+            r"""() => {
+              const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+              const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+              const modalSelector = '[role="dialog"],[role="alertdialog"],[aria-modal="true"],[class*="modal" i],[class*="popup" i]';
+              const voucherReady = [...document.querySelectorAll('button')]
+                .some(element => visible(element) && !element.disabled && /관람권|기프트콘/.test(compact(element.textContent)));
+              const titles = [...document.querySelectorAll('body *')].filter(element =>
+                visible(element) && compact(element.textContent) === '결제 전 확인해 주세요' &&
+                ![...element.children].some(child => visible(child) && compact(child.textContent) === '결제 전 확인해 주세요'));
+              if (!titles.length) return voucherReady ? 'absent' : 'unsafe';
+              const resolved = titles.map(title => title.closest(modalSelector));
+              if (resolved.some(container => !container)) return 'unsafe';
+              const containers = [...new Set(resolved)].filter(visible);
+              if (containers.length !== 1) return 'unsafe';
+              const buttons = [...containers[0].querySelectorAll('button')]
+                .filter(element => visible(element) && compact(element.textContent) === '결제하기');
+              if (buttons.length !== 1 || buttons[0].disabled || !buttons[0].isConnected) return 'unsafe';
+              const freshTitles = [...containers[0].querySelectorAll('*')].filter(element =>
+                visible(element) && compact(element.textContent) === '결제 전 확인해 주세요' &&
+                ![...element.children].some(child => visible(child) && compact(child.textContent) === '결제 전 확인해 주세요'));
+              if (freshTitles.length !== 1) return 'unsafe';
+              buttons[0].click();
+              return 'clicked';
+            }"""
+        )
+        if popup_result == "unsafe":
+            raise CheckoutError("payment confirmation popup is ambiguous")
+        try:
+            self.page.wait_for_function(
+                r"""() => {
+                  const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+                  return [...document.querySelectorAll('button')]
+                    .some(element => visible(element) && !element.disabled && /관람권|기프트콘/.test(element.textContent || ''));
+                }""",
+                timeout=45_000,
+            )
+        except PlaywrightTimeoutError as exc:
+            raise PaymentBlocked("voucher section not found") from exc
         opened = self.page.evaluate(
             r"""() => { const b = [...document.querySelectorAll('button')].find(x =>
             x.offsetParent && !x.disabled && /관람권|기프트콘/.test(x.textContent)); if (!b) return false; b.click(); return true; }"""
         )
         if not opened:
             raise PaymentBlocked("voucher section not found")
-        self._wait("() => document.body.innerText.includes('IMAX 영화관람권')")
+        try:
+            self._wait("() => document.body.innerText.includes('IMAX 영화관람권')")
+        except PlaywrightTimeoutError as exc:
+            raise PaymentBlocked("voucher options not found") from exc
         count = int(self.config["payment"]["voucher_count"])
         selected = self.page.evaluate(
             r"""count => { const candidates = [...document.querySelectorAll('button,label')].filter(x =>

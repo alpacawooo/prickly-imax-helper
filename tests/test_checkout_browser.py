@@ -4,7 +4,13 @@ import datetime as dt
 import unittest
 
 from prickly_imax_helper.browser import CHROME
-from prickly_imax_helper.checkout import CheckoutError, CheckoutFlow, PaymentBlocked, UnknownAfterSubmit
+from prickly_imax_helper.checkout import (
+    CheckoutError,
+    CheckoutFlow,
+    PaymentBlocked,
+    SeatVanished,
+    UnknownAfterSubmit,
+)
 from prickly_imax_helper.presets import odyssey
 
 
@@ -19,6 +25,21 @@ HTML = """<!doctype html><meta charset=utf-8>
 <label>IMAX 영화관람권<input type=checkbox checked></label>
 <label>IMAX 영화관람권<input type=checkbox checked></label>
 <button id=submit onclick=\"window.clicked=(window.clicked||0)+1\">0원 결제하기</button>"""
+
+
+class _CappedTimeoutPage:
+    """Keep fail-closed browser fixtures fast without changing production limits."""
+
+    def __init__(self, page, timeout_ms=1_000):
+        self._page = page
+        self._timeout_ms = timeout_ms
+
+    def wait_for_function(self, expression, *, arg=None, timeout=None):
+        timeout = self._timeout_ms if timeout is None else min(timeout, self._timeout_ms)
+        return self._page.wait_for_function(expression, arg=arg, timeout=timeout)
+
+    def __getattr__(self, name):
+        return getattr(self._page, name)
 
 
 @unittest.skipIf(sync_playwright is None or CHROME is None or not CHROME.is_file(), "Playwright and system Chrome are required")
@@ -41,6 +62,25 @@ class CheckoutBrowserTests(unittest.TestCase):
 
     def tearDown(self):
         self.page.close()
+
+    def _cap_checkout_waits(self, timeout_ms=1_000):
+        self.flow.page = _CappedTimeoutPage(self.page, timeout_ms)
+
+    def _set_payment_content(self, body, script=""):
+        self.page.set_content(
+            f"""<!doctype html><meta charset=utf-8>
+            <script>window.orderClicks=0;window.popupClicks=0;window.finalSubmitClicks=0;{script}</script>
+            {body}
+            <button id=final-submit style=display:none
+              onclick="window.finalSubmitClicks += 1">0원 결제하기</button>"""
+        )
+
+    def _voucher_markup(self):
+        return """<button id=voucher-section>관람권</button>
+          <button>IMAX 영화관람권 A</button><button>IMAX 영화관람권 B</button><button>적용</button>"""
+
+    def _assert_no_final_submit(self):
+        self.assertEqual(self.page.evaluate("() => window.finalSubmitClicks"), 0)
 
     def test_exact_proof_clicks_once_and_cannot_repeat(self):
         self.flow.prove_ready(self.match)
@@ -306,6 +346,256 @@ class CheckoutBrowserTests(unittest.TestCase):
             self.flow._select_general_party(2, timeout_ms=500)
 
         self.assertEqual(self.page.evaluate("() => window.general"), 1)
+
+    def test_waits_for_all_clicked_seats_to_be_confirmed(self):
+        self._cap_checkout_waits()
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8><script>window.orderClicks=0;window.finalSubmitClicks=0</script>
+            <button data-seatlocno onclick="setTimeout(() => this.classList.add('seatSelected'), 300)">H15</button>
+            <button data-seatlocno onclick="setTimeout(() => this.setAttribute('aria-pressed','true'), 300)">H16</button>
+            <button onclick="window.orderClicks += 1">30,000원 결제하기</button>
+            <button onclick="window.finalSubmitClicks += 1">0원 결제하기</button>"""
+        )
+
+        self.flow._select_seats(self.match)
+
+        seats = self.page.locator("button[data-seatlocno]")
+        self.assertTrue(seats.nth(0).evaluate("e => e.classList.contains('seatSelected')"))
+        self.assertEqual(seats.nth(1).get_attribute("aria-pressed"), "true")
+        self.assertEqual(self.page.evaluate("() => window.orderClicks"), 0)
+        self._assert_no_final_submit()
+
+    def test_unconfirmed_requested_seat_blocks_order_and_final_submit(self):
+        self._cap_checkout_waits(500)
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8><script>window.orderClicks=0;window.finalSubmitClicks=0</script>
+            <button data-seatlocno onclick="this.classList.add('seatSelected')">H15</button>
+            <button data-seatlocno>H16</button>
+            <button onclick="window.orderClicks += 1">30,000원 결제하기</button>
+            <button onclick="window.finalSubmitClicks += 1">0원 결제하기</button>"""
+        )
+
+        with self.assertRaisesRegex(SeatVanished, "target seat selection was not confirmed"):
+            self.flow._select_seats(self.match)
+
+        self.assertEqual(self.page.evaluate("() => window.orderClicks"), 0)
+        self._assert_no_final_submit()
+
+    def test_waits_for_one_delayed_enabled_order_button_and_clicks_once(self):
+        self._cap_checkout_waits()
+        vouchers = self._voucher_markup().replace("`", "\\`")
+        self._set_payment_content(
+            """<button id=order disabled onclick="window.orderClicks += 1;
+              document.body.insertAdjacentHTML('beforeend', window.vouchers)">30,000원 결제하기</button>""",
+            f"window.vouchers=`{vouchers}`;setTimeout(() => order.disabled=false, 500);",
+        )
+
+        self.flow.open_payment_and_apply_vouchers()
+
+        self.assertEqual(self.page.evaluate("() => window.orderClicks"), 1)
+        self._assert_no_final_submit()
+
+    def test_invalid_order_button_states_fail_closed(self):
+        cases = {
+            "missing": "",
+            "duplicate": "<button onclick='window.orderClicks+=1'>30,000원 결제하기</button><button onclick='window.orderClicks+=1'>30,000원 결제하기</button>",
+            "hidden": "<button style='display:none' onclick='window.orderClicks+=1'>30,000원 결제하기</button>",
+            "disabled": "<button disabled onclick='window.orderClicks+=1'>30,000원 결제하기</button>",
+            "wrong-text": "<button onclick='window.orderClicks+=1'>30,000원 결제</button>",
+        }
+        for name, body in cases.items():
+            with self.subTest(name=name):
+                self._cap_checkout_waits(150)
+                self._set_payment_content(body)
+                with self.assertRaises(CheckoutError):
+                    self.flow.open_payment_and_apply_vouchers()
+                self.assertEqual(self.page.evaluate("() => window.orderClicks"), 0)
+                self._assert_no_final_submit()
+
+    def test_popup_absent_existing_voucher_flow_still_succeeds(self):
+        self._cap_checkout_waits()
+        vouchers = self._voucher_markup().replace("`", "\\`")
+        self._set_payment_content(
+            """<button id=order onclick="window.orderClicks += 1;
+              document.body.insertAdjacentHTML('beforeend', window.vouchers)">30,000원 결제하기</button>""",
+            f"window.vouchers=`{vouchers}`;",
+        )
+
+        self.flow.open_payment_and_apply_vouchers()
+
+        self.assertEqual(self.page.evaluate("() => window.orderClicks"), 1)
+        self.assertEqual(self.page.evaluate("() => window.popupClicks"), 0)
+        self._assert_no_final_submit()
+
+    def test_delayed_exact_popup_clicks_only_its_exact_payment_button(self):
+        self._cap_checkout_waits()
+        vouchers = self._voucher_markup().replace("`", "\\`")
+        self._set_payment_content(
+            """<button id=order onclick="window.delayedPopup()">
+              30,000원 결제하기</button>
+              <button onclick="window.outsideClicks=(window.outsideClicks||0)+1">결제하기</button>""",
+            f"""window.vouchers=`{vouchers}`;window.delayedPopup=()=>{{window.orderClicks+=1;setTimeout(()=>
+              document.body.insertAdjacentHTML('beforeend',`<div role=dialog><h2>결제 전 확인해 주세요</h2>
+              <button onclick=\"window.popupClicks+=1;document.body.insertAdjacentHTML('beforeend',window.vouchers)\">결제하기</button></div>`),100)}};""",
+        )
+
+        self.flow.open_payment_and_apply_vouchers()
+
+        self.assertEqual(self.page.evaluate("() => window.popupClicks"), 1)
+        self.assertIsNone(self.page.evaluate("() => window.outsideClicks"))
+        self._assert_no_final_submit()
+
+    def test_visible_popup_takes_priority_over_coexisting_voucher_ui(self):
+        self._cap_checkout_waits()
+        vouchers = self._voucher_markup().replace("`", "\\`")
+        popup = """<div role=dialog><h2>결제 전 확인해 주세요</h2>
+          <button onclick="window.popupClicks+=1">결제하기</button></div>"""
+        self._set_payment_content(
+            """<button id=order onclick="window.orderClicks+=1;
+              document.body.insertAdjacentHTML('beforeend',window.transitionMarkup)">30,000원 결제하기</button>""",
+            f"window.transitionMarkup=`{popup + vouchers}`;",
+        )
+
+        self.flow.open_payment_and_apply_vouchers()
+
+        self.assertEqual(self.page.evaluate("() => window.popupClicks"), 1)
+        self._assert_no_final_submit()
+
+    def test_non_heading_title_inside_known_modal_container_is_supported(self):
+        self._cap_checkout_waits()
+        vouchers = self._voucher_markup().replace("`", "\\`")
+        popup = """<section class=bottom-modal><div>결제 전 확인해 주세요</div>
+          <button onclick="window.popupClicks+=1;document.body.insertAdjacentHTML('beforeend',window.vouchers)">
+          결제하기</button></section>"""
+        self._set_payment_content(
+            """<button id=order onclick="window.orderClicks+=1;
+              document.body.insertAdjacentHTML('beforeend',window.popupMarkup)">30,000원 결제하기</button>""",
+            f"window.vouchers=`{vouchers}`;window.popupMarkup=`{popup}`;",
+        )
+
+        self.flow.open_payment_and_apply_vouchers()
+
+        self.assertEqual(self.page.evaluate("() => window.popupClicks"), 1)
+        self._assert_no_final_submit()
+
+    def test_exact_title_in_arbitrary_page_section_is_not_treated_as_popup(self):
+        self._cap_checkout_waits(250)
+        section = """<section><div>결제 전 확인해 주세요</div>
+          <button onclick="window.popupClicks+=1">결제하기</button></section>"""
+        self._set_payment_content(
+            """<button id=order onclick="window.orderClicks+=1;
+              document.body.insertAdjacentHTML('beforeend',window.sectionMarkup)">30,000원 결제하기</button>""",
+            f"window.sectionMarkup=`{section}`;",
+        )
+
+        with self.assertRaises(CheckoutError):
+            self.flow.open_payment_and_apply_vouchers()
+
+        self.assertEqual(self.page.evaluate("() => window.popupClicks"), 0)
+        self._assert_no_final_submit()
+
+    def test_waits_for_delayed_popup_payment_button(self):
+        self._cap_checkout_waits()
+        vouchers = self._voucher_markup().replace("`", "\\`")
+        popup = """<div role=dialog><h2>결제 전 확인해 주세요</h2><div id=popup-actions></div></div>"""
+        self._set_payment_content(
+            """<button id=order onclick="window.showPopup()">30,000원 결제하기</button>""",
+            f"""window.vouchers=`{vouchers}`;window.showPopup=()=>{{window.orderClicks+=1;
+              document.body.insertAdjacentHTML('beforeend',`{popup}`);setTimeout(() =>
+              document.querySelector('#popup-actions').insertAdjacentHTML('beforeend',
+              `<button onclick=\"window.popupClicks+=1;document.body.insertAdjacentHTML('beforeend',window.vouchers)\">결제하기</button>`),300)}};""",
+        )
+
+        self.flow.open_payment_and_apply_vouchers()
+
+        self.assertEqual(self.page.evaluate("() => window.popupClicks"), 1)
+        self._assert_no_final_submit()
+
+    def test_duplicate_exact_popup_containers_fail_without_clicking_either(self):
+        self._cap_checkout_waits(300)
+        popup = """<div role=dialog><h2>결제 전 확인해 주세요</h2>
+          <button onclick="window.popupClicks+=1">결제하기</button></div>"""
+        self._set_payment_content(
+            """<button id=order onclick="window.orderClicks+=1;
+              document.body.insertAdjacentHTML('beforeend',window.popups)">30,000원 결제하기</button>""",
+            f"window.popups=`{popup + popup}`;",
+        )
+
+        with self.assertRaises(CheckoutError):
+            self.flow.open_payment_and_apply_vouchers()
+
+        self.assertEqual(self.page.evaluate("() => window.popupClicks"), 0)
+        self._assert_no_final_submit()
+
+    def test_unsafe_popup_titles_and_buttons_fail_without_any_payment_click(self):
+        cases = {
+            "wrong-title": """<div role=dialog><h2>결제 전 꼭 확인해 주세요</h2>
+              <button onclick="window.popupClicks+=1">결제하기</button></div>""",
+            "duplicate-buttons": """<div role=dialog><h2>결제 전 확인해 주세요</h2>
+              <button onclick="window.popupClicks+=1">결제하기</button><button onclick="window.popupClicks+=1">결제하기</button></div>""",
+            "disabled-button": """<div role=dialog><h2>결제 전 확인해 주세요</h2>
+              <button disabled onclick="window.popupClicks+=1">결제하기</button></div>""",
+            "outside-only": """<div role=dialog><h2>결제 전 확인해 주세요</h2></div>
+              <button onclick="window.popupClicks+=1">결제하기</button>""",
+        }
+        for name, popup in cases.items():
+            with self.subTest(name=name):
+                self._cap_checkout_waits(200)
+                self._set_payment_content(
+                    """<button id=order onclick="window.orderClicks+=1;
+                      document.body.insertAdjacentHTML('beforeend',window.popupMarkup)">30,000원 결제하기</button>""",
+                    f"window.popupMarkup=`{popup}`;",
+                )
+                with self.assertRaises(CheckoutError):
+                    self.flow.open_payment_and_apply_vouchers()
+                self.assertEqual(self.page.evaluate("() => window.popupClicks"), 0)
+                self._assert_no_final_submit()
+
+    def test_waits_for_delayed_voucher_ui_after_popup_confirmation(self):
+        self._cap_checkout_waits()
+        vouchers = self._voucher_markup().replace("`", "\\`")
+        popup = """<div role=dialog><h2>결제 전 확인해 주세요</h2>
+          <button onclick="window.popupClicks+=1;setTimeout(() => document.body.insertAdjacentHTML('beforeend',window.vouchers),500)">
+          결제하기</button></div>"""
+        self._set_payment_content(
+            """<button id=order onclick="window.orderClicks+=1;
+              document.body.insertAdjacentHTML('beforeend',window.popupMarkup)">30,000원 결제하기</button>""",
+            f"window.vouchers=`{vouchers}`;window.popupMarkup=`{popup}`;",
+        )
+
+        self.flow.open_payment_and_apply_vouchers()
+
+        self.assertEqual(self.page.evaluate("() => window.popupClicks"), 1)
+        self._assert_no_final_submit()
+
+    def test_missing_voucher_ui_after_popup_confirmation_fails_closed(self):
+        self._cap_checkout_waits(200)
+        popup = """<div role=dialog><h2>결제 전 확인해 주세요</h2>
+          <button onclick="window.popupClicks+=1">결제하기</button></div>"""
+        self._set_payment_content(
+            """<button id=order onclick="window.orderClicks+=1;
+              document.body.insertAdjacentHTML('beforeend',window.popupMarkup)">30,000원 결제하기</button>""",
+            f"window.popupMarkup=`{popup}`;",
+        )
+
+        with self.assertRaises(CheckoutError):
+            self.flow.open_payment_and_apply_vouchers()
+
+        self.assertEqual(self.page.evaluate("() => window.popupClicks"), 1)
+        self._assert_no_final_submit()
+
+    def test_missing_voucher_options_after_section_open_is_payment_blocked(self):
+        self._cap_checkout_waits(200)
+        self._set_payment_content(
+            """<button id=order onclick="window.orderClicks+=1;
+              document.body.insertAdjacentHTML('beforeend','<button id=voucher-section>관람권</button>')">
+              30,000원 결제하기</button>"""
+        )
+
+        with self.assertRaises(PaymentBlocked):
+            self.flow.open_payment_and_apply_vouchers()
+
+        self._assert_no_final_submit()
 
 
 if __name__ == "__main__":
