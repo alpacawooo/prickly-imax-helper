@@ -127,7 +127,7 @@ class CheckoutNoSubmitProbeTests(unittest.TestCase):
                     sys.executable,
                     str(ROOT / "scripts/build_release.py"),
                     "--version",
-                    "0.2.3",
+                    "0.2.4",
                     "--authorization",
                     str(authorization),
                     "--output",

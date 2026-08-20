@@ -27,7 +27,9 @@ def main() -> int:
     if system == "Darwin":
         chrome_candidates = [Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")]
         service = shutil.which("launchctl")
-        notifier = Path("/usr/bin/osascript") if Path("/usr/bin/osascript").is_file() else None
+        mail_candidates = [Path("/System/Applications/Mail.app"), Path("/Applications/Mail.app")]
+        mail_path = next((candidate for candidate in mail_candidates if candidate.is_dir()), None)
+        notifier = Path("/usr/bin/osascript") if mail_path and Path("/usr/bin/osascript").is_file() else None
     elif system == "Windows":
         chrome_candidates = []
         for variable in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"):
@@ -36,17 +38,23 @@ def main() -> int:
                 chrome_candidates.append(Path(base) / "Google" / "Chrome" / "Application" / "chrome.exe")
         service = shutil.which("schtasks.exe")
         notifier = shutil.which("powershell.exe") or shutil.which("powershell")
+        mail_path = None
     else:
         chrome_candidates = []
         service = None
         notifier = None
+        mail_path = None
     chrome = next((candidate for candidate in chrome_candidates if candidate.is_file()), None)
     checks = {
         "operating_system": {"ok": system in {"Darwin", "Windows"}, "value": platform.platform()},
         "python": {"ok": sys.version_info >= (3, 10), "value": sys.version.split()[0]},
         "chrome": {"ok": chrome is not None, "path": str(chrome) if chrome else None},
         "resident_service": {"ok": service is not None, "path": service},
-        "notification_backend": {"ok": notifier is not None, "path": str(notifier) if notifier else None},
+        "notification_backend": {
+            "ok": notifier is not None,
+            "path": str(notifier) if notifier else None,
+            "mail_path": str(mail_path) if mail_path else None,
+        },
     }
     required_ok = all(item["ok"] for item in checks.values())
     print(json.dumps({"status": "ok" if required_ok else "needs_setup", "checks": checks}, ensure_ascii=False, indent=2))

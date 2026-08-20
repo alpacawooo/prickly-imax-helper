@@ -4,22 +4,32 @@ import os
 import platform
 import shutil
 import subprocess
+from pathlib import Path
 
 
-MAIL_SCRIPT = r'''
+APPLE_MAIL_PATHS = (Path("/System/Applications/Mail.app"), Path("/Applications/Mail.app"))
+
+
+def mail_script(mail_path: Path) -> str:
+    if mail_path not in APPLE_MAIL_PATHS:
+        raise ValueError("untrusted Apple Mail path")
+    return rf'''
 on run argv
   set recipientAddress to item 1 of argv
   set messageSubject to item 2 of argv
   set messageBody to item 3 of argv
-  tell application "Mail"
-    set outgoingMessage to make new outgoing message with properties {subject:messageSubject, content:messageBody & return & return, visible:false}
+  tell application "{mail_path}"
+    set outgoingMessage to make new outgoing message with properties {{subject:messageSubject, content:messageBody & return & return, visible:false}}
     tell outgoingMessage
-      make new to recipient at end of to recipients with properties {address:recipientAddress}
+      make new to recipient at end of to recipients with properties {{address:recipientAddress}}
       send
     end tell
   end tell
 end run
 '''
+
+
+MAIL_SCRIPT = mail_script(APPLE_MAIL_PATHS[0])
 
 OUTLOOK_SCRIPT = r'''
 $ErrorActionPreference = 'Stop'
@@ -53,6 +63,10 @@ def powershell_executable() -> str | None:
     return shutil.which("powershell.exe") or shutil.which("powershell")
 
 
+def apple_mail_path() -> Path | None:
+    return next((path for path in APPLE_MAIL_PATHS if path.is_dir()), None)
+
+
 def notification_method() -> str:
     if platform.system() == "Darwin":
         return "apple_mail"
@@ -81,8 +95,11 @@ def _run_powershell(script: str, environment: dict[str, str], timeout: int) -> s
 def send_email(recipient: str, subject: str, body: str, timeout: int = 20) -> None:
     system = platform.system()
     if system == "Darwin":
+        mail_path = apple_mail_path()
+        if mail_path is None:
+            raise RuntimeError("Apple Mail is not installed at a supported system location")
         process = subprocess.run(
-            ["/usr/bin/osascript", "-e", MAIL_SCRIPT, recipient, subject, body],
+            ["/usr/bin/osascript", "-e", mail_script(mail_path), recipient, subject, body],
             text=True,
             capture_output=True,
             timeout=timeout,
