@@ -6,7 +6,7 @@ The repository contains no CGV credentials, customer identifiers, cookies, vouch
 
 ## Public release flow
 
-1. Release 0.2.4 is the next immutable package. Its artifacts and SHA-256 values are not published yet; do not install until the blocked placeholders in the onboarding guide are replaced by final audited hashes.
+1. Download only the operating-system archive attached to the immutable GitHub release, and install only when the onboarding guide contains the same audited 64-character SHA-256 value. A blocked placeholder means installation must stop.
 2. Verify the checksum, extract the release, and run `scripts/Install.command` on macOS or `scripts/Install.ps1` on Windows.
 3. In the localhost-only setup page, open the dedicated Chrome profile and log in to CGV personally.
 4. Keep or edit the Odyssey preset (movie, CGV theater, IMAX format, time windows, minimum lead time, party size, rows, edge exclusion, and seat priority), then confirm the notification email and one-time automatic voucher-submission consent.
@@ -14,7 +14,7 @@ The repository contains no CGV credentials, customer identifiers, cookies, vouch
 
 ### Windows 10/11 one-line install
 
-After 0.2.4 is published with audited hashes, download only `prickly-imax-helper-0.2.4.zip` and leave the original ZIP unextracted. Use the PowerShell command in [docs/notion-quick-start.md](docs/notion-quick-start.md). It searches the default Downloads folder, the Desktop, and Desktop subfolders such as a custom Chrome download folder. If the ZIP is missing, the command stops before hashing and prints only the download instruction. If the ZIP exists but the SHA-256 differs, it stops with a separate wrong-version or damaged-file message. Only a matching ZIP is extracted and installed.
+For release 0.2.4, download only `prickly-imax-helper-0.2.4.zip` and leave the original ZIP unextracted. Use the PowerShell command in [docs/notion-quick-start.md](docs/notion-quick-start.md) only after its expected value is a real 64-character SHA-256 rather than a blocked placeholder. It searches the default Downloads folder, the Desktop, and Desktop subfolders such as a custom Chrome download folder. If the ZIP is missing, the command stops before hashing and prints only the download instruction. If the ZIP exists but the SHA-256 differs, it stops with a separate wrong-version or damaged-file message. Only a matching ZIP is extracted and installed.
 
 No password or payment credential is entered into Prickly AI, Codex, Notion, GitHub, or the helper.
 Python is not a user prerequisite; the installer bootstraps a checksum-verified, pinned `uv` binary and managed Python. It installs only the locked runtime dependencies and generates a local launcher without resolving a separate project build backend.
