@@ -418,7 +418,7 @@ function ConvertFrom-StrictOldCliJson {
     $SafeStatus = @("unconfigured", "login_required", "armed", "staging", "completed", "recovering", "rate_limited", "blocked_duplicate", "blocked_payment", "fatal", "stopped")
     if ($Payload["status"] -isnot [string]) { throw "기존 CLI 상태가 없어 업데이트를 중단합니다." }
     if ($StopPayload) {
-        if ($Payload.Count -ne 2 -or -not $Payload.Contains("ok") -or -not $Payload.Contains("status") -or $Payload["ok"] -isnot [bool] -or -not $Payload["ok"] -or $Payload["status"] -notin @("completed", "blocked_duplicate", "blocked_payment", "fatal", "stopped")) {
+        if ($Payload.Count -ne 2 -or -not ($Payload.Keys -contains "ok") -or -not ($Payload.Keys -contains "status") -or $Payload["ok"] -isnot [bool] -or -not $Payload["ok"] -or $Payload["status"] -notin @("completed", "blocked_duplicate", "blocked_payment", "fatal", "stopped")) {
             throw "기존 CLI 중지 결과를 안전하게 증명하지 못해 업데이트를 중단합니다."
         }
     } elseif ($Payload["status"] -notin $SafeStatus) {

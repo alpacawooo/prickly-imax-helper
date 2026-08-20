@@ -444,6 +444,17 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn("'$env:PRICKLY_INSTALL_SAFETY_LIBRARY = \"1\"'", source)
         self.assertNotIn("'`$env:PRICKLY_INSTALL_SAFETY_LIBRARY", source)
 
+    def test_windows_old_cli_json_uses_powershell_5_compatible_key_checks(self):
+        """JavaScriptSerializer dictionaries must not use an ambiguous generic Contains overload."""
+
+        installer = (ROOT / "scripts/Install.ps1").read_text(encoding="utf-8-sig")
+        parser = installer.split("function ConvertFrom-StrictOldCliJson {", 1)[1].split(
+            "function Get-ExistingTaskInspection {", 1
+        )[0]
+        self.assertIn('$Payload.Keys -contains "ok"', parser)
+        self.assertIn('$Payload.Keys -contains "status"', parser)
+        self.assertNotIn('$Payload.Contains(', parser)
+
     def test_installer_avoids_unlocked_project_build_backend(self):
         installer = (ROOT / "scripts/Install.command").read_text(encoding="utf-8")
         self.assertIn("--no-install-project", installer)
