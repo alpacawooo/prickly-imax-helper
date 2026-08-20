@@ -183,7 +183,16 @@ def main() -> int:
             source = root / name
             destination = stage / name
             if source.is_dir():
-                shutil.copytree(source, destination, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.egg-info"))
+                shutil.copytree(
+                    source,
+                    destination,
+                    ignore=shutil.ignore_patterns(
+                        "__pycache__",
+                        "*.pyc",
+                        "*.egg-info",
+                        "cgv_checkout_no_submit_probe.py",
+                    ),
+                )
             else:
                 shutil.copy2(source, destination)
         (stage / "AUTHORIZATION.json").write_text(
