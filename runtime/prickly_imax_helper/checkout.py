@@ -263,8 +263,19 @@ class CheckoutFlow:
         search.fill(theater)
         exact = self.page.get_by_role("button", name=theater, exact=True)
         self._wait(
-            "theater => [...document.querySelectorAll('button')].some(b => "
-            "b.offsetParent && !b.disabled && b.textContent.trim() === theater)",
+            r"""theater => {
+              const compact = value => (value || '').replace(/\s+/g, ' ').trim();
+              const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+              const matchesDistanceRow = element => {
+                const text = compact(element.textContent);
+                if (!text.startsWith(theater)) return false;
+                const suffix = text.slice(theater.length).trim();
+                return /^\d+(?:\.\d+)?\s*(?:km|m)$/i.test(suffix);
+              };
+              return [...document.querySelectorAll('button, [role="button"], a[href]')].some(element =>
+                visible(element) && !element.disabled &&
+                (compact(element.textContent) === theater || matchesDistanceRow(element)));
+            }""",
             20_000,
             theater,
         )
@@ -289,9 +300,18 @@ class CheckoutFlow:
                 r"""theater => {
                   const compact = value => (value || '').replace(/\s+/g, ' ').trim();
                   const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
-                  return [...document.querySelectorAll('button')].filter(button =>
-                    visible(button) && !button.disabled && button.closest('li') && !button.closest('.search-result') &&
-                    compact(button.textContent) === theater).length === 1;
+                  const candidates = [...document.querySelectorAll('button, [role="button"], a[href]')].filter(element =>
+                    visible(element) && !element.disabled && !element.closest('.search-result'));
+                  const listedExact = candidates.filter(element =>
+                    element.closest('li') && compact(element.textContent) === theater);
+                  const distanceRows = candidates.filter(element => {
+                    const text = compact(element.textContent);
+                    if (!text.startsWith(theater)) return false;
+                    const suffix = text.slice(theater.length).trim();
+                    return /^\d+(?:\.\d+)?\s*(?:km|m)$/i.test(suffix);
+                  });
+                  const choices = listedExact.length ? listedExact : distanceRows;
+                  return choices.length === 1;
                 }""",
                 10_000,
                 theater,
@@ -302,11 +322,19 @@ class CheckoutFlow:
             r"""theater => {
               const compact = value => (value || '').replace(/\s+/g, ' ').trim();
               const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
-              const rows = [...document.querySelectorAll('button')].filter(button =>
-                visible(button) && !button.disabled && button.closest('li') && !button.closest('.search-result') &&
-                compact(button.textContent) === theater);
-              if (rows.length !== 1) return false;
-              rows[0].click();
+              const candidates = [...document.querySelectorAll('button, [role="button"], a[href]')].filter(element =>
+                visible(element) && !element.disabled && !element.closest('.search-result'));
+              const listedExact = candidates.filter(element =>
+                element.closest('li') && compact(element.textContent) === theater);
+              const distanceRows = candidates.filter(element => {
+                const text = compact(element.textContent);
+                if (!text.startsWith(theater)) return false;
+                const suffix = text.slice(theater.length).trim();
+                return /^\d+(?:\.\d+)?\s*(?:km|m)$/i.test(suffix);
+              });
+              const choices = listedExact.length ? listedExact : distanceRows;
+              if (choices.length !== 1) return false;
+              choices[0].click();
               return true;
             }""",
             theater,
@@ -322,11 +350,19 @@ class CheckoutFlow:
                 r"""theater => {
                   const compact = value => (value || '').replace(/\s+/g, ' ').trim();
                   const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
-                  const rows = [...document.querySelectorAll('button')].filter(button =>
-                    visible(button) && !button.disabled && button.closest('li') && !button.closest('.search-result') &&
-                    compact(button.textContent) === theater);
-                  if (rows.length !== 1) return false;
-                  rows[0].click();
+                  const candidates = [...document.querySelectorAll('button, [role="button"], a[href]')].filter(element =>
+                    visible(element) && !element.disabled && !element.closest('.search-result'));
+                  const listedExact = candidates.filter(element =>
+                    element.closest('li') && compact(element.textContent) === theater);
+                  const distanceRows = candidates.filter(element => {
+                    const text = compact(element.textContent);
+                    if (!text.startsWith(theater)) return false;
+                    const suffix = text.slice(theater.length).trim();
+                    return /^\d+(?:\.\d+)?\s*(?:km|m)$/i.test(suffix);
+                  });
+                  const choices = listedExact.length ? listedExact : distanceRows;
+                  if (choices.length !== 1) return false;
+                  choices[0].click();
                   return true;
                 }""",
                 theater,
