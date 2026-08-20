@@ -40,7 +40,7 @@ try {
     Set-Content -LiteralPath $CrashScript -Encoding UTF8 -Value @(
         '$ErrorActionPreference = "Stop"',
         "`$env:PRICKLY_IMAX_HOME = '$EscapedAppHome'",
-        '`$env:PRICKLY_INSTALL_SAFETY_LIBRARY = "1"',
+        '$env:PRICKLY_INSTALL_SAFETY_LIBRARY = "1"',
         ". '$InstallerSourcePath'",
         'New-Item -ItemType Directory -Force -Path (Join-Path $AppHome "state") | Out-Null',
         'Enter-InstallerGate',

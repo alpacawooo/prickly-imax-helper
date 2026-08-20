@@ -437,6 +437,13 @@ class ReleaseTests(unittest.TestCase):
         else:
             self.assertTrue(source.isascii(), "BOM-less Windows PowerShell 5.1 harness must be ASCII-only")
 
+    def test_windows_safety_harness_emits_executable_child_environment_assignments(self):
+        """Single-quoted child-script lines must not retain a literal PowerShell escape."""
+
+        source = (ROOT / "tests/test_install_safety.ps1").read_text(encoding="ascii")
+        self.assertIn("'$env:PRICKLY_INSTALL_SAFETY_LIBRARY = \"1\"'", source)
+        self.assertNotIn("'`$env:PRICKLY_INSTALL_SAFETY_LIBRARY", source)
+
     def test_installer_avoids_unlocked_project_build_backend(self):
         installer = (ROOT / "scripts/Install.command").read_text(encoding="utf-8")
         self.assertIn("--no-install-project", installer)
