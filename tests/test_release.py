@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -454,6 +455,38 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn('$Payload.Keys -contains "ok"', parser)
         self.assertIn('$Payload.Keys -contains "status"', parser)
         self.assertNotIn('$Payload.Contains(', parser)
+
+    def test_powershell_cmdlet_composite_arguments_are_parenthesized(self):
+        """PowerShell command argument mode must not split composite expressions."""
+
+        unsafe_argument = re.compile(
+            r"""(?mx)
+            ^[ \t]*[A-Za-z][A-Za-z0-9]*-[A-Za-z][A-Za-z0-9]*\b
+            [^\r\n]*?
+            -[A-Za-z][A-Za-z0-9]*[ \t]+
+            (?:
+                \$[A-Za-z_][A-Za-z0-9_:]*
+                |
+                '(?:''|[^'\r\n])*'
+                |
+                "(?:`.|[^"\r\n])*"
+            )
+            [ \t]+(?:\+|-f|-join|-replace|-split|-and|-or|-eq|-ne)[ \t]+
+            """
+        )
+        failures = []
+        paths = (*ROOT.glob("scripts/*.ps1"), *ROOT.glob("tests/*.ps1"))
+        for path in sorted(paths):
+            source = path.read_text(encoding="utf-8-sig")
+            for match in unsafe_argument.finditer(source):
+                line = source.count("\n", 0, match.start()) + 1
+                failures.append(f"{path.relative_to(ROOT)}:{line}: {match.group(0).strip()}")
+
+        self.assertEqual(
+            [],
+            failures,
+            "parenthesize composite expressions passed as cmdlet arguments:\n" + "\n".join(failures),
+        )
 
     def test_installer_avoids_unlocked_project_build_backend(self):
         installer = (ROOT / "scripts/Install.command").read_text(encoding="utf-8")

@@ -160,7 +160,7 @@ try {
     }
 
     $FakeCli = Join-Path $TempRoot "old-cli.cmd"
-    Set-Content -LiteralPath $FakeCli -Encoding ASCII -Value '@echo off' + "`r`n" + 'if "%3"=="status" (echo {"status":"armed"}) else (echo {"ok":true,"status":"stopped"})'
+    Set-Content -LiteralPath $FakeCli -Encoding ASCII -Value ('@echo off' + "`r`n" + 'if "%3"=="status" (echo {"status":"armed"}) else (echo {"ok":true,"status":"stopped"})')
     $script:QueryCount = 0
     $script:StopCount = 0
     $script:TaskStates = [System.Collections.Generic.Queue[string]]::new()
