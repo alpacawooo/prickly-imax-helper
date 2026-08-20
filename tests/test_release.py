@@ -533,8 +533,29 @@ class ReleaseTests(unittest.TestCase):
         self.assertLess(guide.index(zip_guard), guide.index(hash_check))
         self.assertIn("설치 ZIP 파일을 찾을 수 없습니다.", guide)
         self.assertIn("압축을 풀지 않은 원본 ZIP", guide)
-        self.assertIn("최종 릴리스 해시 확정 전입니다.", guide)
+        self.assertIn("체크섬이 일치하지 않습니다.", guide)
         self.assertNotIn("Get-FileHash $f -Algorithm SHA256", guide)
+
+    def test_release_docs_pin_audited_0_2_4_artifact_hashes(self):
+        guide = (ROOT / "docs/notion-quick-start.md").read_text(encoding="utf-8")
+        notes = (ROOT / "docs/release-notes-0.2.4.md").read_text(encoding="utf-8")
+        mac_hash = "18a37b78f05a40118df73db7d04d61e4d25de1840a8fd6e70a2de11a3ca1eb64"
+        windows_hash = "432caab792f69f2ccc3ea57be748c22755dd6a3df2c6356f1224d14a75bff3d2"
+
+        for document in (guide, notes):
+            self.assertIn(mac_hash, document)
+            self.assertIn(windows_hash, document)
+            self.assertNotIn("RELEASE_NOT_PUBLISHED", document)
+        self.assertIn(
+            "https://github.com/alpacawooo/prickly-imax-helper/releases/download/0.2.4/"
+            "prickly-imax-helper-0.2.4.tar.gz",
+            guide,
+        )
+        self.assertIn(
+            "https://github.com/alpacawooo/prickly-imax-helper/releases/download/0.2.4/"
+            "prickly-imax-helper-0.2.4.zip",
+            guide,
+        )
 
     def test_windows_quick_start_finds_zip_in_custom_desktop_download_folder(self):
         guide = (ROOT / "docs/notion-quick-start.md").read_text(encoding="utf-8")

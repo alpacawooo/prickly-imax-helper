@@ -1,6 +1,9 @@
 # Prickly IMAX Helper 0.2.4
 
-0.2.4 is the immutable release version for the login-required restart and safe-update hardening port. The final macOS and Windows artifacts and their SHA-256 values have not been published yet. Do not install a file labelled 0.2.4 until the public guide contains real 64-character hashes instead of `RELEASE_NOT_PUBLISHED`.
+0.2.4 is the immutable release version for the login-required restart and safe-update hardening port. Download only the operating-system archives attached to this GitHub Release and verify their SHA-256 values before installation.
+
+- macOS `prickly-imax-helper-0.2.4.tar.gz`: `18a37b78f05a40118df73db7d04d61e4d25de1840a8fd6e70a2de11a3ca1eb64`
+- Windows `prickly-imax-helper-0.2.4.zip`: `432caab792f69f2ccc3ea57be748c22755dd6a3df2c6356f1224d14a75bff3d2`
 
 ## 0.2.3 결제 팝업 안전 유지
 
