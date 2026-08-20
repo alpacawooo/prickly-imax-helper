@@ -159,6 +159,20 @@ try {
         if (-not $Rejected) { throw "accepted unsafe stop: $Case" }
     }
 
+    function Global:Get-ScheduledTask {
+        [CmdletBinding()]
+        param([string]$TaskName)
+        $MissingTaskError = [System.Management.Automation.ErrorRecord]::new(
+            [System.Exception]::new("task absent"),
+            "CmdletizationQuery_NotFound_TaskName",
+            [System.Management.Automation.ErrorCategory]::ObjectNotFound,
+            $TaskName
+        )
+        $PSCmdlet.ThrowTerminatingError($MissingTaskError)
+    }
+    $MissingInspection = Get-ExistingTaskInspection
+    if ($MissingInspection.Found -or $MissingInspection.State -ne "Missing") { throw "scheduled task absence was not recognized" }
+
     $FakeCli = Join-Path $TempRoot "old-cli.cmd"
     Set-Content -LiteralPath $FakeCli -Encoding ASCII -Value ('@echo off' + "`r`n" + 'if "%3"=="status" (echo {"status":"armed"}) else (echo {"ok":true,"status":"stopped"})')
     $script:QueryCount = 0

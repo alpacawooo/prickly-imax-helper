@@ -432,7 +432,7 @@ function Get-ExistingTaskInspection {
         $Task = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
         return @{ Found = $true; State = [string]$Task.State }
     } catch {
-        if ($_.FullyQualifiedErrorId -match "NoMatchingMSFT_ScheduledTask|TaskNotFound") { return @{ Found = $false; State = "Missing" } }
+        if ($_.FullyQualifiedErrorId -match '^(?:CmdletizationQuery_NotFound_TaskName|NoMatchingMSFT_ScheduledTask|TaskNotFound)(?:,Get-ScheduledTask)?$') { return @{ Found = $false; State = "Missing" } }
         throw "예약 작업 상태를 확인하지 못해 업데이트를 중단합니다: $($_.Exception.Message)"
     }
 }
