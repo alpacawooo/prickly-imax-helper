@@ -41,6 +41,16 @@ class PlatformAdapterTests(unittest.TestCase):
             ["schtasks.exe", "/Run", "/TN", "Prickly IMAX Helper"], text=True, capture_output=True
         )
 
+    def test_macos_service_start_preserves_an_active_monitor(self):
+        completed = subprocess.CompletedProcess([], 0, "", "")
+        with mock.patch("prickly_imax_helper.service.platform.system", return_value="Darwin"), mock.patch(
+            "prickly_imax_helper.service.os.getuid", return_value=501
+        ), mock.patch("prickly_imax_helper.service.subprocess.run", return_value=completed) as run:
+            self.assertIs(start_service(), completed)
+        run.assert_called_once_with(
+            ["/bin/launchctl", "kickstart", "-p", "gui/501/ai.prickly.imax-helper"], text=True, capture_output=True
+        )
+
     def test_windows_notification_copy_names_outlook(self):
         with mock.patch("prickly_imax_helper.notify.platform.system", return_value="Windows"):
             self.assertEqual(notification_method(), "outlook_desktop")

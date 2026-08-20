@@ -41,6 +41,10 @@ class RuntimePaths:
         return self.state_dir / "stop-requested"
 
     @property
+    def maintenance_barrier(self) -> Path:
+        return self.state_dir / "update-in-progress"
+
+    @property
     def logs(self) -> Path:
         return self.root / "logs"
 

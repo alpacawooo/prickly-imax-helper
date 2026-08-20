@@ -6,7 +6,7 @@ The repository contains no CGV credentials, customer identifiers, cookies, vouch
 
 ## Public release flow
 
-1. Open the public [0.2.3 release](https://github.com/alpacawooo/prickly-imax-helper/releases/tag/0.2.3) and download the installer for your operating system plus its SHA-256 file. No repository invitation or GitHub sign-in is required.
+1. Release 0.2.4 is the next immutable package. Its artifacts and SHA-256 values are not published yet; do not install until the blocked placeholders in the onboarding guide are replaced by final audited hashes.
 2. Verify the checksum, extract the release, and run `scripts/Install.command` on macOS or `scripts/Install.ps1` on Windows.
 3. In the localhost-only setup page, open the dedicated Chrome profile and log in to CGV personally.
 4. Keep or edit the Odyssey preset (movie, CGV theater, IMAX format, time windows, minimum lead time, party size, rows, edge exclusion, and seat priority), then confirm the notification email and one-time automatic voucher-submission consent.
@@ -14,12 +14,14 @@ The repository contains no CGV credentials, customer identifiers, cookies, vouch
 
 ### Windows 10/11 one-line install
 
-Download only `prickly-imax-helper-0.2.3.zip` and leave the original ZIP unextracted. Use the current PowerShell command in [docs/notion-quick-start.md](docs/notion-quick-start.md). It searches the default Downloads folder, the Desktop, and Desktop subfolders such as a custom Chrome download folder. If the ZIP is missing, the command stops before hashing and prints only the download instruction. If the ZIP exists but the SHA-256 differs, it stops with a separate wrong-version or damaged-file message. Only a matching ZIP is extracted and installed.
+After 0.2.4 is published with audited hashes, download only `prickly-imax-helper-0.2.4.zip` and leave the original ZIP unextracted. Use the PowerShell command in [docs/notion-quick-start.md](docs/notion-quick-start.md). It searches the default Downloads folder, the Desktop, and Desktop subfolders such as a custom Chrome download folder. If the ZIP is missing, the command stops before hashing and prints only the download instruction. If the ZIP exists but the SHA-256 differs, it stops with a separate wrong-version or damaged-file message. Only a matching ZIP is extracted and installed.
 
 No password or payment credential is entered into Prickly AI, Codex, Notion, GitHub, or the helper.
 Python is not a user prerequisite; the installer bootstraps a checksum-verified, pinned `uv` binary and managed Python. It installs only the locked runtime dependencies and generates a local launcher without resolving a separate project build backend.
 
 Users choose a Gmail, Naver Mail, iCloud Mail, or other recipient address during setup. Email delivery uses the account already signed in to Apple Mail on macOS or classic Outlook desktop on Windows, so the helper never asks for an email or app password. New Outlook for Windows does not expose the classic Outlook COM interface and is not yet supported as the local sending bridge; Windows desktop notifications still work independently.
+
+On macOS the helper resolves Apple Mail only from the trusted system locations used by supported releases (`/System/Applications/Mail.app` or `/Applications/Mail.app`). `doctor` fails the notification check when neither trusted location is present.
 
 The configured recipient account can also be added to the iPhone Mail app. The helper sends ordinary email rather than direct mobile push, so delivery can be delayed and it cannot bypass the iPhone's silent mode or Focus settings.
 
@@ -52,6 +54,7 @@ CGV login and browser data remain under the user's local profile. Runtime state 
 - Shipped presets keep duplicate-booking prevention enabled, so the runtime checks existing tickets before booking preparation and again after the seat, voucher-count, and zero-balance checks.
 - An advanced local `prevent_duplicate_booking: false` policy skips only those two existing-ticket page lookups. It is intended for a voucher-exhaustive one-transaction setup; exact consecutive seats, voucher count, zero balance, one submission, mobile-ticket proof, and terminal stop behavior remain mandatory.
 - A restart or network failure across the submission boundary becomes `unknown_after_submit` and is never retried automatically.
+- `start` is serialized across overlapping callers and remains blocked while an installer maintenance barrier exists. Install and update use an outer, stale-owner-aware lock before shared runtime or virtual-environment mutation.
 
 ## Development
 

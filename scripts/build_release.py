@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import json
 import os
 import re
+import shlex
 import shutil
 import tarfile
 import tempfile
@@ -73,29 +75,338 @@ def validate_stage(stage: Path) -> None:
         raise SystemExit("release stage privacy check failed: " + "; ".join(problems))
 
 
-def validate_release_versions(root: Path, version: str) -> None:
-    project_version = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
-    if version != project_version:
-        raise SystemExit(f"release version {version} does not match pyproject version {project_version}")
-    lock = tomllib.loads((root / "uv.lock").read_text(encoding="utf-8"))
-    root_package = next(
-        (package for package in lock["package"] if package.get("name") == "prickly-imax-helper"),
-        None,
+def _literal_python_string(expression: ast.expr) -> str | None:
+    if isinstance(expression, ast.Constant) and isinstance(expression.value, str):
+        return expression.value
+    return None
+
+
+def _python_version_assignments(source: str) -> list[str | None]:
+    """Accept only a docstring and one literal __version__ assignment without importing it."""
+
+    try:
+        module = ast.parse(source)
+    except SyntaxError:
+        return [None]
+    if len(module.body) != 2:
+        return [None]
+    docstring, assignment = module.body
+    if not (
+        isinstance(docstring, ast.Expr)
+        and isinstance(docstring.value, ast.Constant)
+        and isinstance(docstring.value.value, str)
+        and isinstance(assignment, ast.Assign)
+        and len(assignment.targets) == 1
+        and isinstance(assignment.targets[0], ast.Name)
+        and assignment.targets[0].id == "__version__"
+    ):
+        return [None]
+    return [_literal_python_string(assignment.value)]
+
+
+def _shell_statements(source: str) -> list[str]:
+    """Split shell source on executable command boundaries without executing it."""
+
+    statements: list[str] = []
+    current: list[str] = []
+    quote: str | None = None
+    escaped = False
+    comment = False
+    for character in source:
+        if comment:
+            if character == "\n":
+                comment = False
+                statements.append("".join(current))
+                current = []
+            continue
+        if escaped:
+            current.append(character)
+            escaped = False
+            continue
+        if quote:
+            current.append(character)
+            if character == "\\" and quote == '"':
+                escaped = True
+            elif character == quote:
+                quote = None
+            continue
+        if character in ("'", '"'):
+            quote = character
+            current.append(character)
+        elif character == "#":
+            comment = True
+        elif character in (";", "\n"):
+            statements.append("".join(current))
+            current = []
+        else:
+            current.append(character)
+    if current:
+        statements.append("".join(current))
+    return statements
+
+
+def _shell_version_assignments(source: str) -> list[str | None]:
+    """Collect literal executable APP_VERSION assignments using shell tokenization only."""
+
+    assignments: list[str | None] = []
+    declaration_builtins = {"export", "readonly", "typeset", "declare", "local"}
+    dynamic_commands = {".", "builtin", "command", "eval", "read", "source", "vared"}
+    command_boundaries = {"&&", "||", "|", "&", "if", "then", "elif", "while", "until", "do"}
+    target_write = re.compile(r"^APP_VERSION(?:=|\+=|-=|\*=|/=|%=|\?=|:=|\[[^]]*\][+\-*/%]?=|$)")
+    for statement in _shell_statements(source):
+        try:
+            tokens = shlex.split(statement, posix=True, comments=True)
+        except ValueError:
+            if re.search(r"(?<![A-Za-z0-9_])APP_VERSION=", statement):
+                assignments.append(None)
+            continue
+        if not tokens:
+            continue
+        candidates: list[str | None] = []
+        index = 0
+        while index < len(tokens) and target_write.match(tokens[index]):
+            candidates.append(tokens[index] if tokens[index].startswith("APP_VERSION=") else None)
+            index += 1
+        command_indexes = {index} if index < len(tokens) else set()
+        command_indexes.update(
+            token_index + 1
+            for token_index, token in enumerate(tokens[:-1])
+            if token in command_boundaries
+        )
+        if any(tokens[token_index] in dynamic_commands for token_index in command_indexes):
+            assignments.append(None)
+        if tokens[0] in declaration_builtins:
+            for token in tokens[1:]:
+                if target_write.match(token):
+                    candidates.append(token if token.startswith("APP_VERSION=") else None)
+        for candidate in candidates:
+            if candidate is None:
+                assignments.append(None)
+                continue
+            value = candidate.removeprefix("APP_VERSION=")
+            assignments.append(value if value and not any(marker in value for marker in ("$", "`", "$((")) else None)
+    return assignments
+
+
+def _powershell_statement_tokens(source: str, start: int) -> list[str]:
+    """Tokenize one PowerShell pipeline segment without evaluating it."""
+
+    tokens: list[str] = []
+    current: list[str] = []
+    quote: str | None = None
+    index = start
+    while index < len(source):
+        character = source[index]
+        if quote:
+            if quote == "'" and character == "'" and index + 1 < len(source) and source[index + 1] == "'":
+                current.append("'")
+                index += 2
+                continue
+            if quote == '"' and character == "`" and index + 1 < len(source):
+                current.append(source[index + 1])
+                index += 2
+                continue
+            if character == quote:
+                quote = None
+            else:
+                current.append(character)
+            index += 1
+            continue
+        if character in ("'", '"'):
+            quote = character
+        elif character == "#" or character in (";", "\n", "|"):
+            break
+        elif character.isspace() or character == ",":
+            if current:
+                tokens.append("".join(current))
+                current = []
+        else:
+            current.append(character)
+        index += 1
+    if current:
+        tokens.append("".join(current))
+    return tokens
+
+
+def _powershell_mutates_version_provider(source: str, start: int) -> bool:
+    """Return whether a provider mutation command targets the AppVersion variable."""
+
+    tokens = _powershell_statement_tokens(source, start)
+    if len(tokens) < 2:
+        return False
+    arguments = tokens[1:]
+    path_arguments: list[str] = []
+    for index, argument in enumerate(arguments[:-1]):
+        if argument.casefold() in {"-path", "-literalpath"}:
+            path_arguments.append(arguments[index + 1])
+    if not path_arguments:
+        index = 0
+        while index < len(arguments):
+            argument = arguments[index]
+            if argument.casefold() == "-value":
+                index += 2
+                continue
+            if not argument.startswith("-"):
+                path_arguments.append(argument)
+                break
+            index += 1
+    provider_target = re.compile(
+        r"^variable:[\\/]?\$?\{?(?:(?:global|local|script|private|using|\d+):)?appversion\}?$",
+        re.IGNORECASE,
     )
-    if not root_package or root_package.get("version") != version:
-        raise SystemExit("uv.lock root package version does not match the release version")
-    runtime_init = (root / "runtime" / "prickly_imax_helper" / "__init__.py").read_text(encoding="utf-8")
-    runtime_version = re.search(r'^__version__ = "([^"]+)"$', runtime_init, re.MULTILINE)
-    if not runtime_version or runtime_version.group(1) != version:
-        raise SystemExit("runtime __version__ does not match the release version")
+    return any(provider_target.fullmatch(path) for path in path_arguments)
+
+
+def _powershell_version_assignments(source: str) -> list[str | None]:
+    """Collect literal $AppVersion assignments outside comments and string literals."""
+
+    assignments: list[str | None] = []
+    dynamic_command = re.compile(
+        r"(?:"
+        r"Invoke-Expression|Invoke-Command|Set-Variable|New-Variable|Clear-Variable|Remove-Variable|"
+        r"Set-Alias|New-Alias|Import-Alias|iex|icm|sv|nv|clv|rv"
+        r")(?![A-Za-z0-9_-])",
+        re.IGNORECASE,
+    )
+    dynamic_scriptblock = re.compile(
+        r"\[(?:System\.Management\.Automation\.)?ScriptBlock\]\s*::\s*Create\s*\(",
+        re.IGNORECASE,
+    )
+    provider_mutation_command = re.compile(
+        r"(?:Set-Item|Set-Content|si|sc)(?![A-Za-z0-9_-])",
+        re.IGNORECASE,
+    )
+    target_write = re.compile(
+        r"(?P<target>\$(?:"
+        r"\{(?:(?:global|local|script|private|using|\d+):)?AppVersion\}|"
+        r"(?:(?:global|local|script|private|using|\d+):)?AppVersion(?![A-Za-z0-9_])"
+        r"))\s*(?P<operator>\+\+|--|\?\?=|\+=|-=|\*=|/=|%=|=)\s*",
+        re.IGNORECASE,
+    )
+    index = 0
+    quote: str | None = None
+    while index < len(source):
+        character = source[index]
+        if quote:
+            if quote == "'" and character == "'" and index + 1 < len(source) and source[index + 1] == "'":
+                index += 2
+                continue
+            if quote == '"' and character == "`" and index + 1 < len(source):
+                index += 2
+                continue
+            if character == quote:
+                quote = None
+            index += 1
+            continue
+        if character in ("'", '"'):
+            quote = character
+            index += 1
+            continue
+        if source.startswith("<#", index):
+            block_comment_end = source.find("#>", index + 2)
+            index = len(source) if block_comment_end == -1 else block_comment_end + 2
+            continue
+        if character == "#":
+            newline = source.find("\n", index)
+            index = len(source) if newline == -1 else newline + 1
+            continue
+        dynamic_match = dynamic_command.match(source, index) or dynamic_scriptblock.match(source, index)
+        if dynamic_match and not (
+            index and (source[index - 1].isalnum() or source[index - 1] in "_-$")
+        ):
+            assignments.append(None)
+            index = dynamic_match.end()
+            continue
+        provider_match = provider_mutation_command.match(source, index)
+        if (
+            provider_match
+            and not (index and (source[index - 1].isalnum() or source[index - 1] in "_-$"))
+            and _powershell_mutates_version_provider(source, index)
+        ):
+            assignments.append(None)
+            index = provider_match.end()
+            continue
+        match = target_write.match(source, index)
+        if not match or (index and (source[index - 1].isalnum() or source[index - 1] in "_$")):
+            index += 1
+            continue
+        target = match.group("target")
+        operator = match.group("operator")
+        value_start = match.end()
+        if target.casefold() != "$appversion" or operator != "=":
+            assignments.append(None)
+            index = value_start
+            continue
+        if value_start >= len(source) or source[value_start] not in ("'", '"'):
+            assignments.append(None)
+            index = value_start
+            continue
+        value_quote = source[value_start]
+        cursor = value_start + 1
+        value: list[str] = []
+        literal = True
+        while cursor < len(source):
+            current = source[cursor]
+            if value_quote == "'" and current == "'" and cursor + 1 < len(source) and source[cursor + 1] == "'":
+                value.append("'")
+                cursor += 2
+                continue
+            if value_quote == '"' and current == "`" and cursor + 1 < len(source):
+                literal = False
+                cursor += 2
+                continue
+            if current == value_quote:
+                break
+            if value_quote == '"' and current == "$":
+                literal = False
+            value.append(current)
+            cursor += 1
+        if cursor >= len(source):
+            assignments.append(None)
+            index = len(source)
+            continue
+        boundary_candidates = [
+            position
+            for position in (source.find(";", cursor + 1), source.find("\n", cursor + 1))
+            if position != -1
+        ]
+        statement_end = min(boundary_candidates) if boundary_candidates else len(source)
+        trailing_expression = source[cursor + 1 : statement_end].split("#", 1)[0].strip()
+        assignments.append("".join(value) if literal and not trailing_expression else None)
+        index = cursor + 1
+    return assignments
+
+
+def validate_version_alignment(root: Path, version: str) -> None:
+    """Require every release-facing version source to match the requested version."""
+
+    project_version = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+    runtime = (root / "runtime" / "prickly_imax_helper" / "__init__.py").read_text(encoding="utf-8")
+    runtime_versions = _python_version_assignments(runtime)
     mac_installer = (root / "scripts" / "Install.command").read_text(encoding="utf-8")
-    mac_version = re.search(r"^APP_VERSION=([^\s]+)$", mac_installer, re.MULTILINE)
-    if not mac_version or mac_version.group(1) != version:
-        raise SystemExit("Install.command APP_VERSION does not match the release version")
-    windows_installer = (root / "scripts" / "Install.ps1").read_text(encoding="utf-8")
-    windows_version = re.search(r'^\$AppVersion = "([^"]+)"$', windows_installer, re.MULTILINE)
-    if not windows_version or windows_version.group(1) != version:
-        raise SystemExit("Install.ps1 AppVersion does not match the release version")
+    mac_versions = _shell_version_assignments(mac_installer)
+    windows_installer = (root / "scripts" / "Install.ps1").read_text(encoding="utf-8-sig")
+    windows_versions = _powershell_version_assignments(windows_installer)
+    lock_packages = tomllib.loads((root / "uv.lock").read_text(encoding="utf-8")).get("package", [])
+    lock_project_entries = [
+        package for package in lock_packages if package.get("name") == "prickly-imax-helper"
+    ]
+    lock_versions = [package.get("version") for package in lock_project_entries]
+
+    sources = {
+        "pyproject.toml": [project_version],
+        "runtime __version__": runtime_versions,
+        "Install.command APP_VERSION": mac_versions,
+        "Install.ps1 AppVersion": windows_versions,
+        "uv.lock project version": lock_versions,
+    }
+    mismatches = [f"{source}={actual!r}" for source, actual in sources.items() if actual != [version]]
+    if len(lock_project_entries) == 1 and lock_project_entries[0].get("source", {}).get("editable") != ".":
+        mismatches.append(f"uv.lock project source={lock_project_entries[0].get('source')!r}")
+    if mismatches:
+        raise SystemExit(
+            f"release version alignment failed for {version}: " + "; ".join(mismatches)
+        )
 
 
 def main() -> int:
@@ -105,7 +416,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=Path("dist"))
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
-    validate_release_versions(root, args.version)
+    validate_version_alignment(root, args.version)
     authorization = json.loads(args.authorization.read_text(encoding="utf-8"))
     if not isinstance(authorization, dict):
         raise SystemExit("authorization metadata must be a JSON object")

@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from prickly_imax_helper.monitor import _notify
-from prickly_imax_helper.notify import MAIL_SCRIPT, OUTLOOK_SCRIPT, send_email
+from prickly_imax_helper.notify import MAIL_SCRIPT, OUTLOOK_SCRIPT, apple_mail_path, mail_script, send_email
 from prickly_imax_helper.paths import RuntimePaths
 
 
@@ -69,6 +69,8 @@ class NotificationTests(unittest.TestCase):
     def test_user_values_are_arguments_not_script_source(self):
         recipient = 'person+"quote"@example.com'
         with patch("prickly_imax_helper.notify.platform.system", return_value="Darwin"), patch(
+            "prickly_imax_helper.notify.apple_mail_path", return_value=Path("/System/Applications/Mail.app")
+        ), patch(
             "prickly_imax_helper.notify.subprocess.run"
         ) as run:
             run.return_value.returncode = 0
@@ -78,6 +80,24 @@ class NotificationTests(unittest.TestCase):
         command = run.call_args.args[0]
         self.assertEqual(command[-3:], [recipient, 'subject " test', "body"])
         self.assertNotIn(recipient, MAIL_SCRIPT)
+
+    def test_mail_uses_only_trusted_system_paths_without_user_values_in_script_source(self):
+        modern = Path("/System/Applications/Mail.app")
+        legacy = Path("/Applications/Mail.app")
+        self.assertIn(f'tell application "{modern}"', MAIL_SCRIPT)
+        self.assertIn(f'tell application "{legacy}"', mail_script(legacy))
+        with self.assertRaisesRegex(ValueError, "untrusted"):
+            mail_script(Path("/tmp/Mail.app"))
+
+    def test_mail_path_accepts_modern_and_legacy_supported_locations(self):
+        modern = Path("/System/Applications/Mail.app")
+        legacy = Path("/Applications/Mail.app")
+        with patch("pathlib.Path.is_dir", autospec=True, side_effect=lambda path: path == modern):
+            self.assertEqual(apple_mail_path(), modern)
+        with patch("pathlib.Path.is_dir", autospec=True, side_effect=lambda path: path == legacy):
+            self.assertEqual(apple_mail_path(), legacy)
+        with patch("pathlib.Path.is_dir", autospec=True, return_value=False):
+            self.assertIsNone(apple_mail_path())
 
     def test_windows_outlook_values_use_child_environment_not_script_source(self):
         recipient = 'person+"quote"@example.com'

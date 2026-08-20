@@ -9,7 +9,7 @@ from pathlib import Path
 from .config import ConfigError, load_config
 from .browser import chrome_executable
 from .locks import LockUnavailable, locked_file
-from .notify import notification_method, powershell_executable
+from .notify import apple_mail_path, notification_method, powershell_executable
 from .paths import RuntimePaths
 from .redaction import redact
 from .setup_server import serve_setup
@@ -35,6 +35,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "doctor":
         system = platform.system()
+        mail_path = apple_mail_path() if system == "Darwin" else None
         checks = {
             "configured": {"ok": paths.config.is_file(), "required": False},
             "state_directory": {"ok": paths.state_dir.is_dir(), "required": False},
@@ -42,8 +43,17 @@ def main(argv: list[str] | None = None) -> int:
             "operating_system": {"ok": system in {"Darwin", "Windows"}, "value": system, "required": True},
             "chrome": {"ok": chrome_executable() is not None, "required": True},
             "notification_backend": {
-                "ok": Path("/usr/bin/osascript").is_file() if system == "Darwin" else powershell_executable() is not None,
+                "ok": (
+                    Path("/usr/bin/osascript").is_file() and mail_path is not None
+                    if system == "Darwin"
+                    else powershell_executable() is not None
+                ),
                 "method": notification_method(),
+                "mail_path": str(mail_path) if mail_path else None,
+                "required": True,
+            },
+            "update_in_progress": {
+                "ok": not paths.maintenance_barrier.exists(),
                 "required": True,
             },
         }
@@ -62,6 +72,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "run":
         from .monitor import AlreadyRunning, run
 
+        with locked_file(paths.state_dir / "service-control.lock"):
+            if paths.maintenance_barrier.exists():
+                print("업데이트가 진행 중이므로 상주 감시를 시작하지 않았습니다.")
+                return 0
         try:
             return run(paths)
         except AlreadyRunning:
@@ -134,17 +148,26 @@ def main(argv: list[str] | None = None) -> int:
         except ConfigError as exc:
             print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))
             return 1
-        paths.stop_requested.unlink(missing_ok=True)
-        current = read_state(paths.heartbeat).get("status", Status.UNCONFIGURED.value)
-        if current in {Status.COMPLETED.value, Status.UNKNOWN_AFTER_SUBMIT.value, Status.BLOCKED_DUPLICATE.value, Status.BLOCKED_PAYMENT.value}:
-            print(json.dumps({"ok": False, "error": f"terminal state {current} requires review before a new configuration"}, ensure_ascii=False))
-            return 2
-        if current not in {Status.UNCONFIGURED.value, Status.STOPPED.value, Status.FATAL.value}:
-            print(json.dumps({"ok": True, "status": current, "detail": "monitor is already active or starting"}, ensure_ascii=False))
-            return 0
-        if current != Status.LOGIN_REQUIRED.value:
-            transition(paths.heartbeat, Status.LOGIN_REQUIRED, detail="start requested by user")
-        process = start_service()
+        with locked_file(paths.state_dir / "service-control.lock"):
+            if paths.maintenance_barrier.exists():
+                print(json.dumps({"ok": False, "error": "update in progress; start is blocked"}, ensure_ascii=False))
+                return 2
+            paths.stop_requested.unlink(missing_ok=True)
+            current = read_state(paths.heartbeat).get("status", Status.UNCONFIGURED.value)
+            try:
+                with locked_file(paths.state_dir / "monitor.lock", blocking=False):
+                    monitor_running = False
+            except LockUnavailable:
+                monitor_running = True
+            if monitor_running:
+                print(json.dumps({"ok": True, "status": current, "detail": "monitor is already active or starting"}, ensure_ascii=False))
+                return 0
+            if current in {Status.COMPLETED.value, Status.UNKNOWN_AFTER_SUBMIT.value, Status.BLOCKED_DUPLICATE.value, Status.BLOCKED_PAYMENT.value}:
+                print(json.dumps({"ok": False, "error": f"terminal state {current} requires review before a new configuration"}, ensure_ascii=False))
+                return 2
+            if current in {Status.UNCONFIGURED.value, Status.STOPPED.value, Status.FATAL.value}:
+                transition(paths.heartbeat, Status.LOGIN_REQUIRED, detail="start requested by user")
+            process = start_service()
         print(json.dumps({"ok": process.returncode == 0, "status": "starting", "detail": (process.stderr or "").strip()}, ensure_ascii=False))
         return process.returncode
     return 2

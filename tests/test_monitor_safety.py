@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import copy
 import contextlib
+import os
 import subprocess
+import sys
 import tempfile
+import textwrap
+import time
 import unittest
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -13,6 +17,7 @@ from prickly_imax_helper.checkout import DuplicateBlocked, PaymentBlocked, Ticke
 from prickly_imax_helper.checkout_attempt import CheckoutAttemptRecorder
 from prickly_imax_helper.config import write_config
 from prickly_imax_helper.cli import main as cli_main
+from prickly_imax_helper.locks import LockUnavailable, locked_file
 from prickly_imax_helper.monitor import (
     CHECKOUT_GUARD_RETRY_SECONDS,
     _checkout,
@@ -28,6 +33,242 @@ from test_runtime_core import VALID_CONFIG
 
 
 class MonitorRestartSafetyTests(unittest.TestCase):
+    def test_overlapping_start_processes_emit_only_one_service_request_after_monitor_owns_lock(self):
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            write_config(paths.config, copy.deepcopy(VALID_CONFIG))
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+            root = Path(temp)
+            request_entered = root / "service-request-entered"
+            request_log = root / "service-requests"
+            allow_request = root / "allow-service-request"
+            monitor_ready = root / "monitor-lock-ready"
+            release_monitor = root / "release-monitor-lock"
+            monitor_done = root / "monitor-lock-done"
+            holder = textwrap.dedent(
+                f"""
+                import time
+                from pathlib import Path
+                from prickly_imax_helper.locks import locked_file
+
+                ready = Path({str(monitor_ready)!r})
+                release = Path({str(release_monitor)!r})
+                with locked_file(Path({str(paths.state_dir / 'monitor.lock')!r})):
+                    ready.touch()
+                    deadline = time.monotonic() + 10
+                    while not release.exists() and time.monotonic() < deadline:
+                        time.sleep(0.01)
+                Path({str(monitor_done)!r}).touch()
+                """
+            )
+            worker = textwrap.dedent(
+                f"""
+                import os
+                import subprocess
+                import sys
+                import time
+                from pathlib import Path
+                import prickly_imax_helper.cli as cli
+
+                entered = Path({str(request_entered)!r})
+                requests = Path({str(request_log)!r})
+                allow = Path({str(allow_request)!r})
+                ready = Path({str(monitor_ready)!r})
+
+                def safe_service_request():
+                    with requests.open("a", encoding="utf-8") as stream:
+                        stream.write(f"{{os.getpid()}}\\n")
+                        stream.flush()
+                        os.fsync(stream.fileno())
+                    entered.touch()
+                    deadline = time.monotonic() + 10
+                    while not allow.exists() and time.monotonic() < deadline:
+                        time.sleep(0.01)
+                    if not allow.exists():
+                        raise RuntimeError("test service request was not released")
+                    subprocess.Popen(
+                        [sys.executable, "-c", {holder!r}],
+                        env=os.environ.copy(),
+                        stdin=subprocess.DEVNULL,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        close_fds=True,
+                    )
+                    deadline = time.monotonic() + 10
+                    while not ready.exists() and time.monotonic() < deadline:
+                        time.sleep(0.01)
+                    if not ready.exists():
+                        raise RuntimeError("test resident did not acquire monitor.lock")
+                    return subprocess.CompletedProcess([], 0, "", "")
+
+                cli.start_service = safe_service_request
+                raise SystemExit(cli.main(["--home", {temp!r}, "start"]))
+                """
+            )
+            environment = {**os.environ, "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "runtime")}
+            processes: list[subprocess.Popen[str]] = []
+            try:
+                first = subprocess.Popen(
+                    [sys.executable, "-c", worker],
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    env=environment,
+                )
+                processes.append(first)
+                deadline = time.monotonic() + 5
+                while not request_entered.exists() and first.poll() is None and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertTrue(request_entered.exists(), "first start did not enter the safe service adapter")
+
+                second = subprocess.Popen(
+                    [sys.executable, "-c", worker],
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    env=environment,
+                )
+                processes.append(second)
+                time.sleep(0.15)
+                self.assertIsNone(second.poll(), "second start did not overlap the locked first process")
+                self.assertEqual(request_log.read_text(encoding="utf-8").splitlines(), [str(first.pid)])
+
+                allow_request.touch()
+                first_stdout, first_stderr = first.communicate(timeout=10)
+                second_stdout, second_stderr = second.communicate(timeout=10)
+                self.assertEqual(first.returncode, 0, first_stderr or first_stdout)
+                self.assertEqual(second.returncode, 0, second_stderr or second_stdout)
+                self.assertEqual(request_log.read_text(encoding="utf-8").splitlines(), [str(first.pid)])
+            finally:
+                allow_request.touch(exist_ok=True)
+                release_monitor.touch(exist_ok=True)
+                deadline = time.monotonic() + 5
+                while monitor_ready.exists() and not monitor_done.exists() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                for process in processes:
+                    if process.poll() is None:
+                        process.terminate()
+                        process.communicate(timeout=5)
+
+    def test_start_from_login_required_requests_service_once_when_monitor_lock_is_free(self):
+        completed = subprocess.CompletedProcess([], 0, "", "")
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            write_config(paths.config, copy.deepcopy(VALID_CONFIG))
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+
+            with patch("prickly_imax_helper.cli.start_service", return_value=completed) as start:
+                self.assertEqual(cli_main(["--home", temp, "start"]), 0)
+
+            start.assert_called_once_with()
+            self.assertEqual(read_state(paths.heartbeat)["status"], Status.LOGIN_REQUIRED.value)
+
+    def test_start_does_not_request_service_when_monitor_lock_is_held(self):
+        completed = subprocess.CompletedProcess([], 0, "", "")
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            write_config(paths.config, copy.deepcopy(VALID_CONFIG))
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+
+            with locked_file(paths.state_dir / "monitor.lock"):
+                with patch("prickly_imax_helper.cli.start_service", return_value=completed) as start:
+                    self.assertEqual(cli_main(["--home", temp, "start"]), 0)
+
+            start.assert_not_called()
+
+    def test_start_holds_service_control_lock_until_service_request_finishes(self):
+        completed = subprocess.CompletedProcess([], 0, "", "")
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            write_config(paths.config, copy.deepcopy(VALID_CONFIG))
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+            lock_during_start = []
+
+            def start_while_checking_control_lock():
+                try:
+                    with locked_file(paths.state_dir / "service-control.lock", blocking=False):
+                        lock_during_start.append("unlocked")
+                except LockUnavailable:
+                    lock_during_start.append("held")
+                return completed
+
+            with patch("prickly_imax_helper.cli.start_service", side_effect=start_while_checking_control_lock):
+                self.assertEqual(cli_main(["--home", temp, "start"]), 0)
+
+            self.assertEqual(lock_during_start, ["held"])
+
+    def test_start_preserves_dead_staging_for_run_recovery(self):
+        completed = subprocess.CompletedProcess([], 0, "", "")
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            write_config(paths.config, copy.deepcopy(VALID_CONFIG))
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+            transition(paths.heartbeat, Status.ARMED)
+            transition(paths.heartbeat, Status.STAGING)
+
+            with patch("prickly_imax_helper.cli.start_service", return_value=completed) as start:
+                self.assertEqual(cli_main(["--home", temp, "start"]), 0)
+
+            start.assert_called_once_with()
+            self.assertEqual(read_state(paths.heartbeat)["status"], Status.STAGING.value)
+            with patch("prickly_imax_helper.monitor.launch_browser", side_effect=RuntimeError("stop after recovery")):
+                with self.assertRaisesRegex(RuntimeError, "stop after recovery"):
+                    run(paths)
+            self.assertEqual(read_state(paths.heartbeat)["status"], Status.RECOVERING.value)
+
+    def test_start_preserves_dead_submitting_for_run_fail_closed_recovery(self):
+        completed = subprocess.CompletedProcess([], 0, "", "")
+        with tempfile.TemporaryDirectory() as temp:
+            paths = RuntimePaths(Path(temp))
+            paths.prepare()
+            write_config(paths.config, copy.deepcopy(VALID_CONFIG))
+            transition(paths.heartbeat, Status.LOGIN_REQUIRED)
+            transition(paths.heartbeat, Status.ARMED)
+            transition(paths.heartbeat, Status.STAGING)
+            transition(paths.heartbeat, Status.SUBMITTING)
+
+            with patch("prickly_imax_helper.cli.start_service", return_value=completed) as start:
+                self.assertEqual(cli_main(["--home", temp, "start"]), 0)
+
+            start.assert_called_once_with()
+            self.assertEqual(read_state(paths.heartbeat)["status"], Status.SUBMITTING.value)
+            with patch("prickly_imax_helper.monitor.launch_browser") as launch, patch("prickly_imax_helper.monitor._notify"):
+                self.assertEqual(run(paths), 2)
+            launch.assert_not_called()
+            self.assertEqual(read_state(paths.heartbeat)["status"], Status.UNKNOWN_AFTER_SUBMIT.value)
+
+    def test_start_never_requests_service_from_review_required_terminal_states(self):
+        sequences = {
+            Status.COMPLETED: [Status.LOGIN_REQUIRED, Status.ARMED, Status.STAGING, Status.SUBMITTING, Status.COMPLETED],
+            Status.UNKNOWN_AFTER_SUBMIT: [
+                Status.LOGIN_REQUIRED,
+                Status.ARMED,
+                Status.STAGING,
+                Status.SUBMITTING,
+                Status.UNKNOWN_AFTER_SUBMIT,
+            ],
+            Status.BLOCKED_DUPLICATE: [Status.LOGIN_REQUIRED, Status.ARMED, Status.BLOCKED_DUPLICATE],
+            Status.BLOCKED_PAYMENT: [Status.LOGIN_REQUIRED, Status.ARMED, Status.STAGING, Status.BLOCKED_PAYMENT],
+        }
+        completed = subprocess.CompletedProcess([], 0, "", "")
+        for terminal, states in sequences.items():
+            with self.subTest(terminal=terminal.value), tempfile.TemporaryDirectory() as temp:
+                paths = RuntimePaths(Path(temp))
+                paths.prepare()
+                write_config(paths.config, copy.deepcopy(VALID_CONFIG))
+                for state in states:
+                    transition(paths.heartbeat, state)
+
+                with patch("prickly_imax_helper.cli.start_service", return_value=completed) as start:
+                    self.assertEqual(cli_main(["--home", temp, "start"]), 2)
+
+                start.assert_not_called()
+
     def test_resident_bootstraps_once_then_uses_only_hot_seat_probes_same_day(self):
         calls = []
 
