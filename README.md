@@ -6,7 +6,7 @@ The repository contains no CGV credentials, customer identifiers, cookies, vouch
 
 ## Public release flow
 
-1. Open the public [0.2.2 release](https://github.com/alpacawooo/prickly-imax-helper/releases/tag/0.2.2) and download the installer for your operating system plus its SHA-256 file. No repository invitation or GitHub sign-in is required.
+1. Open the public [0.2.3 release](https://github.com/alpacawooo/prickly-imax-helper/releases/tag/0.2.3) and download the installer for your operating system plus its SHA-256 file. No repository invitation or GitHub sign-in is required.
 2. Verify the checksum, extract the release, and run `scripts/Install.command` on macOS or `scripts/Install.ps1` on Windows.
 3. In the localhost-only setup page, open the dedicated Chrome profile and log in to CGV personally.
 4. Keep or edit the Odyssey preset (movie, CGV theater, IMAX format, time windows, minimum lead time, party size, rows, edge exclusion, and seat priority), then confirm the notification email and one-time automatic voucher-submission consent.
@@ -14,7 +14,7 @@ The repository contains no CGV credentials, customer identifiers, cookies, vouch
 
 ### Windows 10/11 one-line install
 
-Download only `prickly-imax-helper-0.2.2.zip` and leave the original ZIP unextracted. Use the current PowerShell command in [docs/notion-quick-start.md](docs/notion-quick-start.md). It searches the default Downloads folder, the Desktop, and Desktop subfolders such as a custom Chrome download folder. If the ZIP is missing, the command stops before hashing and prints only the download instruction. If the ZIP exists but the SHA-256 differs, it stops with a separate wrong-version or damaged-file message. Only a matching ZIP is extracted and installed.
+Download only `prickly-imax-helper-0.2.3.zip` and leave the original ZIP unextracted. Use the current PowerShell command in [docs/notion-quick-start.md](docs/notion-quick-start.md). It searches the default Downloads folder, the Desktop, and Desktop subfolders such as a custom Chrome download folder. If the ZIP is missing, the command stops before hashing and prints only the download instruction. If the ZIP exists but the SHA-256 differs, it stops with a separate wrong-version or damaged-file message. Only a matching ZIP is extracted and installed.
 
 No password or payment credential is entered into Prickly AI, Codex, Notion, GitHub, or the helper.
 Python is not a user prerequisite; the installer bootstraps a checksum-verified, pinned `uv` binary and managed Python. It installs only the locked runtime dependencies and generates a local launcher without resolving a separate project build backend.
