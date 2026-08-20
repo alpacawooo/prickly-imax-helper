@@ -759,6 +759,97 @@ class CheckoutBrowserTests(unittest.TestCase):
         self.assertEqual(self.page.evaluate("() => window.popupClicks"), 1)
         self._assert_no_final_submit()
 
+    def test_unknown_modal_after_approved_popup_blocks_all_later_payment_clicks(self):
+        self._cap_checkout_waits(200)
+        post_popup = """<button id=voucher-section onclick="window.voucherSectionClicks+=1">관람권</button>
+          <button onclick="window.voucherClicks+=1">IMAX 영화관람권 A</button>
+          <button onclick="window.voucherClicks+=1">IMAX 영화관람권 B</button>
+          <button onclick="window.applyClicks+=1">적용</button>
+          <div role=alertdialog><p>추가 확인이 필요합니다</p><button>확인</button></div>"""
+        popup = """<div role=dialog><h2>결제 전 확인해 주세요</h2>
+          <button onclick="window.popupClicks+=1;this.closest('[role=dialog]').remove();
+            document.body.insertAdjacentHTML('beforeend',window.postPopupMarkup)">결제하기</button></div>"""
+        self._set_payment_content(
+            """<button id=order onclick="window.orderClicks+=1;
+              document.body.insertAdjacentHTML('beforeend',window.popupMarkup)">30,000원 결제하기</button>""",
+            f"""window.voucherSectionClicks=0;window.voucherClicks=0;window.applyClicks=0;
+              window.postPopupMarkup=`{post_popup}`;window.popupMarkup=`{popup}`;""",
+        )
+
+        with self.assertRaises(CheckoutError):
+            self.flow.open_payment_and_apply_vouchers()
+
+        self.assertEqual(self.page.evaluate("() => window.popupClicks"), 1)
+        self.assertEqual(self.page.evaluate("() => window.voucherSectionClicks"), 0)
+        self.assertEqual(self.page.evaluate("() => window.voucherClicks"), 0)
+        self.assertEqual(self.page.evaluate("() => window.applyClicks"), 0)
+        self._assert_no_final_submit()
+
+    def test_unknown_visible_modal_blocks_payment_proof(self):
+        self.page.evaluate(
+            """() => document.body.insertAdjacentHTML('beforeend',
+              '<div role="alertdialog"><p>추가 확인이 필요합니다</p><button>확인</button></div>')"""
+        )
+
+        with self.assertRaises(PaymentBlocked):
+            self.flow.prove_ready(self.match)
+
+        self.assertIsNone(self.page.evaluate("() => window.clicked"))
+
+    def test_modal_opened_by_first_voucher_blocks_second_voucher_and_apply_clicks(self):
+        self._cap_checkout_waits(200)
+        vouchers = """<button id=voucher-section>관람권</button>
+          <button onclick="window.voucherClicks+=1;document.body.insertAdjacentHTML('beforeend',
+            '<div role=alertdialog><p>추가 확인이 필요합니다</p><button>확인</button></div>')">
+            IMAX 영화관람권 A</button>
+          <button onclick="window.voucherClicks+=1">IMAX 영화관람권 B</button>
+          <button onclick="window.applyClicks+=1">적용</button>""".replace("`", "\\`")
+        self._set_payment_content(
+            """<button id=order onclick="window.orderClicks+=1;
+              document.body.insertAdjacentHTML('beforeend',window.vouchers)">30,000원 결제하기</button>""",
+            f"window.voucherClicks=0;window.applyClicks=0;window.vouchers=`{vouchers}`;",
+        )
+
+        with self.assertRaises(CheckoutError):
+            self.flow.open_payment_and_apply_vouchers()
+
+        self.assertEqual(self.page.evaluate("() => window.voucherClicks"), 1)
+        self.assertEqual(self.page.evaluate("() => window.applyClicks"), 0)
+        self._assert_no_final_submit()
+
+    def test_modal_opened_by_last_voucher_blocks_apply_click(self):
+        self._cap_checkout_waits(200)
+        vouchers = """<button id=voucher-section>관람권</button>
+          <button onclick="window.voucherClicks+=1">IMAX 영화관람권 A</button>
+          <button onclick="window.voucherClicks+=1;document.body.insertAdjacentHTML('beforeend',
+            '<div role=alertdialog><p>추가 확인이 필요합니다</p><button>확인</button></div>')">
+            IMAX 영화관람권 B</button>
+          <button onclick="window.applyClicks+=1">적용</button>""".replace("`", "\\`")
+        self._set_payment_content(
+            """<button id=order onclick="window.orderClicks+=1;
+              document.body.insertAdjacentHTML('beforeend',window.vouchers)">30,000원 결제하기</button>""",
+            f"window.voucherClicks=0;window.applyClicks=0;window.vouchers=`{vouchers}`;",
+        )
+
+        with self.assertRaises(CheckoutError):
+            self.flow.open_payment_and_apply_vouchers()
+
+        self.assertEqual(self.page.evaluate("() => window.voucherClicks"), 2)
+        self.assertEqual(self.page.evaluate("() => window.applyClicks"), 0)
+        self._assert_no_final_submit()
+
+    def test_unknown_modal_appearing_after_proof_blocks_final_submit(self):
+        self.flow.prove_ready(self.match)
+        self.page.evaluate(
+            """() => document.body.insertAdjacentHTML('beforeend',
+              '<div role="alertdialog"><p>추가 확인이 필요합니다</p><button>확인</button></div>')"""
+        )
+
+        with self.assertRaises(UnknownAfterSubmit):
+            self.flow.submit_once()
+
+        self.assertIsNone(self.page.evaluate("() => window.clicked"))
+
     def test_missing_voucher_options_after_section_open_is_payment_blocked(self):
         self._cap_checkout_waits(200)
         self._set_payment_content(
