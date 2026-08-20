@@ -97,14 +97,14 @@ class ReleaseTests(unittest.TestCase):
 
     def test_public_github_docs_explain_the_windows_zip_discovery_guard(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        release_notes = (ROOT / "docs/release-notes-0.2.1.md").read_text(encoding="utf-8")
+        release_notes = (ROOT / "docs/release-notes-0.2.2.md").read_text(encoding="utf-8")
 
         self.assertIn("docs/notion-quick-start.md", readme)
         self.assertIn("Desktop subfolders", readme)
         self.assertIn("stops before hashing", readme)
         self.assertIn("다운로드 폴더와 바탕화면 아래의 하위 폴더", release_notes)
         self.assertIn("ZIP이 없으면 체크섬을 검사하지 않고", release_notes)
-        self.assertIn("설치 ZIP과 SHA-256 값은 변경되지 않았다", release_notes)
+        self.assertIn("거리 표기가 함께 있는 실제 극장 행", release_notes)
 
     def test_install_and_uninstall_restrict_app_home_to_user_home(self):
         for name in ("Install.command", "Uninstall.command"):
@@ -204,7 +204,7 @@ class ReleaseTests(unittest.TestCase):
             )
             output = root / "dist"
             process = subprocess.run(
-                [sys.executable, str(ROOT / "scripts/build_release.py"), "--version", "0.2.1", "--authorization", str(authorization), "--output", str(output)],
+                [sys.executable, str(ROOT / "scripts/build_release.py"), "--version", "0.2.2", "--authorization", str(authorization), "--output", str(output)],
                 text=True,
                 capture_output=True,
                 check=True,
@@ -251,7 +251,7 @@ class ReleaseTests(unittest.TestCase):
                 encoding="utf-8",
             )
             process = subprocess.run(
-                [sys.executable, str(ROOT / "scripts/build_release.py"), "--version", "0.2.1", "--authorization", str(authorization), "--output", str(root / "dist")],
+                [sys.executable, str(ROOT / "scripts/build_release.py"), "--version", "0.2.2", "--authorization", str(authorization), "--output", str(root / "dist")],
                 text=True,
                 capture_output=True,
             )
@@ -284,7 +284,7 @@ class ReleaseTests(unittest.TestCase):
                     sys.executable,
                     str(ROOT / "scripts/build_release.py"),
                     "--version",
-                    "0.2.1",
+                    "0.2.2",
                     "--authorization",
                     str(authorization),
                     "--output",
@@ -321,7 +321,7 @@ class ReleaseTests(unittest.TestCase):
                     sys.executable,
                     str(ROOT / "scripts/build_release.py"),
                     "--version",
-                    "0.2.1",
+                    "0.2.2",
                     "--authorization",
                     str(authorization),
                     "--output",
@@ -361,7 +361,7 @@ class ReleaseTests(unittest.TestCase):
                     sys.executable,
                     str(ROOT / "scripts/build_release.py"),
                     "--version",
-                    "0.2.1",
+                    "0.2.2",
                     "--authorization",
                     str(authorization),
                     "--output",
@@ -372,7 +372,7 @@ class ReleaseTests(unittest.TestCase):
             )
             self.assertNotEqual(process.returncode, 0)
             self.assertIn("non-public or unknown fields", process.stderr)
-            self.assertFalse((root / "dist" / "prickly-imax-helper-0.2.1.tar.gz").exists())
+            self.assertFalse((root / "dist" / "prickly-imax-helper-0.2.2.tar.gz").exists())
 
     def test_release_rejects_placeholder_authorization_reference(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -400,7 +400,7 @@ class ReleaseTests(unittest.TestCase):
                     sys.executable,
                     str(ROOT / "scripts/build_release.py"),
                     "--version",
-                    "0.2.1",
+                    "0.2.2",
                     "--authorization",
                     str(authorization),
                     "--output",

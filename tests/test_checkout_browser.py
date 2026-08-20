@@ -139,6 +139,30 @@ class CheckoutBrowserTests(unittest.TestCase):
             {"picker": False, "target_ready": True},
         )
 
+    def test_selects_single_direct_theater_result_when_cgv_does_not_use_list_rows(self):
+        self.page.set_content(
+            """<!doctype html><meta charset=utf-8>
+            <input placeholder="지역을 입력해주세요">
+            <div role="button" id="actual" tabindex="0">용산아이파크몰 10.3km</div>
+            <script>
+              actual.onclick = () => document.body.insertAdjacentHTML(
+                'beforeend', '<button id="confirm" type="button">극장선택</button>');
+              document.addEventListener('click', event => {
+                if (event.target.id !== 'confirm') return;
+                document.querySelector('input').remove();
+                document.body.insertAdjacentHTML('beforeend',
+                  '<button>용산아이파크몰</button><button>21:00-23:45 8 / 624석</button><h3>IMAX관</h3>');
+              });
+            </script>"""
+        )
+
+        self.flow._select_theater_from_picker("용산아이파크몰", "IMAX")
+
+        self.assertEqual(
+            self.flow._booking_page_state("용산아이파크몰", "IMAX"),
+            {"picker": False, "target_ready": True},
+        )
+
     def test_retries_actual_theater_row_only_when_selection_did_not_register(self):
         self.page.set_content(
             """<!doctype html><meta charset=utf-8>

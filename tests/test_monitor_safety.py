@@ -46,7 +46,7 @@ class MonitorRestartSafetyTests(unittest.TestCase):
 
             def open_dates(self):
                 calls.append(("open_dates", None))
-                return ["20260820"]
+                return ["20991231"]
 
             def schedules(self, ymd):
                 calls.append(("schedule", ymd))
@@ -76,7 +76,7 @@ class MonitorRestartSafetyTests(unittest.TestCase):
                 calls,
                 [
                     ("open_dates", None),
-                    ("schedule", "20260820"),
+                    ("schedule", "20991231"),
                     ("seats", "1"),
                     ("seats", "2"),
                     ("seats", "1"),
@@ -103,7 +103,7 @@ class MonitorRestartSafetyTests(unittest.TestCase):
         class FakeSession:
             def open_dates(self):
                 calls.append(("open_dates", None))
-                return ["20260820", "20260821"]
+                return ["20991230", "20991231"]
 
             def schedules(self, ymd):
                 calls.append(("schedule", ymd))
@@ -124,7 +124,7 @@ class MonitorRestartSafetyTests(unittest.TestCase):
 
         self.assertEqual(
             calls,
-            [("open_dates", None), ("schedule", "20260820"), ("schedule", "20260821")],
+            [("open_dates", None), ("schedule", "20991230"), ("schedule", "20991231")],
         )
         self.assertEqual(count, 2)
         self.assertEqual(len(planner.hot_targets), 2)
@@ -147,7 +147,7 @@ class MonitorRestartSafetyTests(unittest.TestCase):
 
             def open_dates(self):
                 calls.append(("open_dates", None))
-                return ["20260820"]
+                return ["20991231"]
 
             def schedules(self, ymd):
                 calls.append(("schedule", ymd))
@@ -178,13 +178,13 @@ class MonitorRestartSafetyTests(unittest.TestCase):
                 self.assertEqual(run(paths, max_cycles=5, allow_checkout=False), 0)
 
         self.assertEqual(calls.count(("open_dates", None)), 2)
-        self.assertEqual(calls.count(("schedule", "20260820")), 2)
+        self.assertEqual(calls.count(("schedule", "20991231")), 2)
         self.assertEqual(calls.count(("seats", "1")), 3)
 
     def test_hot_target_is_pruned_when_it_no_longer_meets_time_policy(self):
         seat_calls = []
         cached_show = {
-            "ymd": "20260820",
+            "ymd": "20991231",
             "movkndDsplNm": "IMAX",
             "scnsrtTm": "1900",
             "scnsNo": "18",
@@ -206,7 +206,7 @@ class MonitorRestartSafetyTests(unittest.TestCase):
                 return None
 
             def open_dates(self):
-                return ["20260820"]
+                return ["20991231"]
 
             def schedules(self, _ymd):
                 return [cached_show]
@@ -250,7 +250,7 @@ class MonitorRestartSafetyTests(unittest.TestCase):
 
             def open_dates(self):
                 calls.append(("open_dates", None))
-                return ["20260820"]
+                return ["20991231"]
 
             def schedules(self, ymd):
                 calls.append(("schedule", ymd))
@@ -279,7 +279,7 @@ class MonitorRestartSafetyTests(unittest.TestCase):
                 calls,
                 [
                     ("open_dates", None),
-                    ("schedule", "20260820"),
+                    ("schedule", "20991231"),
                     ("seats", "1"),
                 ],
             )
@@ -302,7 +302,7 @@ class MonitorRestartSafetyTests(unittest.TestCase):
                 return None
 
             def open_dates(self):
-                return ["20260820"]
+                return ["20991231"]
 
             def schedules(self, _ymd):
                 return [{"movkndDsplNm": "IMAX", "scnsrtTm": "1900", "scnsNo": "18", "scnSseq": "1"}]
