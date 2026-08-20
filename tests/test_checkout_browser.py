@@ -42,6 +42,23 @@ class _CappedTimeoutPage:
         return getattr(self._page, name)
 
 
+class _MutatingAfterWaitPage(_CappedTimeoutPage):
+    """Mutate browser state after readiness to exercise click-time revalidation."""
+
+    def __init__(self, page, *, after_wait, mutation, timeout_ms=1_000):
+        super().__init__(page, timeout_ms)
+        self._after_wait = after_wait
+        self._mutation = mutation
+        self._completed_waits = 0
+
+    def wait_for_function(self, expression, *, arg=None, timeout=None):
+        result = super().wait_for_function(expression, arg=arg, timeout=timeout)
+        self._completed_waits += 1
+        if self._completed_waits == self._after_wait:
+            self._page.evaluate(self._mutation)
+        return result
+
+
 @unittest.skipIf(sync_playwright is None or CHROME is None or not CHROME.is_file(), "Playwright and system Chrome are required")
 class CheckoutBrowserTests(unittest.TestCase):
     @classmethod
@@ -400,7 +417,10 @@ class CheckoutBrowserTests(unittest.TestCase):
             "missing": "",
             "duplicate": "<button onclick='window.orderClicks+=1'>30,000원 결제하기</button><button onclick='window.orderClicks+=1'>30,000원 결제하기</button>",
             "hidden": "<button style='display:none' onclick='window.orderClicks+=1'>30,000원 결제하기</button>",
+            "css-visibility-hidden": "<button style='visibility:hidden' onclick='window.orderClicks+=1'>30,000원 결제하기</button>",
             "disabled": "<button disabled onclick='window.orderClicks+=1'>30,000원 결제하기</button>",
+            "aria-disabled": "<button aria-disabled='true' onclick='window.orderClicks+=1'>30,000원 결제하기</button>",
+            "aria-disabled-ancestor": "<div aria-disabled='true'><button onclick='window.orderClicks+=1'>30,000원 결제하기</button></div>",
             "wrong-text": "<button onclick='window.orderClicks+=1'>30,000원 결제</button>",
         }
         for name, body in cases.items():
@@ -411,6 +431,26 @@ class CheckoutBrowserTests(unittest.TestCase):
                     self.flow.open_payment_and_apply_vouchers()
                 self.assertEqual(self.page.evaluate("() => window.orderClicks"), 0)
                 self._assert_no_final_submit()
+
+    def test_order_button_inherited_disabledness_is_revalidated_at_click_time(self):
+        vouchers = self._voucher_markup().replace("`", "\\`")
+        self._set_payment_content(
+            """<div id=order-guard><button id=order onclick="window.orderClicks+=1;
+              document.body.insertAdjacentHTML('beforeend',window.vouchers)">
+              30,000원 결제하기</button></div>""",
+            f"window.vouchers=`{vouchers}`;",
+        )
+        self.flow.page = _MutatingAfterWaitPage(
+            self.page,
+            after_wait=1,
+            mutation="() => document.querySelector('#order-guard').setAttribute('aria-disabled', 'true')",
+        )
+
+        with self.assertRaises(CheckoutError):
+            self.flow.open_payment_and_apply_vouchers()
+
+        self.assertEqual(self.page.evaluate("() => window.orderClicks"), 0)
+        self._assert_no_final_submit()
 
     def test_popup_absent_existing_voucher_flow_still_succeeds(self):
         self._cap_checkout_waits()
@@ -478,6 +518,23 @@ class CheckoutBrowserTests(unittest.TestCase):
         self.assertEqual(self.page.evaluate("() => window.popupClicks"), 1)
         self._assert_no_final_submit()
 
+    def test_nested_modal_structure_is_treated_as_one_popup(self):
+        self._cap_checkout_waits()
+        vouchers = self._voucher_markup().replace("`", "\\`")
+        popup = """<div role=dialog><div class=modal-body><h2>결제 전 확인해 주세요</h2>
+          <button onclick="window.popupClicks+=1;document.body.insertAdjacentHTML('beforeend',window.vouchers)">
+          결제하기</button></div></div>"""
+        self._set_payment_content(
+            """<button id=order onclick="window.orderClicks+=1;
+              document.body.insertAdjacentHTML('beforeend',window.popupMarkup)">30,000원 결제하기</button>""",
+            f"window.vouchers=`{vouchers}`;window.popupMarkup=`{popup}`;",
+        )
+
+        self.flow.open_payment_and_apply_vouchers()
+
+        self.assertEqual(self.page.evaluate("() => window.popupClicks"), 1)
+        self._assert_no_final_submit()
+
     def test_exact_title_in_arbitrary_page_section_is_not_treated_as_popup(self):
         self._cap_checkout_waits(250)
         section = """<section><div>결제 전 확인해 주세요</div>
@@ -523,6 +580,122 @@ class CheckoutBrowserTests(unittest.TestCase):
 
         with self.assertRaises(CheckoutError):
             self.flow.open_payment_and_apply_vouchers()
+
+        self.assertEqual(self.page.evaluate("() => window.popupClicks"), 0)
+        self._assert_no_final_submit()
+
+    def test_visible_unknown_or_ambiguous_modal_blocks_coexisting_voucher_ui(self):
+        cases = {
+            "wrong-title": """<div role=dialog><h2>결제 전 꼭 확인해 주세요</h2>
+              <button onclick="window.popupClicks+=1">결제하기</button></div>""",
+            "missing-title": """<div role=alertdialog><p>계속 진행하시겠습니까?</p>
+              <button onclick="window.popupClicks+=1">확인</button></div>""",
+            "exact-plus-unknown": """<div role=dialog><h2>결제 전 확인해 주세요</h2>
+              <button onclick="window.popupClicks+=1">결제하기</button></div>
+              <section class=payment-popup><p>추가 확인</p>
+              <button onclick="window.popupClicks+=1">확인</button></section>""",
+            "nested-alertdialog": """<div role=dialog><h2>결제 전 확인해 주세요</h2>
+              <button onclick="window.popupClicks+=1">결제하기</button>
+              <div role=alertdialog><p>추가 확인</p>
+              <button onclick="window.popupClicks+=1">확인</button></div></div>""",
+            "class-host-with-two-dialogs": """<div class=modal-host>
+              <div role=dialog><h2>결제 전 확인해 주세요</h2>
+              <button onclick="window.popupClicks+=1">결제하기</button></div>
+              <div role=dialog><p>추가 확인</p>
+              <button onclick="window.popupClicks+=1">확인</button></div></div>""",
+            "class-only-branches": """<div class=modal-host>
+              <section class=payment-popup><h2>결제 전 확인해 주세요</h2>
+              <button onclick="window.popupClicks+=1">결제하기</button></section>
+              <section class=warning-popup><p>추가 확인</p>
+              <button onclick="window.popupClicks+=1">확인</button></section></div>""",
+            "class-only-nested-extra": """<div class=payment-modal>
+              <h2>결제 전 확인해 주세요</h2>
+              <button onclick="window.popupClicks+=1">결제하기</button>
+              <section class=warning-popup><p>추가 확인</p>
+              <button onclick="window.popupClicks+=1">확인</button></section></div>""",
+        }
+        for name, popup in cases.items():
+            with self.subTest(name=name):
+                self._cap_checkout_waits(200)
+                transition_markup = (popup + self._voucher_markup()).replace("`", "\\`")
+                self._set_payment_content(
+                    """<button id=order onclick="window.orderClicks+=1;
+                      document.body.insertAdjacentHTML('beforeend',window.transitionMarkup)">
+                      30,000원 결제하기</button>""",
+                    f"window.transitionMarkup=`{transition_markup}`;",
+                )
+
+                with self.assertRaises(CheckoutError):
+                    self.flow.open_payment_and_apply_vouchers()
+
+                self.assertEqual(self.page.evaluate("() => window.popupClicks"), 0)
+                self._assert_no_final_submit()
+
+    def test_non_actionable_popup_elements_block_coexisting_voucher_ui(self):
+        cases = {
+            "hidden-button": """<div role=dialog><h2>결제 전 확인해 주세요</h2>
+              <button style="visibility:hidden" onclick="window.popupClicks+=1">결제하기</button></div>""",
+            "aria-disabled-button": """<div role=dialog><h2>결제 전 확인해 주세요</h2>
+              <button aria-disabled="true" onclick="window.popupClicks+=1">결제하기</button></div>""",
+            "aria-disabled-ancestor": """<div role=dialog><h2>결제 전 확인해 주세요</h2>
+              <div aria-disabled="true"><button onclick="window.popupClicks+=1">결제하기</button></div></div>""",
+            "disabled-fieldset": """<div role=dialog><h2>결제 전 확인해 주세요</h2>
+              <fieldset disabled><button onclick="window.popupClicks+=1">결제하기</button></fieldset></div>""",
+        }
+        for name, popup in cases.items():
+            with self.subTest(name=name):
+                self._cap_checkout_waits(200)
+                transition_markup = (popup + self._voucher_markup()).replace("`", "\\`")
+                self._set_payment_content(
+                    """<button id=order onclick="window.orderClicks+=1;
+                      document.body.insertAdjacentHTML('beforeend',window.transitionMarkup)">
+                      30,000원 결제하기</button>""",
+                    f"window.transitionMarkup=`{transition_markup}`;",
+                )
+
+                with self.assertRaises(CheckoutError):
+                    self.flow.open_payment_and_apply_vouchers()
+
+                self.assertEqual(self.page.evaluate("() => window.popupClicks"), 0)
+                self._assert_no_final_submit()
+
+    def test_popup_button_inherited_disabledness_is_revalidated_at_click_time(self):
+        vouchers = self._voucher_markup().replace("`", "\\`")
+        popup = """<div role=dialog><h2>결제 전 확인해 주세요</h2><div id=popup-guard>
+          <button onclick="window.popupClicks+=1">결제하기</button></div></div>"""
+        transition_markup = (popup + vouchers).replace("`", "\\`")
+        self._set_payment_content(
+            """<button id=order onclick="window.orderClicks+=1;
+              document.body.insertAdjacentHTML('beforeend',window.transitionMarkup)">
+              30,000원 결제하기</button>""",
+            f"window.transitionMarkup=`{transition_markup}`;",
+        )
+        self.flow.page = _MutatingAfterWaitPage(
+            self.page,
+            after_wait=2,
+            mutation="() => document.querySelector('#popup-guard').setAttribute('aria-disabled', 'true')",
+        )
+
+        with self.assertRaises(CheckoutError):
+            self.flow.open_payment_and_apply_vouchers()
+
+        self.assertEqual(self.page.evaluate("() => window.popupClicks"), 0)
+        self._assert_no_final_submit()
+
+    def test_hidden_popup_container_is_ignored_for_coexisting_voucher_ui(self):
+        self._cap_checkout_waits()
+        popup = """<div role=dialog style="visibility:hidden">
+          <h2>결제 전 확인해 주세요</h2>
+          <button onclick="window.popupClicks+=1">결제하기</button></div>"""
+        transition_markup = (popup + self._voucher_markup()).replace("`", "\\`")
+        self._set_payment_content(
+            """<button id=order onclick="window.orderClicks+=1;
+              document.body.insertAdjacentHTML('beforeend',window.transitionMarkup)">
+              30,000원 결제하기</button>""",
+            f"window.transitionMarkup=`{transition_markup}`;",
+        )
+
+        self.flow.open_payment_and_apply_vouchers()
 
         self.assertEqual(self.page.evaluate("() => window.popupClicks"), 0)
         self._assert_no_final_submit()

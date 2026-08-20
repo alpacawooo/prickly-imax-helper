@@ -541,9 +541,17 @@ class CheckoutFlow:
     def open_payment_and_apply_vouchers(self) -> None:
         order_button_ready = r"""() => {
           const compact = value => (value || '').replace(/\s+/g, ' ').trim();
-          const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+          const visible = element => {
+            if (!element?.isConnected) return false;
+            const style = window.getComputedStyle(element);
+            if (style.visibility === 'hidden' || style.visibility === 'collapse') return false;
+            const bounds = element.getBoundingClientRect();
+            return bounds.width > 0 && bounds.height > 0;
+          };
+          const actionable = element => visible(element) && !element.matches(':disabled') &&
+            !element.closest('[aria-disabled="true" i]');
           return [...document.querySelectorAll('button')]
-            .filter(element => visible(element) && !element.disabled &&
+            .filter(element => actionable(element) &&
               /원\s*결제하기$/.test(compact(element.textContent))).length === 1;
         }"""
         try:
@@ -553,9 +561,17 @@ class CheckoutFlow:
         clicked = self.page.evaluate(
             r"""() => {
               const compact = value => (value || '').replace(/\s+/g, ' ').trim();
-              const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+              const visible = element => {
+                if (!element?.isConnected) return false;
+                const style = window.getComputedStyle(element);
+                if (style.visibility === 'hidden' || style.visibility === 'collapse') return false;
+                const bounds = element.getBoundingClientRect();
+                return bounds.width > 0 && bounds.height > 0;
+              };
+              const actionable = element => visible(element) && !element.matches(':disabled') &&
+                !element.closest('[aria-disabled="true" i]');
               const buttons = [...document.querySelectorAll('button')]
-                .filter(element => visible(element) && !element.disabled &&
+                .filter(element => actionable(element) &&
                   /원\s*결제하기$/.test(compact(element.textContent)));
               if (buttons.length !== 1) return false;
               buttons[0].click();
@@ -566,22 +582,36 @@ class CheckoutFlow:
             raise CheckoutError("seat order button not available")
         payment_transition_ready = r"""() => {
           const compact = value => (value || '').replace(/\s+/g, ' ').trim();
-          const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
-          const modalSelector = '[role="dialog"],[role="alertdialog"],[aria-modal="true"],[class*="modal" i],[class*="popup" i]';
+          const visible = element => {
+            if (!element?.isConnected) return false;
+            const style = window.getComputedStyle(element);
+            if (style.visibility === 'hidden' || style.visibility === 'collapse') return false;
+            const bounds = element.getBoundingClientRect();
+            return bounds.width > 0 && bounds.height > 0;
+          };
+          const actionable = element => visible(element) && !element.matches(':disabled') &&
+            !element.closest('[aria-disabled="true" i]');
+          const semanticModalSelector = '[role="dialog"],[role="alertdialog"],[aria-modal="true"]';
+          const classModalSelector = '[class*="modal" i],[class*="popup" i]';
+          const modalSelector = semanticModalSelector + ',' + classModalSelector;
           const voucherReady = [...document.querySelectorAll('button')]
-            .some(element => visible(element) && !element.disabled && /관람권|기프트콘/.test(compact(element.textContent)));
+            .some(element => actionable(element) && /관람권|기프트콘/.test(compact(element.textContent)));
+          const semanticModals = [...document.querySelectorAll(semanticModalSelector)].filter(visible);
+          const modalMatches = [...document.querySelectorAll(modalSelector)].filter(visible);
           const titles = [...document.querySelectorAll('body *')].filter(element =>
             visible(element) && compact(element.textContent) === '결제 전 확인해 주세요' &&
             ![...element.children].some(child => visible(child) && compact(child.textContent) === '결제 전 확인해 주세요'));
-          if (!titles.length) return voucherReady;
-          const resolved = titles.map(title => title.closest(modalSelector));
-          if (resolved.some(container => !container)) return true;
-          const containers = [...new Set(resolved)].filter(visible);
-          if (containers.length !== 1) return true;
-          const buttons = [...containers[0].querySelectorAll('button')]
+          if (!modalMatches.length) return titles.length ? true : voucherReady;
+          if (titles.length !== 1) return true;
+          const titleContainers = modalMatches.filter(container => container.contains(titles[0]));
+          if (titleContainers.length !== modalMatches.length || semanticModals.length > 1) return true;
+          const modalContainers = titleContainers.filter(container =>
+            !titleContainers.some(other => other !== container && other.contains(container)));
+          if (modalContainers.length !== 1) return true;
+          const buttons = [...modalContainers[0].querySelectorAll('button')]
             .filter(element => visible(element) && compact(element.textContent) === '결제하기');
           if (buttons.length > 1) return true;
-          return buttons.length === 1 && !buttons[0].disabled;
+          return buttons.length === 1 && actionable(buttons[0]);
         }"""
         try:
             self.page.wait_for_function(payment_transition_ready, timeout=45_000)
@@ -591,22 +621,39 @@ class CheckoutFlow:
         popup_result = self.page.evaluate(
             r"""() => {
               const compact = value => (value || '').replace(/\s+/g, ' ').trim();
-              const visible = element => !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
-              const modalSelector = '[role="dialog"],[role="alertdialog"],[aria-modal="true"],[class*="modal" i],[class*="popup" i]';
+              const visible = element => {
+                if (!element?.isConnected) return false;
+                const style = window.getComputedStyle(element);
+                if (style.visibility === 'hidden' || style.visibility === 'collapse') return false;
+                const bounds = element.getBoundingClientRect();
+                return bounds.width > 0 && bounds.height > 0;
+              };
+              const actionable = element => visible(element) && !element.matches(':disabled') &&
+                !element.closest('[aria-disabled="true" i]');
+              const semanticModalSelector = '[role="dialog"],[role="alertdialog"],[aria-modal="true"]';
+              const classModalSelector = '[class*="modal" i],[class*="popup" i]';
+              const modalSelector = semanticModalSelector + ',' + classModalSelector;
               const voucherReady = [...document.querySelectorAll('button')]
-                .some(element => visible(element) && !element.disabled && /관람권|기프트콘/.test(compact(element.textContent)));
+                .some(element => actionable(element) && /관람권|기프트콘/.test(compact(element.textContent)));
+              const semanticModals = [...document.querySelectorAll(semanticModalSelector)].filter(visible);
+              const modalMatches = [...document.querySelectorAll(modalSelector)].filter(visible);
               const titles = [...document.querySelectorAll('body *')].filter(element =>
                 visible(element) && compact(element.textContent) === '결제 전 확인해 주세요' &&
                 ![...element.children].some(child => visible(child) && compact(child.textContent) === '결제 전 확인해 주세요'));
-              if (!titles.length) return voucherReady ? 'absent' : 'unsafe';
-              const resolved = titles.map(title => title.closest(modalSelector));
-              if (resolved.some(container => !container)) return 'unsafe';
-              const containers = [...new Set(resolved)].filter(visible);
-              if (containers.length !== 1) return 'unsafe';
-              const buttons = [...containers[0].querySelectorAll('button')]
+              if (!modalMatches.length) {
+                if (titles.length) return 'unsafe';
+                return voucherReady ? 'absent' : 'unsafe';
+              }
+              if (titles.length !== 1) return 'unsafe';
+              const titleContainers = modalMatches.filter(container => container.contains(titles[0]));
+              if (titleContainers.length !== modalMatches.length || semanticModals.length > 1) return 'unsafe';
+              const modalContainers = titleContainers.filter(container =>
+                !titleContainers.some(other => other !== container && other.contains(container)));
+              if (modalContainers.length !== 1) return 'unsafe';
+              const buttons = [...modalContainers[0].querySelectorAll('button')]
                 .filter(element => visible(element) && compact(element.textContent) === '결제하기');
-              if (buttons.length !== 1 || buttons[0].disabled || !buttons[0].isConnected) return 'unsafe';
-              const freshTitles = [...containers[0].querySelectorAll('*')].filter(element =>
+              if (buttons.length !== 1 || !actionable(buttons[0])) return 'unsafe';
+              const freshTitles = [...modalContainers[0].querySelectorAll('*')].filter(element =>
                 visible(element) && compact(element.textContent) === '결제 전 확인해 주세요' &&
                 ![...element.children].some(child => visible(child) && compact(child.textContent) === '결제 전 확인해 주세요'));
               if (freshTitles.length !== 1) return 'unsafe';
