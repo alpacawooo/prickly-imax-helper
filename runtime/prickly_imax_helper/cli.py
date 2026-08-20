@@ -74,7 +74,7 @@ def main(argv: list[str] | None = None) -> int:
 
         with locked_file(paths.state_dir / "service-control.lock"):
             if paths.maintenance_barrier.exists():
-                print("업데이트가 진행 중이므로 상주 감시를 시작하지 않았습니다.")
+                print(json.dumps({"ok": False, "error": "update in progress; run is blocked"}))
                 return 0
         try:
             return run(paths)

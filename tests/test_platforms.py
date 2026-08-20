@@ -44,7 +44,7 @@ class PlatformAdapterTests(unittest.TestCase):
     def test_macos_service_start_preserves_an_active_monitor(self):
         completed = subprocess.CompletedProcess([], 0, "", "")
         with mock.patch("prickly_imax_helper.service.platform.system", return_value="Darwin"), mock.patch(
-            "prickly_imax_helper.service.os.getuid", return_value=501
+            "prickly_imax_helper.service.os.getuid", return_value=501, create=True
         ), mock.patch("prickly_imax_helper.service.subprocess.run", return_value=completed) as run:
             self.assertIs(start_service(), completed)
         run.assert_called_once_with(

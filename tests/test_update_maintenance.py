@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import copy
+import io
+import json
 import os
 import shutil
 import subprocess
@@ -8,6 +10,7 @@ import sys
 import tempfile
 import time
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -226,8 +229,13 @@ class UpdateMaintenanceTests(unittest.TestCase):
             paths = RuntimePaths(Path(temp))
             token = begin_update(paths)
             with patch("prickly_imax_helper.monitor.run") as run:
-                self.assertEqual(cli_main(["--home", temp, "run"]), 0)
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    self.assertEqual(cli_main(["--home", temp, "run"]), 0)
             run.assert_not_called()
+            rendered = output.getvalue().strip()
+            self.assertTrue(rendered.isascii())
+            self.assertEqual(json.loads(rendered), {"ok": False, "error": "update in progress; run is blocked"})
             end_update(paths, token)
 
     def test_monitor_lock_is_reprobed_immediately_before_runtime_replacement(self):
