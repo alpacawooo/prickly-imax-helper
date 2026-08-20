@@ -468,7 +468,9 @@ class CheckoutBrowserTests(unittest.TestCase):
         self._assert_no_final_submit()
 
     def test_delayed_exact_popup_clicks_only_its_exact_payment_button(self):
-        self._cap_checkout_waits()
+        # Windows CI can take more than one second to deliver the timer and
+        # requestAnimationFrame callback even though the popup delay is 100 ms.
+        self._cap_checkout_waits(3_000)
         vouchers = self._voucher_markup().replace("`", "\\`")
         self._set_payment_content(
             """<button id=order onclick="window.delayedPopup()">
